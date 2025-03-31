@@ -1,15 +1,11 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* Define CSS variables for light and dark modes */
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,8 +15,32 @@
   }
 }
 
+/* Base styles */
+html,
 body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Add custom styles for elements not easily styled with Tailwind */
+textarea {
+  min-height: 100px;
+}
+
+/* Tutoring guide styles */
+.guide {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.step {
+  margin-bottom: 20px;
+}
+
+.step h3 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
 }
