@@ -164,6 +164,14 @@ export default function UploadPage() {
     }
   };
 
+  // End the tutoring session
+  const endSession = () => {
+    setQuiz(null);
+    setFeedback(null);
+    setAnswer(null);
+    // Future: Add parent notification flow here when implemented
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Upload Your Problem</h1>
@@ -265,7 +273,7 @@ export default function UploadPage() {
       )}
 
       {/* Quiz display */}
-      {quiz && (
+      {quiz && !feedback && (
         <div className="mt-4 p-4 bg-gray-50 rounded border">
           <h2 className="text-lg font-semibold">Quiz Problem</h2>
           <p>{quiz.problem}</p>
@@ -287,7 +295,7 @@ export default function UploadPage() {
           )}
           {quiz.answerFormat === "text" && (
             <textarea
-              value={answer as string}
+              value={answer as string || ""} // Default to empty string if answer is null
               onChange={(e) => setAnswer(e.target.value)}
               className="w-full p-2 border rounded mb-4"
               rows={4}
@@ -320,6 +328,22 @@ export default function UploadPage() {
             {feedback.isCorrect ? "Correct!" : "Incorrect"}
           </p>
           <div dangerouslySetInnerHTML={{ __html: feedback.commentary }} />
+          <div className="mt-4">
+            <button
+              onClick={fetchQuiz}
+              disabled={loading}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 mr-2"
+            >
+              {loading ? "Loading..." : "Continue with Another Quiz"}
+            </button>
+            <button
+              onClick={endSession}
+              disabled={loading}
+              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 disabled:bg-gray-400"
+            >
+              {loading ? "Loading..." : "End Session"}
+            </button>
+          </div>
         </div>
       )}
     </div>
