@@ -1,6 +1,14 @@
+// scripts/dbMigrations.js
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env.local") });
 const { createClient } = require("@supabase/supabase-js");
 const packageJson = require("../package.json");
+
+// Import individual migration scripts
+const migrationV1 = require("./migrations/migrationV1");
+const migrationV2 = require("./migrations/migrationV2");
+const migrationV3 = require("./migrations/migrationV3");
+const migrationV4 = require("./migrations/migrationV4");
+const migrationV5 = require("./migrations/migrationV5");
 
 // Validate environment variables
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -27,83 +35,46 @@ const APP_VERSION = packageJson.version;
 
 // Define the migrations with their required app versions
 const migrations = [
-  {
-    version: 1,
-    appVersion: "0.1.0",
-  },
-  {
-    version: 2,
-    appVersion: "0.2.0",
-    modifications: [
-      "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS completed BOOLEAN DEFAULT FALSE;",
-      "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;"
-    ]
-  },
-  {
-    version: 3,
-    appVersion: "0.3.0",
-    async apply(supabase) {
-      try {
-        const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-        if (listError) {
-          console.error("Failed to list buckets:", listError.message);
-          throw new Error(`Failed to list buckets: ${listError.message}`);
-        }
-
-        const bucketExists = buckets.some(bucket => bucket.name === "problems");
-        if (bucketExists) return;
-
-        const { data, error } = await supabase.storage.createBucket("problems", {
-          public: true,
-        });
-
-        if (error) {
-          console.error("Failed to create bucket 'problems':", error.message);
-          throw new Error(`Failed to create bucket 'problems': ${error.message}`);
-        }
-      } catch (err) {
-        console.error("Error creating bucket 'problems':", err);
-        throw err;
-      }
-    }
-  },
-  {
-    version: 4,
-    appVersion: "0.3.0",
-    modifications: [
-      "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
-      "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP;"
-    ]
-  },
+  migrationV1,
+  migrationV2,
+  migrationV3,
+  migrationV4,
+  migrationV5,
 ];
 
-// Execute SQL via the execute-sql Edge Function
-async function executeSql(sqlText) {
-  try {
-    const { data, error } = await supabase.functions.invoke("execute-sql", {
-      method: "POST",
-      body: { sql_text: sqlText },
-    });
+// Execute SQL via the execute-sql Edge Function with retry logic
+async function executeSql(sqlText, retries = 3, delay = 1000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const { data, error } = await supabase.functions.invoke("execute-sql", {
+        method: "POST",
+        body: { sql_text: sqlText },
+      });
 
-    if (error) {
-      console.error("Edge Function invocation error:", error);
-      throw new Error(`Failed to invoke Edge Function: ${error.message}`);
+      if (error) {
+        console.error(`Edge Function invocation error (attempt ${attempt}/${retries}):`, error);
+        throw new Error(`Failed to invoke Edge Function: ${error.message}`);
+      }
+
+      if (data.error) {
+        console.error(`SQL execution error from Edge Function (attempt ${attempt}/${retries}):`, data.error);
+        throw new Error(`SQL execution failed: ${data.error}`);
+      }
+
+      if (!data.success) {
+        console.error(`SQL execution failed (attempt ${attempt}/${retries}):`, JSON.stringify(data, null, 2));
+        throw new Error("SQL execution failed without error message");
+      }
+
+      return data;
+    } catch (error) {
+      if (attempt === retries) {
+        console.error("Error executing SQL after all retries:", error);
+        throw error;
+      }
+      console.warn(`Retrying SQL execution (${attempt}/${retries}) due to error: ${error.message}`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-
-    if (data.error) {
-      console.error("SQL execution error from Edge Function:", data.error);
-      throw new Error(`SQL execution failed: ${data.error}`);
-    }
-
-    if (!data.success) {
-      console.error("SQL execution failed:", JSON.stringify(data, null, 2));
-      throw new Error("SQL execution failed without error message");
-    }
-
-    return data;
-  } catch (error) {
-    console.error("Error executing SQL:", error);
-    throw error;
   }
 }
 

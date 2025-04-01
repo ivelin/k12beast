@@ -1,157 +1,64 @@
+// src/app/upload/QuizSection.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import useAppStore from "../../store";
 
-interface QuizSectionProps {
-  sessionId: string | null;
-  problem: string;
-  images: File[];
-  imageUrls: string[];
-  setQuiz: (value: any) => void;
-  setStep: (value: string) => void;
-  setError: (value: string | null) => void;
-  quiz: any;
-  step: string;
-  shareableLink: string | null;
-  handleEndSession: () => void;
-  error: string | null;
-}
+export default function QuizSection() {
+  const {
+    step,
+    sessionId,
+    quiz,
+    setStep,
+    setError,
+    handleQuizSubmit,
+    handleValidate,
+    handleEndSession,
+  } = useAppStore();
 
-export default function QuizSection({
-  sessionId,
-  problem,
-  images,
-  imageUrls,
-  setQuiz,
-  setStep,
-  setError,
-  quiz,
-  step,
-  shareableLink,
-  handleEndSession,
-  error,
-}: QuizSectionProps) {
-  const [answer, setAnswer] = useState("");
-  const [isCorrect, setIsCorrect] = useState(null);
-  const [commentary, setCommentary] = useState("");
-  const [solution, setSolution] = useState(null);
-  const [feedback, setFeedback] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const answer = useAppStore((state) => state.quizAnswer);
+  const setAnswer = (value: string) => useAppStore.setState({ quizAnswer: value });
+  const isCorrect = useAppStore((state) => state.quizIsCorrect);
+  const setIsCorrect = (value: boolean | null) => useAppStore.setState({ quizIsCorrect: value });
+  const commentary = useAppStore((state) => state.quizCommentary);
+  const setCommentary = (value: string) => useAppStore.setState({ quizCommentary: value });
+  const solution = useAppStore((state) => state.quizSolution);
+  const setSolution = (value: any) => useAppStore.setState({ quizSolution: value });
+  const feedback = useAppStore((state) => state.quizFeedback);
+  const setFeedback = (value: any) => useAppStore.setState({ quizFeedback: value });
 
-  // Automatically fetch quiz when step is "quizzes" and quiz is null
   useEffect(() => {
-    if (step === "quizzes" && !quiz && !loading) {
-      console.log("useEffect triggering handleQuizSubmit on mount");
+    if (step === "quizzes" && !quiz) {
       handleQuizSubmit();
     }
-  }, [step, quiz, loading]);
+  }, [step, quiz, handleQuizSubmit]);
 
-  const handleQuizSubmit = async () => {
-    console.log("handleQuizSubmit called with:", { sessionId, problem, imageUrls });
-    try {
-      if (!problem && images.length === 0) {
-        throw new Error("Please enter a problem or upload an image before requesting a quiz.");
-      }
-
-      setLoading(true);
-      console.log("Fetching quiz from /api/quiz...");
-      const response = await fetch("/api/quiz", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": sessionId || "",
-        },
-        body: JSON.stringify({ problem, images: imageUrls }),
-      });
-
-      console.log("Quiz API response status:", response.status);
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch quiz");
-      }
-
-      console.log("Quiz data received:", data);
-      setQuiz(data);
-      setAnswer("");
-      setIsCorrect(null);
-      setCommentary("");
-      setSolution(null);
-      setFeedback(null);
-      // Step is already "quizzes", no need to set it again
-    } catch (err) {
-      console.error("Error in handleQuizSubmit:", err);
-      setError(err.message || "Failed to fetch quiz. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleValidate = async () => {
-    console.log("handleValidate called with answer:", answer);
-    try {
-      if (!answer) {
-        throw new Error("Please select an option before validating.");
-      }
-
-      setLoading(true);
-      const response = await fetch("/api/validate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": sessionId || "",
-        },
-        body: JSON.stringify({
-          sessionId,
-          problem: quiz.problem,
-          answer,
-          isCorrect: answer === quiz.correctAnswer,
-          commentary: answer === quiz.correctAnswer
-            ? "<p>Great job! You got it right!</p>"
-            : `<p>Not quite. The correct answer is ${quiz.correctAnswer}.</p>`,
-        }),
-      });
-
-      console.log("Validate API response status:", response.status);
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to validate quiz");
-      }
-
-      console.log("Validation data received:", data);
-      setIsCorrect(data.isCorrect);
-      setCommentary(data.commentary);
-      setSolution(data.solution);
-      setFeedback({ isCorrect: data.isCorrect, commentary: data.commentary });
-      setStep("end");
-    } catch (err) {
-      console.error("Error in handleValidate:", err);
-      setError(err.message || "Failed to validate quiz. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+  const handleNewQuiz = async () => {
+    setStep("quizzes"); // Ensure step is set to "quizzes" to trigger useEffect
+    await handleQuizSubmit();
   };
 
   return (
     <div>
       {step === "quizzes" && !quiz && (
         <div>
-          <p style={{ color: "blue" }}>Loading quiz... Please wait.</p>
+          <p className="text-blue-500">Loading quiz... Please wait.</p>
         </div>
       )}
       {step === "quizzes" && quiz && (
         <div>
-          <h2>Step 2: Answer the Quiz</h2>
-          {loading && <p style={{ color: "blue" }}>Loading... Please wait.</p>}
-          {error && <div style={{ color: "red" }}>{error}</div>}
+          <h2 className="text-xl mb-2">Step 2: Answer the Quiz</h2>
+          {useAppStore.getState().loading && <p className="text-blue-500">Loading... Please wait.</p>}
+          {useAppStore.getState().error && <div className="text-red-500">{useAppStore.getState().error}</div>}
           <p>Session ID: {sessionId}</p>
           <p>Problem: {quiz.problem}</p>
           {quiz.encouragement && (
-            <p style={{ color: "green", fontStyle: "italic" }}>{quiz.encouragement}</p>
+            <p className="text-green-500 italic">{quiz.encouragement}</p>
           )}
           {quiz.answerFormat === "multiple-choice" && quiz.options && (
             <div>
-              {quiz.options.map((option, index) => (
-                <div key={index} style={{ margin: "10px 0" }}>
+              {quiz.options.map((option: string, index: number) => (
+                <div key={index} className="my-2">
                   <input
                     type="radio"
                     id={`option-${index}`}
@@ -159,15 +66,12 @@ export default function QuizSection({
                     value={option}
                     checked={answer === option}
                     onChange={(e) => setAnswer(e.target.value)}
-                    style={{ marginRight: "5px" }}
-                    disabled={loading}
+                    className="mr-2"
+                    disabled={useAppStore.getState().loading}
                   />
                   <label
                     htmlFor={`option-${index}`}
-                    style={{
-                      color: answer === option ? "blue" : "inherit",
-                      fontWeight: answer === option ? "bold" : "normal",
-                    }}
+                    className={answer === option ? "text-blue-500 font-bold" : ""}
                   >
                     {option}
                   </label>
@@ -175,25 +79,29 @@ export default function QuizSection({
               ))}
             </div>
           )}
-          <button onClick={handleValidate} disabled={!answer || loading}>
+          <button
+            onClick={() => handleValidate(answer, quiz)}
+            disabled={!answer || useAppStore.getState().loading}
+            className="mt-2 p-2 bg-blue-500 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+          >
             Submit Answer
           </button>
         </div>
       )}
-      {step === "end" && !shareableLink && feedback && (
+      {step === "end" && !useAppStore.getState().shareableLink && feedback && (
         <div>
-          <h2>Step 3: Review Your Result</h2>
-          {loading && <p style={{ color: "blue" }}>Loading... Please wait.</p>}
-          {error && <div style={{ color: "red" }}>{error}</div>}
+          <h2 className="text-xl mb-2">Step 3: Review Your Result</h2>
+          {useAppStore.getState().loading && <p className="text-blue-500">Loading... Please wait.</p>}
+          {useAppStore.getState().error && <div className="text-red-500">{useAppStore.getState().error}</div>}
           <p>Session ID: {sessionId}</p>
           <p>Problem: {quiz.problem}</p>
           <p>Answer: {answer}</p>
           <p>Result: {feedback.isCorrect ? "Correct" : "Incorrect"}</p>
           <div dangerouslySetInnerHTML={{ __html: feedback.commentary }} />
           {solution && (
-            <div style={{ border: "1px solid #ccc", padding: "10px", marginTop: "10px", backgroundColor: "#f9f9f9" }}>
-              <h3>Solution</h3>
-              {solution.map((step, index) => (
+            <div className="border border-gray-300 p-2 mt-2 bg-gray-50 rounded">
+              <h3 className="text-lg">Solution</h3>
+              {solution.map((step: any, index: number) => (
                 <div key={index}>
                   <h4>{step.title}</h4>
                   <div dangerouslySetInnerHTML={{ __html: step.content }} />
@@ -201,10 +109,18 @@ export default function QuizSection({
               ))}
             </div>
           )}
-          <button onClick={handleQuizSubmit} disabled={loading}>
+          <button
+            onClick={handleNewQuiz}
+            disabled={useAppStore.getState().loading}
+            className="mt-2 p-2 bg-blue-500 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+          >
             Take Another Quiz
           </button>
-          <button onClick={handleEndSession} disabled={loading}>
+          <button
+            onClick={handleEndSession}
+            disabled={useAppStore.getState().loading}
+            className="mt-2 p-2 bg-red-500 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
+          >
             End Session
           </button>
         </div>

@@ -1,3 +1,4 @@
+/* src/app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -43,4 +44,66 @@ textarea {
 .step h3 {
   font-size: 1.2rem;
   margin-bottom: 10px;
+}
+
+/* Fade transition styles */
+.fade {
+  animation: fadeIn 300ms ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: none; /* Simplify for mobile */
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  h1 {
+    font-size: 1.5rem; /* Smaller heading on mobile */
+  }
+  h2 {
+    font-size: 1.25rem;
+  }
+  h3 {
+    font-size: 1rem;
+  }
+  button {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    min-height: 48px; /* Touch-friendly size */
+    width: 100%; /* Full-width buttons on mobile */
+  }
+  textarea {
+    font-size: 0.875rem;
+  }
+  img {
+    max-width: 150px; /* Smaller images on mobile */
+  }
+}
+
+@media (min-width: 769px) {
+  button {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    width: auto; /* Buttons auto-size on desktop */
+  }
+  img {
+    max-width: 200px;
+  }
 }

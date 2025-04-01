@@ -1,23 +1,30 @@
+// src/app/upload/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProblemSubmission from "./ProblemSubmission";
 import QuizSection from "./QuizSection";
 import SessionEnd from "./SessionEnd";
+import useAppStore from "../../store";
 
 export default function UploadPage() {
   const router = useRouter();
-  const [sessionId, setSessionId] = useState(null);
-  const [problem, setProblem] = useState("");
-  const [images, setImages] = useState<File[]>([]);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [error, setError] = useState(null);
-  const [step, setStep] = useState("problem");
-  const [lesson, setLesson] = useState(null);
-  const [examples, setExamples] = useState(null);
-  const [quiz, setQuiz] = useState(null);
-  const [shareableLink, setShareableLink] = useState(null);
+  const {
+    step,
+    sessionId,
+    problem,
+    imageUrls,
+    lesson,
+    examples,
+    setSessionId,
+    setStep,
+    setLoading,
+    setError,
+    handleExamplesRequest,
+  } = useAppStore();
+
+  const [fadeKey, setFadeKey] = useState(step); // Track step for fade animation
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -26,55 +33,90 @@ export default function UploadPage() {
       setSessionId(sessionIdFromUrl);
       setStep("quizzes");
     }
-  }, []);
+  }, [setSessionId, setStep]);
 
   useEffect(() => {
-    console.log("Current step:", step);
+    // Trigger fade animation when step changes
+    setFadeKey(step);
   }, [step]);
 
-  const handleEndSession = async () => {
-    try {
-      const response = await fetch("/api/end-session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": sessionId || "",
-        },
-        body: JSON.stringify({ sessionId }),
-      });
+  const steps = ["problem", "examples", "quizzes", "end"];
+  const progress = ((steps.indexOf(step) + 1) / steps.length) * 100;
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to end session");
-      }
-
-      setShareableLink(data.shareableLink);
-    } catch (err) {
-      console.error("Error ending session:", err);
-      setError("Failed to end session. Please try again.");
+  const renderStep = () => {
+    switch (step) {
+      case "problem":
+        return <ProblemSubmission />;
+      case "examples":
+        return (
+          <div>
+            {lesson && (
+              <div>
+                <h2 className="text-xl mb-2">Your Tutor Lesson</h2>
+                <div dangerouslySetInnerHTML={{ __html: lesson }} />
+              </div>
+            )}
+            {examples && (
+              <div className="mt-4">
+                <h2 className="text-xl mb-2">Example Problem</h2>
+                <p>{examples.problem}</p>
+                {examples.solution.map((step: any, index: number) => (
+                  <div key={index} className="step">
+                    <h3>{step.title}</h3>
+                    <div dangerouslySetInnerHTML={{ __html: step.content }} />
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={handleExamplesRequest}
+              disabled={useAppStore.getState().loading}
+              className="mt-4 p-2 bg-blue-500 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+            >
+              {examples ? "Another Example" : "Show Me an Example"}
+            </button>
+            <button
+              onClick={() => setStep("quizzes")}
+              disabled={useAppStore.getState().loading}
+              className="mt-2 p-2 bg-green-500 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
+            >
+              Ready for a Quiz
+            </button>
+          </div>
+        );
+      case "quizzes":
+      case "end":
+        return <QuizSection />;
+      default:
+        return null;
     }
   };
 
   return (
-    <div>
-      <h1>Tutoring Session</h1>
-      {error && <div style={{ color: "red" }}>{error}</div>}
+    <div className="max-w-full p-5 mx-auto text-center md:max-w-4xl">
+      <h1 className="text-2xl mb-4 md:text-4xl">Tutoring Session</h1>
+      <div className="w-full h-2 bg-gray-200 rounded mb-4">
+        <div className="h-full bg-blue-500 rounded" style={{ width: `${progress}%` }} />
+      </div>
+      {useAppStore.getState().error && (
+        <div className="text-red-500 mb-4">{useAppStore.getState().error}</div>
+      )}
       {(step === "problem" || step === "end") && (problem || imageUrls.length > 0) && (
-        <div style={{ border: "1px solid #ccc", padding: "10px", marginBottom: "20px", backgroundColor: "#f0f0f0" }}>
-          <h3>Original Problem</h3>
+        <div className="border border-gray-300 p-4 mb-5 bg-gray-100 rounded">
+          <h3 className="text-lg mb-2">Original Problem</h3>
           {problem && (
             <div>
               <p><strong>Text:</strong></p>
-              <p style={{ backgroundColor: "#e0e0e0", padding: "5px", borderRadius: "3px" }}>{problem}</p>
+              <p className="bg-gray-200 p-2 rounded">{problem}</p>
             </div>
           )}
           {imageUrls.length > 0 && (
             <div>
-              <p><strong>Images:</strong></p>
-              <ul>
+              <p className="mt-2"><strong>Images:</strong></p>
+              <ul className="flex flex-wrap gap-2">
                 {imageUrls.map((url, index) => (
                   <li key={index}>
-                    <img src={url} alt={`Uploaded image ${index + 1}`} style={{ maxWidth: "200px", margin: "5px" }} />
+                    <img src={url} alt={`Uploaded image ${index + 1}`} className="max-w-[200px] m-1" />
                   </li>
                 ))}
               </ul>
@@ -82,68 +124,10 @@ export default function UploadPage() {
           )}
         </div>
       )}
-      {step === "problem" && (
-        <ProblemSubmission
-          problem={problem}
-          setProblem={setProblem}
-          images={images}
-          setImages={setImages}
-          imageUrls={imageUrls}
-          setImageUrls={setImageUrls}
-          lesson={lesson}
-          setLesson={setLesson}
-          examples={examples}
-          setExamples={setExamples}
-          sessionId={sessionId}
-          setSessionId={setSessionId}
-          setError={setError}
-          setStep={setStep}
-        />
-      )}
-      {step === "examples" && (
-        <div>
-          {lesson && (
-            <div>
-              <h2>Your Tutor Lesson</h2>
-              <div dangerouslySetInnerHTML={{ __html: lesson }} />
-            </div>
-          )}
-          {examples && (
-            <div>
-              <h2>Example Problem</h2>
-              <p>{examples.problem}</p>
-              {examples.solution.map((step, index) => (
-                <div key={index}>
-                  <h3>{step.title}</h3>
-                  <div dangerouslySetInnerHTML={{ __html: step.content }} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      {(step === "quizzes" || step === "end") && (
-        <QuizSection
-          sessionId={sessionId}
-          problem={problem}
-          images={images}
-          imageUrls={imageUrls}
-          setQuiz={setQuiz}
-          setStep={setStep}
-          setError={setError}
-          quiz={quiz}
-          step={step}
-          shareableLink={shareableLink}
-          handleEndSession={handleEndSession}
-          error={error}
-        />
-      )}
-      <SessionEnd
-        sessionId={sessionId}
-        setShareableLink={setShareableLink}
-        setError={setError}
-        shareableLink={shareableLink}
-      />
+      <div key={fadeKey} className="fade">
+        {renderStep()}
+        <SessionEnd />
+      </div>
     </div>
   );
 }

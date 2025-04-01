@@ -1,15 +1,17 @@
+// src/app/session/[sessionId]/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 
-export default function SessionPage({ params }: { params: { sessionId: string } }) {
+export default function SessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const [session, setSession] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const response = await fetch(`/api/session/${params.sessionId}`);
+        const { sessionId } = await params; // Await params to access sessionId
+        const response = await fetch(`/api/session/${sessionId}`);
         if (!response.ok) {
           throw new Error(`Failed to fetch session: ${response.status} ${response.statusText}`);
         }
@@ -31,7 +33,7 @@ export default function SessionPage({ params }: { params: { sessionId: string } 
     };
 
     fetchSession();
-  }, [params.sessionId]);
+  }, [params]);
 
   if (error) {
     return <div>{error}</div>;
