@@ -6,7 +6,8 @@
     "dev": "node scripts/migrate.js && next dev",
     "build": "next build",
     "start": "node scripts/migrate.js && next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "echo 'Please set up your environment variables in .env.local. See README.md for instructions.'"    
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
