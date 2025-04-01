@@ -2,44 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendXAIRequest, handleXAIError } from "../../../utils/xai";
 import supabase from "../../../supabase/serverClient";
 
-const responseFormat = `Return a JSON object with the problem and a solution array. Structure: {"problem": "problem text", "solution": [{"title": "Step 1", "content": "<p>Step content...</p>"}, ...]}.`;
+const responseFormat = `Return a JSON object with a new example problem and its solution, related to the same topic as the original input problem or image (e.g., if the input is about heat transfer, the example must also be about heat transfer). Structure: {"problem": "Example problem text", "solution": [{"title": "Step 1", "content": "<p>Step content...</p>"}, ...]}. Do not repeat problems from the session history or the original input problem. Do not reference images in the response unless explicitly provided in the current request.`;
 
 const defaultResponse = {
-  problem: "Example Problem",
-  solution: [
-    {
-      title: "Step 1",
-      content: "",
-    },
-  ],
+  problem: "",
+  solution: [],
 };
 
 export async function POST(req: NextRequest) {
   try {
     const { problem, images } = await req.json();
-
-    // Retrieve the session to get the inferred age, grade, skill level, and performance history
     const sessionId = req.headers.get("x-session-id") || null;
-    let inferredAge = "unknown";
-    let inferredGrade = "unknown";
-    let inferredSkillLevel = "beginner";
-    let performanceHistory: { isCorrect: boolean }[] = [];
 
+    console.log("Examples request body:", { problem, images });
+    console.log("Examples session ID from header:", sessionId);
+
+    let sessionHistory = null;
     if (sessionId) {
-      const { data: session, error } = await supabase
+      const { data, error } = await supabase
         .from("sessions")
-        .select("inferredAge, inferredGrade, inferredSkillLevel, performanceHistory")
+        .select("*")
         .eq("id", sessionId)
         .single();
 
       if (error) {
-        console.error("Error fetching session:", error.message);
-      } else if (session) {
-        inferredAge = session.inferredAge || inferredAge;
-        inferredGrade = session.inferredGrade || inferredGrade;
-        inferredSkillLevel = session.inferredSkillLevel || inferredSkillLevel;
-        performanceHistory = session.performanceHistory || performanceHistory;
+        console.error("Error fetching session from Supabase:", error.message);
+      } else if (data) {
+        sessionHistory = data;
+        console.log("Fetched session history:", sessionHistory);
+      } else {
+        console.warn("No session found for ID:", sessionId);
       }
+    } else {
+      console.warn("No sessionId provided in request headers");
     }
 
     const content = await sendXAIRequest({
@@ -47,13 +42,29 @@ export async function POST(req: NextRequest) {
       images,
       responseFormat,
       defaultResponse,
-      validateK12: false, // Disable K12 validation since the prompt was already validated
       maxTokens: 1000,
-      inferredAge,
-      inferredGrade,
-      inferredSkillLevel,
-      performanceHistory,
+      sessionHistory,
     });
+
+    if (sessionId) {
+      const updatedExamples = [
+        ...(sessionHistory?.examples || []),
+        { problem: content.problem, solution: content.solution },
+      ];
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          examples: updatedExamples,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId);
+
+      if (error) {
+        console.error("Error updating session with examples:", error.message);
+      } else {
+        console.log("Session updated with new example:", content.problem);
+      }
+    }
 
     return NextResponse.json(content, { status: 200 });
   } catch (err) {

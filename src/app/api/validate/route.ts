@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import supabase from "../../../supabase/serverClient"; // Server-side client with service role key
+import supabase from "../../../supabase/serverClient";
 
 export async function POST(req: NextRequest) {
   try {

@@ -1,51 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendXAIRequest, handleXAIError } from "../../../utils/xai";
 import supabase from "../../../supabase/serverClient";
+import { v4 as uuidv4 } from "uuid";
 
-const responseFormat = `If the prompt is K12-related, return a JSON object with the inferred age, grade, skill level, and the tutoring lesson. Structure: {"isK12": true, "age": "inferred age", "grade": "inferred grade", "skillLevel": "beginner|intermediate|advanced", "lesson": "<p>Lesson content...</p>"}. If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}.`;
+const responseFormat = `Return a JSON object with the tutoring lesson based on the provided session history and original input problem or image. Structure: {"isK12": true, "lesson": "<p>Lesson content...</p>"}. If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}.`;
 
 const defaultResponse = {
   isK12: true,
-  age: "unknown",
-  grade: "unknown",
-  skillLevel: "unknown",
   lesson: "",
 };
 
 export async function POST(req: NextRequest) {
   try {
     const { problem, images } = await req.json();
+    let sessionId = req.headers.get("x-session-id");
+
+    console.log("Tutor request body:", { problem, images });
+    console.log("Tutor session ID from header:", sessionId);
+
+    // Fetch or create session
+    let sessionHistory = null;
+    if (sessionId) {
+      const { data, error } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("id", sessionId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching session from Supabase:", error.message);
+      } else if (data) {
+        sessionHistory = data;
+        console.log("Fetched session history:", sessionHistory);
+      } else {
+        console.warn("No session found for ID:", sessionId);
+      }
+    }
+
+    if (!sessionId || !sessionHistory) {
+      sessionId = uuidv4();
+      const { data, error } = await supabase
+        .from("sessions")
+        .insert({ id: sessionId, created_at: new Date().toISOString() })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating session:", error.message);
+        return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
+      }
+      sessionHistory = data;
+      console.log("Created new session:", sessionId);
+    }
 
     const content = await sendXAIRequest({
       problem,
       images,
       responseFormat,
       defaultResponse,
-      validateK12: true, // Enable K12 validation for the initial prompt
+      validateK12: true,
       maxTokens: 1000,
+      sessionHistory,
     });
 
-    // Generate a session ID (we'll use this later in /api/quiz)
-    const sessionId = req.headers.get("x-session-id") || null;
-    if (sessionId) {
-      // Update the session with the inferred age, grade, and skill level
-      const { error } = await supabase
+    if (content.isK12) {
+      const { data, error } = await supabase
         .from("sessions")
         .update({
-          inferredAge: content.age,
-          inferredGrade: content.grade,
-          inferredSkillLevel: content.skillLevel,
+          lesson: content.lesson,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", sessionId);
+        .eq("id", sessionId)
+        .select()
+        .single();
 
       if (error) {
-        console.error("Error updating session with inferred data:", error.message);
+        console.error("Error updating session with lesson:", error.message);
+      } else {
+        console.log("Session updated with lesson for ID:", sessionId, "Updated data:", data);
       }
     }
 
-    return NextResponse.json(content, { status: 200 });
+    return NextResponse.json(content, {
+      status: 200,
+      headers: { "x-session-id": sessionId },
+    });
   } catch (err) {
+    console.error("Unexpected error in tutor route:", err);
     return handleXAIError(err);
   }
 }

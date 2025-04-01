@@ -9,9 +9,6 @@ const openai = new OpenAI({
 interface XAIResponse {
   isK12?: boolean;
   error?: string;
-  age?: string;
-  grade?: string;
-  skillLevel?: string;
   lesson?: string;
   problem?: string;
   solution?: { title: string; content: string }[];
@@ -26,10 +23,7 @@ interface XAIRequestOptions {
   responseFormat: string;
   defaultResponse: XAIResponse;
   maxTokens?: number;
-  inferredAge?: string;
-  inferredGrade?: string;
-  inferredSkillLevel?: string;
-  performanceHistory?: { isCorrect: boolean }[];
+  sessionHistory?: any;
   validateK12?: boolean;
 }
 
@@ -60,7 +54,7 @@ export function handleXAIError(error: any) {
 
 /**
  * Sends a request to the xAI API to validate if the prompt is K12-related (if enabled) and provide the requested content.
- * @param options - The request options including problem, images, response format, default response, max tokens, and student context.
+ * @param options - The request options including problem, images, response format, default response, max tokens, and session history.
  * @returns The parsed xAI API response as a JSON object.
  * @throws Error if the prompt is not K12-related (when validation is enabled) or if the request fails.
  */
@@ -71,39 +65,27 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     responseFormat,
     defaultResponse,
     maxTokens = 1000,
-    inferredAge = "unknown",
-    inferredGrade = "unknown",
-    inferredSkillLevel = "beginner",
-    performanceHistory = [],
+    sessionHistory = null,
     validateK12 = false,
   } = options;
 
-  // Validate inputs
   validateRequestInputs(problem, images);
 
-  // Calculate the student's performance trend based on history
-  const correctAnswers = performanceHistory.filter((entry) => entry.isCorrect).length;
-  const totalAttempts = performanceHistory.length;
-  const successRate = totalAttempts > 0 ? correctAnswers / totalAttempts : 0;
-  const performanceTrend =
-    totalAttempts === 0
-      ? "No performance history available."
-      : successRate >= 0.75
-      ? "The student is performing well, answering most questions correctly."
-      : successRate >= 0.5
-      ? "The student is performing moderately, with some correct and incorrect answers."
-      : "The student is struggling, answering most questions incorrectly.";
+  const sessionContext = sessionHistory
+    ? `Session History: ${JSON.stringify(sessionHistory, null, 2)}`
+    : "No session history available.";
 
-  // Construct the prompt for the xAI API
-  const prompt = `You are a highly professional K12 tutor. Your role is to assist students with educational queries related to K12 subjects. Based on the following input, infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) as needed, and provide the requested content. For examples and quizzes, adjust the difficulty based on the student's skill level (${inferredSkillLevel}) and performance trend: ${performanceTrend}. If the student is struggling, provide simpler content with more detailed explanations or more obvious correct answers. If the student is performing well, provide more challenging content within the same grade level (${inferredGrade}).
+  const prompt = `You are a highly professional K12 tutor. Your role is to assist students with educational queries related to K12 subjects. Use the provided session history to understand the student's progress, including past lessons, examples, quiz results, and performance trends. Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the session context. Adapt your response based on this history—e.g., avoid repeating examples or quiz problems already given (check the 'examples' and 'quizzes' arrays in the session history), and adjust difficulty based on performance trends (simpler content for struggling students, more challenging for those excelling).
 
-Input: "${problem || 'No text provided'}"
+Original Input Problem (if provided): "${problem || 'No text provided'}"
+
+${sessionContext}
 
 ${responseFormat}
 
 Ensure the response is valid JSON without any additional text, whitespace, or formatting outside the JSON object. Do not wrap the JSON in code blocks (e.g., do not use triple backticks with json). Return only the JSON object.`;
 
-  const systemMessage = "You are a K12 tutor. Validate inputs and respond only to valid K12 queries. Always return valid JSON without extra formatting or code blocks.";
+  const systemMessage = "You are a K12 tutor. Validate inputs and respond only to valid K12 queries using the session history for context. Always return valid JSON without extra formatting or code blocks.";
 
   const messages: any[] = [
     {
@@ -116,7 +98,6 @@ Ensure the response is valid JSON without any additional text, whitespace, or fo
     },
   ];
 
-  // Add images as a separate message entry if provided
   if (images && images.length > 0) {
     messages.push({
       role: "user",
@@ -126,6 +107,13 @@ Ensure the response is valid JSON without any additional text, whitespace, or fo
       })),
     });
   }
+
+  // Log the full request payload
+  console.log("Full xAI API request:", JSON.stringify({
+    model: process.env.XAI_MODEL_NAME || "grok-2-vision-1212",
+    messages,
+    max_tokens: maxTokens,
+  }, null, 2));
 
   const response = await openai.chat.completions.create({
     model: process.env.XAI_MODEL_NAME || "grok-2-vision-1212",

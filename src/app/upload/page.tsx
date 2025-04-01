@@ -15,44 +15,39 @@ export default function UploadPage() {
   const [commentary, setCommentary] = useState("");
   const [shareableLink, setShareableLink] = useState(null);
   const [error, setError] = useState(null);
-  const [step, setStep] = useState("problem"); // Track the current step: "problem", "validate", "end"
+  const [step, setStep] = useState("problem");
   const [lesson, setLesson] = useState(null);
   const [examples, setExamples] = useState(null);
   const [quiz, setQuiz] = useState(null);
   const [feedback, setFeedback] = useState(null);
 
-  // Check for an existing session to resume
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const sessionIdFromUrl = urlParams.get("sessionId");
     if (sessionIdFromUrl) {
       setSessionId(sessionIdFromUrl);
-      setStep("validate"); // Resume at the validation step
+      setStep("validate");
     }
   }, []);
 
-  // Handle image uploads using react-dropzone
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     try {
-      const newImages = acceptedFiles.filter((file) => file.size <= 5 * 1024 * 1024); // Client-side check for 5MB per file
+      const newImages = acceptedFiles.filter((file) => file.size <= 5 * 1024 * 1024);
       if (newImages.length !== acceptedFiles.length) {
         setError("Some files were rejected because they exceed the 5MB limit.");
         return;
       }
 
-      // Client-side check for total number of files
       if (images.length + newImages.length > 5) {
         setError("You can only upload a maximum of 5 images.");
         return;
       }
 
-      // Prepare form data for the API request
       const formData = new FormData();
       newImages.forEach((file) => {
         formData.append("files", file);
       });
 
-      // Send images to the server-side API route for upload
       const response = await fetch("/api/upload-image", {
         method: "POST",
         body: formData,
@@ -87,7 +82,7 @@ export default function UploadPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-session-id": sessionId || "", // Pass the session ID if available
+          "x-session-id": sessionId || "",
         },
         body: JSON.stringify({ problem, images: imageUrls }),
       });
@@ -97,10 +92,10 @@ export default function UploadPage() {
         throw new Error(data.error || "Failed to fetch tutor lesson");
       }
 
-      // Update the session ID from the response headers
       const newSessionId = response.headers.get("x-session-id");
       if (newSessionId) {
         setSessionId(newSessionId);
+        console.log("Set session ID from tutor response:", newSessionId);
       }
 
       setLesson(data.lesson);
@@ -120,7 +115,7 @@ export default function UploadPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-session-id": sessionId || "", // Pass the session ID
+          "x-session-id": sessionId || "",
         },
         body: JSON.stringify({ problem, images: imageUrls }),
       });
@@ -147,7 +142,7 @@ export default function UploadPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-session-id": sessionId || "", // Pass the session ID
+          "x-session-id": sessionId || "",
         },
         body: JSON.stringify({ problem, images: imageUrls }),
       });
@@ -157,7 +152,6 @@ export default function UploadPage() {
         throw new Error(data.error || "Failed to fetch quiz");
       }
 
-      // Update the session ID from the response headers
       const newSessionId = response.headers.get("x-session-id");
       if (newSessionId) {
         setSessionId(newSessionId);
@@ -173,17 +167,16 @@ export default function UploadPage() {
 
   const handleValidate = async () => {
     try {
-      // Simulate validation (replace with actual xAI API call)
-      const isCorrect = answer === "10z + 20"; // Example correct answer
+      const isCorrect = answer === quiz.correctAnswer;
       const commentary = isCorrect
         ? "<p>Great job! You got it right!</p>"
-        : "<p>Not quite. The correct answer is 10z + 20.</p>";
+        : `<p>Not quite. The correct answer is ${quiz.correctAnswer}.</p>`;
 
       const response = await fetch("/api/validate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-session-id": sessionId || "", // Pass the session ID
+          "x-session-id": sessionId || "",
         },
         body: JSON.stringify({
           sessionId,
@@ -215,7 +208,7 @@ export default function UploadPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-session-id": sessionId || "", // Pass the session ID
+          "x-session-id": sessionId || "",
         },
         body: JSON.stringify({ sessionId }),
       });
@@ -294,12 +287,23 @@ export default function UploadPage() {
           <h2>Step 2: Validate Your Answer</h2>
           <p>Session ID: {sessionId}</p>
           <p>Problem: {quiz.problem}</p>
-          <input
-            type="text"
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Enter your answer (e.g., 10z + 20)"
-          />
+          {quiz.answerFormat === "multiple-choice" && quiz.options && (
+            <div>
+              {quiz.options.map((option, index) => (
+                <div key={index}>
+                  <input
+                    type="radio"
+                    id={`option-${index}`}
+                    name="quiz-answer"
+                    value={option}
+                    checked={answer === option}
+                    onChange={(e) => setAnswer(e.target.value)}
+                  />
+                  <label htmlFor={`option-${index}`}>{option}</label>
+                </div>
+              ))}
+            </div>
+          )}
           <button onClick={handleValidate}>Validate Answer</button>
         </div>
       )}

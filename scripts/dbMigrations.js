@@ -74,6 +74,14 @@ const migrations = [
       }
     }
   },
+  {
+    version: 4,
+    appVersion: "0.3.0",
+    modifications: [
+      "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+      "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP;"
+    ]
+  },
 ];
 
 // Execute SQL via the execute-sql Edge Function
@@ -217,18 +225,22 @@ async function getCurrentVersion() {
 // Check if the app version is compatible with the current database version
 async function isAppVersionCompatible(dbVersion) {
   try {
-    const { data, error } = await supabase
-      .from("db_app_version_compatibility")
-      .select("app_version")
-      .eq("db_version", dbVersion);
+    // Find the highest migration version compatible with the current app version
+    const compatibleMigration = migrations
+      .filter(m => m.appVersion === APP_VERSION)
+      .sort((a, b) => b.version - a.version)[0];
 
-    if (error) throw error;
+    if (!compatibleMigration) {
+      console.log(`No migrations found for app version ${APP_VERSION}.`);
+      return false;
+    }
 
-    // If no compatibility entries exist, assume the app is not compatible
-    if (!data || data.length === 0) return false;
+    // The app is compatible only if the database version matches the highest migration version for this app version
+    const requiredDbVersion = compatibleMigration.version;
+    const isCompatible = dbVersion >= requiredDbVersion;
 
-    // Check if the current app version matches any compatible app version for this db version
-    return data.some(entry => entry.app_version === APP_VERSION);
+    console.log(`App version ${APP_VERSION} requires database version ${requiredDbVersion}. Current database version: ${dbVersion}. Compatible: ${isCompatible}`);
+    return isCompatible;
   } catch (error) {
     console.error("Error checking app version compatibility:", error);
     throw error;

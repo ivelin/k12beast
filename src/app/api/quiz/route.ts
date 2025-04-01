@@ -1,41 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
-import { v4 as uuidv4 } from "uuid";
 import { sendXAIRequest, handleXAIError } from "../../../utils/xai";
 import supabase from "../../../supabase/serverClient";
+import { v4 as uuidv4 } from "uuid";
 
-const responseFormat = `Return a JSON object with the quiz question details. Structure: {"problem": "quiz question", "answerFormat": "multipleChoice", "options": ["option1", "option2", "option3", "option4"], "correctAnswer": "correct option"}.`;
+const responseFormat = `Return a JSON object with a new quiz problem based on the provided session history. The quiz must be related to the same topic as the original input problem or image (e.g., if the input is about heat transfer, the quiz must also be about heat transfer). Do not repeat problems from the session history (check the 'examples' and 'quizzes' arrays). Do not reference images in the problem text. The quiz must be a multiple-choice question with exactly four options. Structure: {"problem": "Quiz problem text", "answerFormat": "multiple-choice", "options": ["option1", "option2", "option3", "option4"], "correctAnswer": "correct option"}.`;
 
 const defaultResponse = {
   problem: "",
-  answerFormat: "multipleChoice",
-  options: ["Option 1", "Option 2", "Option 3", "Option 4"],
-  correctAnswer: "Option 1",
+  answerFormat: "multiple-choice",
+  options: [],
+  correctAnswer: "",
 };
 
 export async function POST(req: NextRequest) {
   try {
     const { problem, images } = await req.json();
+    let sessionId = req.headers.get("x-session-id");
 
-    // Retrieve the session to get the inferred age, grade, skill level, and performance history
-    const sessionId = req.headers.get("x-session-id") || uuidv4();
-    let inferredAge = "unknown";
-    let inferredGrade = "unknown";
-    let inferredSkillLevel = "beginner";
-    let performanceHistory: { isCorrect: boolean }[] = [];
+    // Fetch or create session
+    let sessionHistory = null;
+    if (sessionId) {
+      const { data, error } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("id", sessionId)
+        .single();
 
-    const { data: session, error: fetchError } = await supabase
-      .from("sessions")
-      .select("inferredAge, inferredGrade, inferredSkillLevel, performanceHistory")
-      .eq("id", sessionId)
-      .single();
+      if (error) {
+        console.error("Error fetching session:", error.message);
+      } else if (data) {
+        sessionHistory = data;
+      }
+    }
 
-    if (fetchError && fetchError.code !== "PGRST116") {
-      console.error("Error fetching session:", fetchError.message);
-    } else if (session) {
-      inferredAge = session.inferredAge || inferredAge;
-      inferredGrade = session.inferredGrade || inferredGrade;
-      inferredSkillLevel = session.inferredSkillLevel || inferredSkillLevel;
-      performanceHistory = session.performanceHistory || performanceHistory;
+    if (!sessionId || !sessionHistory) {
+      sessionId = uuidv4();
+      const { error } = await supabase
+        .from("sessions")
+        .insert({ id: sessionId, created_at: new Date().toISOString() });
+
+      if (error) {
+        console.error("Error creating session:", error.message);
+        return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
+      }
+      sessionHistory = { id: sessionId, created_at: new Date().toISOString() };
     }
 
     const content = await sendXAIRequest({
@@ -43,43 +51,14 @@ export async function POST(req: NextRequest) {
       images,
       responseFormat,
       defaultResponse,
-      validateK12: false, // Disable K12 validation since the prompt was already validated
       maxTokens: 1000,
-      inferredAge,
-      inferredGrade,
-      inferredSkillLevel,
-      performanceHistory,
+      sessionHistory,
     });
 
-    // Save the initial session data to Supabase if it doesn't exist
-    const { data, error } = await supabase
-      .from("sessions")
-      .upsert({
-        id: sessionId,
-        lesson: problem,
-        examples: images || null,
-        quizzes: [],
-        performanceHistory: performanceHistory || [],
-        completed: false,
-        completed_at: null,
-        updated_at: new Date().toISOString(),
-        inferredAge,
-        inferredGrade,
-        inferredSkillLevel,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error saving session to Supabase:", error.message);
-      return NextResponse.json({ error: "Failed to save session" }, { status: 500 });
-    }
-
-    console.log("Session created/updated successfully:", data);
-
-    const response = NextResponse.json({ success: true, sessionId, problem: content.problem }, { status: 200 });
-    response.headers.set("x-session-id", sessionId);
-    return response;
+    return NextResponse.json(content, {
+      status: 200,
+      headers: { "x-session-id": sessionId },
+    });
   } catch (err) {
     return handleXAIError(err);
   }
