@@ -25,6 +25,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
+    // Find the quiz in the session to get the solution
+    const quiz = session.quizzes?.find((q) => q.problem === problem);
+    if (!quiz) {
+      console.error("Quiz not found in session:", problem);
+      return NextResponse.json({ error: "Quiz not found in session" }, { status: 404 });
+    }
+
+    console.log("Quiz data from session:", quiz);
+
     // Append the new quiz result to the existing quizzes array
     const updatedQuizzes = [
       ...(session.quizzes || []),
@@ -32,10 +41,10 @@ export async function POST(req: NextRequest) {
     ];
 
     // Update the performance history
-    const updatedPerformanceHistory = {
-      ...(session.performanceHistory || {}),
-      isCorrect,
-    };
+    const updatedPerformanceHistory = [
+      ...(session.performanceHistory || []),
+      { isCorrect },
+    ];
 
     // Update the session in Supabase
     const { data, error } = await supabase
@@ -56,7 +65,20 @@ export async function POST(req: NextRequest) {
 
     console.log("Session updated successfully:", data);
 
-    return NextResponse.json({ success: true, sessionId }, { status: 200 });
+    // Provide a default solution if none exists
+    const solutionToReturn = quiz.solution || [
+      { title: "Step 1", content: "<p>No solution available.</p>" },
+      { title: "Step 2", content: "<p>Please try another quiz to continue learning.</p>" },
+    ];
+
+    // Return the validation result, including the solution if the answer is incorrect
+    return NextResponse.json({
+      success: true,
+      sessionId,
+      isCorrect,
+      commentary,
+      solution: isCorrect ? null : solutionToReturn, // Only reveal solution if incorrect
+    }, { status: 200 });
   } catch (err) {
     console.error("Unexpected error in validate route:", err);
     return NextResponse.json({ error: "Unexpected error validating quiz" }, { status: 500 });

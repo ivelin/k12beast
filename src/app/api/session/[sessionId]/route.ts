@@ -1,12 +1,14 @@
+// src/app/api/session/[sessionId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import supabase from "../../../../supabase/browserClient";
+import supabase from "../../../../supabase/serverClient"; // Use serverClient with service role key
 
-export async function GET(req: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   try {
+    const { sessionId } = await params; // Await params to access sessionId
     const { data, error } = await supabase
       .from("sessions")
       .select("*")
-      .eq("id", params.sessionId)
+      .eq("id", sessionId)
       .single();
 
     if (error) {
