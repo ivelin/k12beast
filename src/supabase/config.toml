@@ -1,0 +1,42 @@
+# Supabase configuration for local development
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+enabled = true
+port = 54322
+major_version = 14
+
+[db.pooler]
+enabled = false
+port = 54329
+
+[realtime]
+enabled = true
+port = 54323
+
+[storage]
+enabled = true
+port = 54324
+file_size_limit = 52428800  # 50MB file size limit for uploads
+
+[auth]
+enabled = true
+port = 54325
+external = ["email"]
+
+[auth.email]
+enabled = true
+double_confirm_changes = true
+enable_signup = true
+
+[functions]
+enabled = true
+port = 54326
+
+[functions.execute-sql]
+enabled = true

@@ -44,3 +44,6 @@ next-env.d.ts
 node_modules\n.env.local
 
 .env.local
+
+# dir for temp work files
+tmp/

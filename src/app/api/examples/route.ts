@@ -1,26 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callXAI } from "../../../utils/xai";
-import { handleApiError } from "../../../utils/errorHandler";
+import { sendXAIRequest, handleXAIError } from "../../../utils/xai";
+import supabase from "../../../supabase/serverClient";
+
+const responseFormat = `Return a JSON object with the problem and a solution array. Structure: {"problem": "problem text", "solution": [{"title": "Step 1", "content": "<p>Step content...</p>"}, ...]}.`;
+
+const defaultResponse = {
+  problem: "Example Problem",
+  solution: [
+    {
+      title: "Step 1",
+      content: "",
+    },
+  ],
+};
 
 export async function POST(req: NextRequest) {
   try {
-    const { originalProblem, age, grade, skillLevel, performanceHistory } = await req.json();
-    const correctCount = performanceHistory.filter(p => p.isCorrect).length;
-    const totalAttempts = performanceHistory.length;
-    const performanceSummary = totalAttempts > 0 ? `The student has answered ${correctCount} out of ${totalAttempts} questions correctly.` : 'No performance history yet.';
+    const { problem, images } = await req.json();
 
-    // Construct the prompt for the AI model
-    const prompt = `You are a highly professional K12 tutor. Generate an example problem similar to "${originalProblem}" for a student around ${age} years old in grade ${grade} with ${skillLevel} skill level. Consider the student's performance: ${performanceSummary}. If the student has been performing well, make the example slightly more challenging. If they have been struggling, provide a simpler example. Return JSON: {"problem": "Example problem text", "solution": [{"title": "Step 1", "content": "<p>Explanation...</p>"}, ...]}
+    // Retrieve the session to get the inferred age, grade, skill level, and performance history
+    const sessionId = req.headers.get("x-session-id") || null;
+    let inferredAge = "unknown";
+    let inferredGrade = "unknown";
+    let inferredSkillLevel = "beginner";
+    let performanceHistory: { isCorrect: boolean }[] = [];
 
-Ensure the response is valid JSON without any additional text, whitespace, or formatting outside the JSON object. Do not wrap the JSON in code blocks (e.g., do not use triple backticks with json). Return only the JSON object.`;
+    if (sessionId) {
+      const { data: session, error } = await supabase
+        .from("sessions")
+        .select("inferredAge, inferredGrade, inferredSkillLevel, performanceHistory")
+        .eq("id", sessionId)
+        .single();
 
-    const systemMessage = "You are a K12 tutor. Provide educational content tailored to the student's inferred age, grade, and skill level. Always return valid JSON without extra formatting or code blocks.";
+      if (error) {
+        console.error("Error fetching session:", error.message);
+      } else if (session) {
+        inferredAge = session.inferredAge || inferredAge;
+        inferredGrade = session.inferredGrade || inferredGrade;
+        inferredSkillLevel = session.inferredSkillLevel || inferredSkillLevel;
+        performanceHistory = session.performanceHistory || performanceHistory;
+      }
+    }
 
-    // Call the xAI API using the utility function
-    const parsedContent = await callXAI(prompt, systemMessage);
+    const content = await sendXAIRequest({
+      problem,
+      images,
+      responseFormat,
+      defaultResponse,
+      validateK12: false, // Disable K12 validation since the prompt was already validated
+      maxTokens: 1000,
+      inferredAge,
+      inferredGrade,
+      inferredSkillLevel,
+      performanceHistory,
+    });
 
-    return NextResponse.json(parsedContent);
-  } catch (error) {
-    return handleApiError(error, "examples");
+    return NextResponse.json(content, { status: 200 });
+  } catch (err) {
+    return handleXAIError(err);
   }
 }

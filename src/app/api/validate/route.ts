@@ -1,26 +1,64 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callXAI } from "../../../utils/xai";
-import { handleApiError } from "../../../utils/errorHandler";
+import supabase from "../../../supabase/serverClient"; // Server-side client with service role key
 
 export async function POST(req: NextRequest) {
   try {
-    const { studentAnswer, quizProblem, correctAnswer, age, grade, skillLevel, performanceHistory } = await req.json();
-    const correctCount = performanceHistory.filter(p => p.isCorrect).length;
-    const totalAttempts = performanceHistory.length;
-    const performanceSummary = totalAttempts > 0 ? `The student has answered ${correctCount} out of ${totalAttempts} questions correctly.` : 'No performance history yet.';
+    const { sessionId, problem, answer, isCorrect, commentary } = await req.json();
 
-    // Construct the prompt for the AI model
-    const prompt = `You are a highly professional K12 tutor. Validate the student’s answer "${studentAnswer}" for the problem "${quizProblem}" with correct answer "${correctAnswer}". Provide feedback suitable for a student around ${age} years old in grade ${grade} with ${skillLevel} skill level. Consider the student's overall performance: ${performanceSummary}. If the student has been struggling, offer more encouragement and simpler explanations. If they have been doing well, provide more advanced feedback. Return JSON: {"isCorrect": true/false, "commentary": "<p>Feedback...</p>"}
+    if (!sessionId || !problem || !answer || isCorrect === undefined || !commentary) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
 
-Ensure the response is valid JSON without any additional text, whitespace, or formatting outside the JSON object. Do not wrap the JSON in code blocks (e.g., do not use triple backticks with json). Return only the JSON object.`;
+    // Fetch the existing session data
+    const { data: session, error: fetchError } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .single();
 
-    const systemMessage = "You are a K12 tutor. Provide educational feedback tailored to the student's inferred age, grade, and skill level. Always return valid JSON without extra formatting or code blocks.";
+    if (fetchError) {
+      console.error("Error fetching session from Supabase:", fetchError);
+      return NextResponse.json({ error: "Failed to fetch session" }, { status: 500 });
+    }
 
-    // Call the xAI API using the utility function
-    const parsedContent = await callXAI(prompt, systemMessage);
+    if (!session) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
 
-    return NextResponse.json(parsedContent);
-  } catch (error) {
-    return handleApiError(error, "validate");
+    // Append the new quiz result to the existing quizzes array
+    const updatedQuizzes = [
+      ...(session.quizzes || []),
+      { problem, answer, isCorrect, commentary },
+    ];
+
+    // Update the performance history
+    const updatedPerformanceHistory = {
+      ...(session.performanceHistory || {}),
+      isCorrect,
+    };
+
+    // Update the session in Supabase
+    const { data, error } = await supabase
+      .from("sessions")
+      .update({
+        quizzes: updatedQuizzes,
+        performanceHistory: updatedPerformanceHistory,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sessionId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating session in Supabase:", error);
+      return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
+    }
+
+    console.log("Session updated successfully:", data);
+
+    return NextResponse.json({ success: true, sessionId }, { status: 200 });
+  } catch (err) {
+    console.error("Unexpected error in validate route:", err);
+    return NextResponse.json({ error: "Unexpected error validating quiz" }, { status: 500 });
   }
 }

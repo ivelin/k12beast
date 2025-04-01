@@ -1,349 +1,324 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import supabase from "../../supabase/client";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
 
 export default function UploadPage() {
-  const [text, setText] = useState("");
-  const [images, setImages] = useState<File[]>([]);
-  const [age, setAge] = useState<string>("");
-  const [grade, setGrade] = useState<string>("");
-  const [skillLevel, setSkillLevel] = useState<string>("");
-  const [lesson, setLesson] = useState<string | null>(null);
-  const [example, setExample] = useState<{ problem: string; solution: { title: string; content: string }[] } | null>(null);
-  const [quiz, setQuiz] = useState<{ problem: string; answerFormat: string; options?: string[]; correctAnswer: string } | null>(null);
-  const [answer, setAnswer] = useState<string | File | null>(null);
-  const [feedback, setFeedback] = useState<{ isCorrect: boolean; commentary: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [performanceHistory, setPerformanceHistory] = useState<{ isCorrect: boolean }[]>([]);
   const router = useRouter();
+  const [sessionId, setSessionId] = useState(null);
+  const [problem, setProblem] = useState("");
+  const [images, setImages] = useState<File[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [answer, setAnswer] = useState("");
+  const [isCorrect, setIsCorrect] = useState(null);
+  const [commentary, setCommentary] = useState("");
+  const [shareableLink, setShareableLink] = useState(null);
+  const [error, setError] = useState(null);
+  const [step, setStep] = useState("problem"); // Track the current step: "problem", "validate", "end"
+  const [lesson, setLesson] = useState(null);
+  const [examples, setExamples] = useState(null);
+  const [quiz, setQuiz] = useState(null);
+  const [feedback, setFeedback] = useState(null);
 
-  // Check if user is logged in
+  // Check for an existing session to resume
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) router.push("/");
-    };
-    checkUser();
-  }, [router]);
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionIdFromUrl = urlParams.get("sessionId");
+    if (sessionIdFromUrl) {
+      setSessionId(sessionIdFromUrl);
+      setStep("validate"); // Resume at the validation step
+    }
+  }, []);
 
-  // Configure react-dropzone with clear styling
-  const { getRootProps, getInputProps } = useDropzone({
-    accept: { "image/*": [".png", ".jpg", ".jpeg", ".gif"] },
+  // Handle image uploads using react-dropzone
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    try {
+      const newImages = acceptedFiles.filter((file) => file.size <= 5 * 1024 * 1024); // Client-side check for 5MB per file
+      if (newImages.length !== acceptedFiles.length) {
+        setError("Some files were rejected because they exceed the 5MB limit.");
+        return;
+      }
+
+      // Client-side check for total number of files
+      if (images.length + newImages.length > 5) {
+        setError("You can only upload a maximum of 5 images.");
+        return;
+      }
+
+      // Prepare form data for the API request
+      const formData = new FormData();
+      newImages.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      // Send images to the server-side API route for upload
+      const response = await fetch("/api/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to upload images");
+      }
+
+      setImages((prev) => [...prev, ...newImages]);
+      setImageUrls((prev) => [...prev, ...data.files.map(file => file.url)]);
+    } catch (err) {
+      console.error("Error uploading images:", err);
+      setError(err.message || "Failed to upload images. Please try again.");
+    }
+  }, [images]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { "image/*": [] },
     maxFiles: 5,
-    maxSize: 5 * 1024 * 1024, // 5MB
-    onDrop: (acceptedFiles) => {
-      setImages(acceptedFiles);
-      setError(null);
-    },
   });
 
-  // Convert file to base64
-  const toBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-
-  // Handle form submission for initial tutoring lesson
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!text && images.length === 0) {
-      setError("Please provide either text or at least one image.");
-      return;
-    }
-    setError(null);
-    setLesson(null);
-    setExample(null);
-    setQuiz(null);
-    setFeedback(null);
-    setPerformanceHistory([]);
-    setLoading(true);
-
+  const handleTutorRequest = async () => {
     try {
-      const imageData = await Promise.all(images.map(toBase64));
-      const res = await fetch("/api/tutor", {
+      if (!problem && images.length === 0) {
+        throw new Error("Please enter a problem or upload an image.");
+      }
+
+      const response = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, images: imageData }),
-        signal: AbortSignal.timeout(60000), // 60-second timeout
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId || "", // Pass the session ID if available
+        },
+        body: JSON.stringify({ problem, images: imageUrls }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to process");
-      setAge(data.age);
-      setGrade(data.grade);
-      setSkillLevel(data.skillLevel);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch tutor lesson");
+      }
+
+      // Update the session ID from the response headers
+      const newSessionId = response.headers.get("x-session-id");
+      if (newSessionId) {
+        setSessionId(newSessionId);
+      }
+
       setLesson(data.lesson);
     } catch (err) {
-      setError(err.message || "Something went wrong. Please try again.");
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error("Error fetching tutor lesson:", err);
+      setError(err.message || "Failed to fetch tutor lesson. Please try again.");
     }
   };
 
-  // Fetch example problem
-  const fetchExample = async () => {
-    setLoading(true);
+  const handleExamplesRequest = async () => {
     try {
-      const res = await fetch("/api/examples", {
+      if (!problem && images.length === 0) {
+        throw new Error("Please enter a problem or upload an image.");
+      }
+
+      const response = await fetch("/api/examples", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ originalProblem: text, age, grade, skillLevel, performanceHistory }),
-        signal: AbortSignal.timeout(60000),
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId || "", // Pass the session ID
+        },
+        body: JSON.stringify({ problem, images: imageUrls }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to fetch example");
-      setExample(data);
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch examples");
+      }
+
+      setExamples(data);
     } catch (err) {
-      setError(err.message || "Failed to fetch example problem. Please try again.");
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error("Error fetching examples:", err);
+      setError(err.message || "Failed to fetch examples. Please try again.");
     }
   };
 
-  // Fetch quiz problem
-  const fetchQuiz = async () => {
-    setLoading(true);
+  const handleQuizSubmit = async () => {
     try {
-      const res = await fetch("/api/quiz", {
+      if (!problem && images.length === 0) {
+        throw new Error("Please enter a problem or upload an image before requesting a quiz.");
+      }
+
+      const response = await fetch("/api/quiz", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ originalProblem: text, age, grade, skillLevel, performanceHistory }),
-        signal: AbortSignal.timeout(60000),
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId || "", // Pass the session ID
+        },
+        body: JSON.stringify({ problem, images: imageUrls }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to fetch quiz");
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch quiz");
+      }
+
+      // Update the session ID from the response headers
+      const newSessionId = response.headers.get("x-session-id");
+      if (newSessionId) {
+        setSessionId(newSessionId);
+      }
+
       setQuiz(data);
-      setAnswer(null);
-      setFeedback(null);
+      setStep("validate");
     } catch (err) {
-      setError(err.message || "Failed to fetch quiz problem. Please try again.");
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error("Error fetching quiz:", err);
+      setError(err.message || "Failed to fetch quiz. Please try again.");
     }
   };
 
-  // Submit quiz answer
-  const submitAnswer = async () => {
-    if (!quiz || !answer) return;
-    setLoading(true);
+  const handleValidate = async () => {
     try {
-      const answerData = typeof answer === "string" ? answer : await toBase64(answer);
-      const res = await fetch("/api/validate", {
+      // Simulate validation (replace with actual xAI API call)
+      const isCorrect = answer === "10z + 20"; // Example correct answer
+      const commentary = isCorrect
+        ? "<p>Great job! You got it right!</p>"
+        : "<p>Not quite. The correct answer is 10z + 20.</p>";
+
+      const response = await fetch("/api/validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId || "", // Pass the session ID
+        },
         body: JSON.stringify({
-          studentAnswer: answerData,
-          quizProblem: quiz.problem,
-          correctAnswer: quiz.correctAnswer,
-          age,
-          grade,
-          skillLevel,
-          performanceHistory,
+          sessionId,
+          problem: quiz.problem,
+          answer,
+          isCorrect,
+          commentary,
         }),
-        signal: AbortSignal.timeout(60000),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to validate answer");
-      setFeedback(data);
-      setPerformanceHistory([...performanceHistory, { isCorrect: data.isCorrect }]);
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to validate quiz");
+      }
+
+      setIsCorrect(isCorrect);
+      setCommentary(commentary);
+      setFeedback({ isCorrect, commentary });
+      setStep("end");
     } catch (err) {
-      setError(err.message || "Failed to validate answer. Please try again.");
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error("Error validating quiz:", err);
+      setError("Failed to validate quiz. Please try again.");
     }
   };
 
-  // End the tutoring session
-  const endSession = () => {
-    setQuiz(null);
-    setFeedback(null);
-    setAnswer(null);
-    // Future: Add parent notification flow here when implemented
+  const handleEndSession = async () => {
+    try {
+      const response = await fetch("/api/end-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId || "", // Pass the session ID
+        },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to end session");
+      }
+
+      setShareableLink(data.shareableLink);
+    } catch (err) {
+      console.error("Error ending session:", err);
+      setError("Failed to end session. Please try again.");
+    }
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Upload Your Problem</h1>
-      <form onSubmit={handleSubmit}>
-        {/* Dropzone with clear styling */}
-        <div
-          {...getRootProps()}
-          className="border-dashed border-4 border-blue-500 p-4 mb-4 bg-gray-100 rounded-lg text-center cursor-pointer hover:bg-gray-200"
-        >
-          <input {...getInputProps()} />
-          <p className="text-gray-700">
-            Drag up to 5 images here (max 5MB each), or click to select
-          </p>
+    <div>
+      <h1>Tutoring Session</h1>
+      {error && <div>{error}</div>}
+      {step === "problem" && (
+        <div>
+          <h2>Upload Your Problem</h2>
+          <div {...getRootProps()} style={{ border: "2px dashed #ccc", padding: "20px", marginBottom: "20px" }}>
+            <input {...getInputProps()} />
+            {isDragActive ? (
+              <p>Drop the images here ...</p>
+            ) : (
+              <p>Drag up to 5 images here (max 5MB each), or click to select</p>
+            )}
+          </div>
           {images.length > 0 && (
-            <ul className="mt-2">
-              {images.map((file, index) => (
-                <li key={index} className="text-sm text-gray-600">
-                  {file.name}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Text input */}
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Describe your problem (optional)"
-          className="w-full p-2 border rounded mb-4"
-          rows={4}
-        />
-
-        {/* Submit button with validation */}
-        <button
-          type="submit"
-          disabled={(text.trim() === "" && images.length === 0) || loading}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
-        >
-          {loading ? "Loading..." : "Submit"}
-        </button>
-      </form>
-
-      {/* Error display */}
-      {error && <p className="text-red-500 mt-4">{error}</p>}
-
-      {/* Lesson display */}
-      {lesson && (
-        <div className="mt-4 p-4 bg-gray-50 rounded border">
-          <h2 className="text-lg font-semibold">Your Tutoring Lesson</h2>
-          <div dangerouslySetInnerHTML={{ __html: lesson }} />
-          <div className="mt-4">
-            <button
-              onClick={fetchExample}
-              disabled={loading}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:bg-gray-400 mr-2"
-            >
-              {loading ? "Loading..." : "Show Me an Example"}
-            </button>
-            <button
-              onClick={fetchQuiz}
-              disabled={loading}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
-            >
-              {loading ? "Loading..." : "Give Me a Quiz"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Example display */}
-      {example && (
-        <div className="mt-4 p-4 bg-gray-50 rounded border">
-          <h2 className="text-lg font-semibold">Example Problem</h2>
-          <p>{example.problem}</p>
-          {example.solution.map((step, index) => (
-            <div key={index} className="mt-2">
-              <h3 className="text-md font-medium">{step.title}</h3>
-              <div dangerouslySetInnerHTML={{ __html: step.content }} />
-            </div>
-          ))}
-          <div className="mt-4">
-            <button
-              onClick={fetchExample}
-              disabled={loading}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:bg-gray-400 mr-2"
-            >
-              {loading ? "Loading..." : "Another Example"}
-            </button>
-            <button
-              onClick={fetchQuiz}
-              disabled={loading}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
-            >
-              {loading ? "Loading..." : "Ready for a Quiz"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Quiz display */}
-      {quiz && !feedback && (
-        <div className="mt-4 p-4 bg-gray-50 rounded border">
-          <h2 className="text-lg font-semibold">Quiz Problem</h2>
-          <p>{quiz.problem}</p>
-          {quiz.answerFormat === "multipleChoice" && quiz.options && (
             <div>
-              {quiz.options.map((option, index) => (
-                <label key={index} className="block mb-2">
-                  <input
-                    type="radio"
-                    name="answer"
-                    value={option}
-                    onChange={(e) => setAnswer(e.target.value)}
-                    className="mr-2"
-                  />
-                  {option}
-                </label>
+              <h3>Uploaded Images:</h3>
+              <ul>
+                {images.map((file, index) => (
+                  <li key={index}>{file.name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <textarea
+            value={problem}
+            onChange={(e) => setProblem(e.target.value)}
+            placeholder="Enter a problem (e.g., Simplify 12(3y + x))"
+            rows={5}
+            style={{ width: "100%", marginBottom: "10px" }}
+          />
+          <button onClick={handleTutorRequest}>Submit Problem</button>
+          {lesson && (
+            <div>
+              <h2>Your Tutor Lesson</h2>
+              <div dangerouslySetInnerHTML={{ __html: lesson }} />
+              <button onClick={handleExamplesRequest}>Show Me an Example</button>
+              <button onClick={handleQuizSubmit}>Give Me a Quiz</button>
+            </div>
+          )}
+          {examples && (
+            <div>
+              <h2>Example Problem</h2>
+              <p>{examples.problem}</p>
+              {examples.solution.map((step, index) => (
+                <div key={index}>
+                  <h3>{step.title}</h3>
+                  <div dangerouslySetInnerHTML={{ __html: step.content }} />
+                </div>
               ))}
+              <button onClick={handleExamplesRequest}>Another Example</button>
+              <button onClick={handleQuizSubmit}>Ready for a Quiz</button>
             </div>
           )}
-          {quiz.answerFormat === "text" && (
-            <textarea
-              value={answer as string || ""} // Default to empty string if answer is null
-              onChange={(e) => setAnswer(e.target.value)}
-              className="w-full p-2 border rounded mb-4"
-              rows={4}
-            />
-          )}
-          {quiz.answerFormat === "image" && (
-            <div
-              {...getRootProps()}
-              className="border-dashed border-4 border-blue-500 p-4 mb-4 bg-gray-100 rounded-lg text-center cursor-pointer hover:bg-gray-200"
-            >
-              <input {...getInputProps()} />
-              <p className="text-gray-700">Upload your solution image</p>
-            </div>
-          )}
-          <button
-            onClick={submitAnswer}
-            disabled={loading || !answer}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
-          >
-            {loading ? "Loading..." : "Submit Answer"}
-          </button>
         </div>
       )}
-
-      {/* Feedback display */}
-      {feedback && (
-        <div className="mt-4 p-4 bg-gray-50 rounded border">
-          <h2 className="text-lg font-semibold">Feedback</h2>
-          <p className={feedback.isCorrect ? "text-green-500" : "text-red-500"}>
-            {feedback.isCorrect ? "Correct!" : "Incorrect"}
-          </p>
+      {step === "validate" && quiz && (
+        <div>
+          <h2>Step 2: Validate Your Answer</h2>
+          <p>Session ID: {sessionId}</p>
+          <p>Problem: {quiz.problem}</p>
+          <input
+            type="text"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            placeholder="Enter your answer (e.g., 10z + 20)"
+          />
+          <button onClick={handleValidate}>Validate Answer</button>
+        </div>
+      )}
+      {step === "end" && !shareableLink && feedback && (
+        <div>
+          <h2>Step 3: End Session</h2>
+          <p>Session ID: {sessionId}</p>
+          <p>Problem: {quiz.problem}</p>
+          <p>Answer: {answer}</p>
+          <p>Result: {feedback.isCorrect ? "Correct" : "Incorrect"}</p>
           <div dangerouslySetInnerHTML={{ __html: feedback.commentary }} />
-          <div className="mt-4">
-            <button
-              onClick={fetchQuiz}
-              disabled={loading}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 mr-2"
-            >
-              {loading ? "Loading..." : "Continue with Another Quiz"}
-            </button>
-            <button
-              onClick={endSession}
-              disabled={loading}
-              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 disabled:bg-gray-400"
-            >
-              {loading ? "Loading..." : "End Session"}
-            </button>
-          </div>
+          <button onClick={handleEndSession}>End Session</button>
+        </div>
+      )}
+      {shareableLink && (
+        <div>
+          <h2>Session Ended</h2>
+          <p>Share this link with a parent:</p>
+          <a href={shareableLink}>{shareableLink}</a>
         </div>
       )}
     </div>
