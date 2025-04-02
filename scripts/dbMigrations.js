@@ -9,6 +9,7 @@ const migrationV2 = require("./migrations/migrationV2");
 const migrationV3 = require("./migrations/migrationV3");
 const migrationV4 = require("./migrations/migrationV4");
 const migrationV5 = require("./migrations/migrationV5");
+const migrationV6 = require("./migrations/migrationV6");
 
 // Validate environment variables
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -40,6 +41,7 @@ const migrations = [
   migrationV3,
   migrationV4,
   migrationV5,
+  migrationV6,
 ];
 
 // Execute SQL via the execute-sql Edge Function with retry logic

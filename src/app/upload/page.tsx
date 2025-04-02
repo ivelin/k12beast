@@ -1,30 +1,33 @@
-// src/app/upload/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
 import ProblemSubmission from "./ProblemSubmission";
 import QuizSection from "./QuizSection";
 import SessionEnd from "./SessionEnd";
 import useAppStore from "../../store";
+import Link from "next/link";
 
 export default function UploadPage() {
-  const router = useRouter();
   const {
-    step,
-    sessionId,
     problem,
+    submittedProblem,
     imageUrls,
     lesson,
     examples,
-    setSessionId,
+    quiz,
+    step,
+    shareableLink,
+    sessionEnded,
+    reset,
     setStep,
-    setLoading,
-    setError,
-    handleExamplesRequest,
+    setSessionId,
+    setSubmittedProblem,
+    hasSubmittedProblem,
   } = useAppStore();
 
-  const [fadeKey, setFadeKey] = useState(step); // Track step for fade animation
+  const [messages, setMessages] = useState([]);
+  const chatEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -36,97 +39,213 @@ export default function UploadPage() {
   }, [setSessionId, setStep]);
 
   useEffect(() => {
-    // Trigger fade animation when step changes
-    setFadeKey(step);
-  }, [step]);
-
-  const steps = ["problem", "examples", "quizzes", "end"];
-  const progress = ((steps.indexOf(step) + 1) / steps.length) * 100;
-
-  const renderStep = () => {
-    switch (step) {
-      case "problem":
-        return <ProblemSubmission />;
-      case "examples":
-        return (
-          <div>
-            {lesson && (
-              <div>
-                <h2 className="text-xl mb-2">Your Tutor Lesson</h2>
-                <div dangerouslySetInnerHTML={{ __html: lesson }} />
+    if (submittedProblem && imageUrls && hasSubmittedProblem) {
+      const problemContent = `
+        <div>
+          <p><strong>Problem:</strong> ${submittedProblem}</p>
+          ${imageUrls.length > 0 ? `
+            <div class="mt-2">
+              <p><strong>Images:</strong></p>
+              <div class="flex flex-wrap gap-2">
+                ${imageUrls.map((url) => `
+                  <img src="${url}" alt="Problem image" class="max-w-[150px] rounded" />
+                `).join("")}
               </div>
-            )}
-            {examples && (
-              <div className="mt-4">
-                <h2 className="text-xl mb-2">Example Problem</h2>
-                <p>{examples.problem}</p>
-                {examples.solution.map((step: any, index: number) => (
-                  <div key={index} className="step">
-                    <h3>{step.title}</h3>
-                    <div dangerouslySetInnerHTML={{ __html: step.content }} />
-                  </div>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={handleExamplesRequest}
-              disabled={useAppStore.getState().loading}
-              className="mt-4 p-2 bg-blue-500 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              {examples ? "Another Example" : "Show Me an Example"}
-            </button>
-            <button
-              onClick={() => setStep("quizzes")}
-              disabled={useAppStore.getState().loading}
-              className="mt-2 p-2 bg-green-500 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
-            >
-              Ready for a Quiz
-            </button>
+            </div>
+          ` : ""}
+        </div>
+      `;
+      setMessages((prev) => {
+        const hasProblemMessage = prev.some((msg) => msg.content.includes("Problem:"));
+        if (!hasProblemMessage) {
+          return [
+            ...prev,
+            { role: "user", content: problemContent },
+          ];
+        }
+        return prev;
+      });
+    }
+  }, [submittedProblem, imageUrls, hasSubmittedProblem]);
+
+  useEffect(() => {
+    if (lesson) {
+      setMessages((prev) => {
+        const hasLessonMessage = prev.some((msg) => msg.content === lesson);
+        if (!hasLessonMessage) {
+          return [
+            ...prev,
+            { role: "assistant", content: lesson },
+          ];
+        }
+        return prev;
+      });
+    }
+  }, [lesson]);
+
+  useEffect(() => {
+    if (examples) {
+      const exampleContent = `
+        <p><strong>Example Problem:</strong> ${examples.problem}</p>
+        ${examples.solution.map((step) => `
+          <div class="mt-2">
+            <h4 class="font-semibold">${step.title}</h4>
+            ${step.content}
           </div>
-        );
-      case "quizzes":
-      case "end":
-        return <QuizSection />;
-      default:
-        return null;
+        `).join("")}
+      `;
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: exampleContent },
+      ]);
+    }
+  }, [examples]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleStartNewSession = () => {
+    reset();
+    setMessages([]);
+  };
+
+  const handleGetExamples = async () => {
+    await useAppStore.getState().handleExamplesRequest();
+  };
+
+  const handleTakeQuiz = async () => {
+    await useAppStore.getState().handleQuizSubmit();
+    setStep("quizzes");
+  };
+
+  const handleEndSession = async () => {
+    await useAppStore.getState().handleEndSession();
+  };
+
+  const handleQuizUpdate = (update) => {
+    if (update.type === "quiz") {
+      setMessages((prev) => {
+        const hasQuizMessage = prev.some((msg) => msg.content === `Quiz: ${update.content}`);
+        if (!hasQuizMessage) {
+          return [
+            ...prev,
+            { role: "assistant", content: `Quiz: ${update.content}` },
+          ];
+        }
+        return prev;
+      });
+    } else if (update.type === "result") {
+      setMessages((prev) => {
+        const hasResultMessage = prev.some((msg) => msg.content === update.content);
+        if (!hasResultMessage) {
+          return [
+            ...prev,
+            { role: "user", content: `Answer: ${useAppStore.getState().quizAnswer}` },
+            { role: "assistant", content: update.content },
+          ];
+        }
+        return prev;
+      });
     }
   };
 
   return (
-    <div className="max-w-full p-5 mx-auto text-center md:max-w-4xl">
-      <h1 className="text-2xl mb-4 md:text-4xl">Tutoring Session</h1>
-      <div className="w-full h-2 bg-gray-200 rounded mb-4">
-        <div className="h-full bg-blue-500 rounded" style={{ width: `${progress}%` }} />
-      </div>
-      {useAppStore.getState().error && (
-        <div className="text-red-500 mb-4">{useAppStore.getState().error}</div>
-      )}
-      {(step === "problem" || step === "end") && (problem || imageUrls.length > 0) && (
-        <div className="border border-gray-300 p-4 mb-5 bg-gray-100 rounded">
-          <h3 className="text-lg mb-2">Original Problem</h3>
-          {problem && (
-            <div>
-              <p><strong>Text:</strong></p>
-              <p className="bg-gray-200 p-2 rounded">{problem}</p>
-            </div>
-          )}
-          {imageUrls.length > 0 && (
-            <div>
-              <p className="mt-2"><strong>Images:</strong></p>
-              <ul className="flex flex-wrap gap-2">
-                {imageUrls.map((url, index) => (
-                  <li key={index}>
-                    <img src={url} alt={`Uploaded image ${index + 1}`} className="max-w-[200px] m-1" />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+    <div className="min-h-screen flex flex-col">
+      <nav className="bg-gray-800 text-white p-4">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <h1 className="text-xl font-bold">K12Beast</h1>
+          <div className="space-x-4">
+            <Link href="/upload" className="hover:underline">Chat</Link>
+            <Link href="/sessions" className="hover:underline">Sessions</Link>
+          </div>
         </div>
-      )}
-      <div key={fadeKey} className="fade">
-        {renderStep()}
-        <SessionEnd />
+      </nav>
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto p-4">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold">K12Beast Chat</h1>
+          <button
+            onClick={handleStartNewSession}
+            className="p-2 bg-blue-500 text-white rounded hover:bg-blue-700"
+          >
+            Start New Session
+          </button>
+        </div>
+
+        <div
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto mb-4 p-4 bg-gray-100 rounded-lg"
+        >
+          {messages.length === 0 && !sessionEnded ? (
+            <div className="text-center text-gray-500">
+              Start a new session by submitting a problem below.
+            </div>
+          ) : (
+            messages.map((msg, index) => (
+              <div key={index}>
+                <div
+                  className={`mb-4 p-3 rounded-lg shadow-sm break-words ${
+                    msg.role === "user"
+                      ? "bg-blue-200 ml-auto max-w-[80%]"
+                      : "bg-white max-w-[80%]"
+                  }`}
+                >
+                  <div dangerouslySetInnerHTML={{ __html: msg.content }} />
+                </div>
+                {index < messages.length - 1 && (
+                  <hr className="border-t border-gray-300 my-2" />
+                )}
+              </div>
+            ))
+          )}
+          {quiz && step === "quizzes" && !sessionEnded && (
+            <div className="mb-4 p-3 rounded-lg bg-white max-w-[80%] shadow-sm break-words">
+              <QuizSection onQuizUpdate={handleQuizUpdate} />
+            </div>
+          )}
+          {sessionEnded && (
+            <div className="text-center">
+              <p className="text-lg font-bold mb-2">Session Ended</p>
+              <SessionEnd />
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </div>
+
+        {!sessionEnded && (
+          <div className="border-t pt-4">
+            {useAppStore.getState().error && (
+              <div className="text-red-500 mb-2">{useAppStore.getState().error}</div>
+            )}
+            {hasSubmittedProblem && (!quiz || step !== "quizzes") ? (
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={handleGetExamples}
+                  className="p-2 bg-blue-500 text-white rounded hover:bg-blue-700"
+                  disabled={useAppStore.getState().loading}
+                >
+                  Get More Examples
+                </button>
+                <button
+                  onClick={handleTakeQuiz}
+                  className="p-2 bg-green-500 text-white rounded hover:bg-green-700"
+                  disabled={useAppStore.getState().loading}
+                >
+                  Take a Quiz
+                </button>
+                <button
+                  onClick={handleEndSession}
+                  className="p-2 bg-red-500 text-white rounded hover:bg-red-700"
+                  disabled={useAppStore.getState().loading}
+                >
+                  End Session
+                </button>
+              </div>
+            ) : !hasSubmittedProblem ? (
+              <ProblemSubmission />
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );

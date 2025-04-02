@@ -1,4 +1,3 @@
-// src/app/upload/ProblemSubmission.tsx
 "use client";
 
 import { useCallback } from "react";
@@ -12,6 +11,7 @@ export default function ProblemSubmission() {
     imageUrls,
     sessionId,
     setProblem,
+    setSubmittedProblem,
     setImages,
     setImageUrls,
     setLesson,
@@ -22,7 +22,7 @@ export default function ProblemSubmission() {
   } = useAppStore();
 
   const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
+    async (acceptedFiles) => {
       try {
         const newImages = acceptedFiles.filter((file) => file.size <= 5 * 1024 * 1024);
         if (newImages.length !== acceptedFiles.length) {
@@ -52,7 +52,7 @@ export default function ProblemSubmission() {
         }
 
         setImages([...images, ...newImages]);
-        setImageUrls([...imageUrls, ...data.files.map((file: any) => file.url)]);
+        setImageUrls([...imageUrls, ...data.files.map((file) => file.url)]);
       } catch (err) {
         setError(err.message || "Failed to upload images. Please try again.");
       } finally {
@@ -75,13 +75,14 @@ export default function ProblemSubmission() {
       }
 
       setLoading(true);
+      setSubmittedProblem(problem || "Image-based problem");
       const response = await fetch("/api/tutor", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-session-id": sessionId || "",
         },
-        body: JSON.stringify({ problem, images: imageUrls }),
+        body: JSON.stringify({ problem: problem || "Image-based problem", images: imageUrls }),
       });
 
       const data = await response.json();

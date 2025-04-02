@@ -1,86 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
-import supabase from "../../../supabase/serverClient";
+import { createClient } from "@supabase/supabase-js";
 
-export async function POST(req: NextRequest) {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(request: NextRequest) {
+  const sessionId = request.headers.get("x-session-id");
+  const { problem, answer } = await request.json();
+
   try {
-    const { sessionId, problem, answer, isCorrect, commentary } = await req.json();
-
-    if (!sessionId || !problem || !answer || isCorrect === undefined || !commentary) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!sessionId) {
+      throw new Error("Session ID is required");
+    }
+    if (!problem || !answer) {
+      throw new Error("Problem and answer are required");
     }
 
-    // Fetch the existing session data
-    const { data: session, error: fetchError } = await supabase
+    const { data: session, error: sessionError } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .single();
+
+    if (sessionError) {
+      throw new Error(`Failed to fetch session: ${sessionError.message}`);
+    }
+
+    console.log("Session data:", session);
+    console.log("Looking for quiz with problem:", problem);
+
+    const quiz = session.quizzes?.find((q: any) => q.problem.trim() === problem.trim());
+    if (!quiz) {
+      console.error("Quiz not found in session. Available quizzes:", session.quizzes);
+      throw new Error("Quiz not found in session");
+    }
+
+    console.log("Quiz data from session:", quiz);
+
+    const isCorrect = answer === quiz.correctAnswer;
+    const commentary = isCorrect
+      ? "<p>Great job! You got it right!</p>"
+      : `<p>Not quite. The correct answer is ${quiz.correctAnswer}.</p>`;
+
+    const updatedQuizzes = [
+      ...session.quizzes.filter((q: any) => q.problem !== problem),
+      { ...quiz, answer, isCorrect, commentary },
+    ];
+
+    const { error: updateError } = await supabase
+      .from("sessions")
+      .update({
+        quizzes: updatedQuizzes,
+        performanceHistory: [
+          ...(session.performanceHistory || []),
+          { isCorrect },
+        ],
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sessionId);
+
+    if (updateError) {
+      throw new Error(`Failed to update session: ${updateError.message}`);
+    }
+
+    const { data: updatedSession, error: fetchError } = await supabase
       .from("sessions")
       .select("*")
       .eq("id", sessionId)
       .single();
 
     if (fetchError) {
-      console.error("Error fetching session from Supabase:", fetchError);
-      return NextResponse.json({ error: "Failed to fetch session" }, { status: 500 });
+      throw new Error(`Failed to fetch updated session: ${fetchError.message}`);
     }
 
-    if (!session) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
-    }
+    console.log("Session updated successfully:", updatedSession);
 
-    // Find the quiz in the session to get the solution
-    const quiz = session.quizzes?.find((q) => q.problem === problem);
-    if (!quiz) {
-      console.error("Quiz not found in session:", problem);
-      return NextResponse.json({ error: "Quiz not found in session" }, { status: 404 });
-    }
-
-    console.log("Quiz data from session:", quiz);
-
-    // Append the new quiz result to the existing quizzes array
-    const updatedQuizzes = [
-      ...(session.quizzes || []),
-      { problem, answer, isCorrect, commentary },
-    ];
-
-    // Update the performance history
-    const updatedPerformanceHistory = [
-      ...(session.performanceHistory || []),
-      { isCorrect },
-    ];
-
-    // Update the session in Supabase
-    const { data, error } = await supabase
-      .from("sessions")
-      .update({
-        quizzes: updatedQuizzes,
-        performanceHistory: updatedPerformanceHistory,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", sessionId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error updating session in Supabase:", error);
-      return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
-    }
-
-    console.log("Session updated successfully:", data);
-
-    // Provide a default solution if none exists
-    const solutionToReturn = quiz.solution || [
-      { title: "Step 1", content: "<p>No solution available.</p>" },
-      { title: "Step 2", content: "<p>Please try another quiz to continue learning.</p>" },
-    ];
-
-    // Return the validation result, including the solution if the answer is incorrect
     return NextResponse.json({
-      success: true,
-      sessionId,
       isCorrect,
       commentary,
-      solution: isCorrect ? null : solutionToReturn, // Only reveal solution if incorrect
-    }, { status: 200 });
-  } catch (err) {
-    console.error("Unexpected error in validate route:", err);
-    return NextResponse.json({ error: "Unexpected error validating quiz" }, { status: 500 });
+      solution: isCorrect ? null : quiz.solution, // Only send solution if the answer is incorrect
+    });
+  } catch (error) {
+    console.error("Error validating quiz:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to validate quiz" },
+      { status: 400 }
+    );
   }
 }
