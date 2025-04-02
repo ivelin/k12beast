@@ -1,23 +1,17 @@
+/* src/app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Define CSS variables for light and dark themes */
+/* Define CSS variables for light and dark modes */
 :root {
-  --background: #1a1a1a; /* Dark background */
-  --foreground: #e5e7eb; /* Light text */
-  --card-bg: #2d2d2d; /* Card background */
-  --card-border: #3f3f3f; /* Card border */
-  --user-bg: #1e3a8a; /* User message background */
-  --assistant-bg: #374151; /* Assistant message background */
-  --text-secondary: #9ca3af; /* Secondary text */
-  --border-secondary: #4b5563; /* Secondary border */
-  --modal-bg: #2d2d2d; /* Modal background */
-  --modal-border: #4b5563; /* Modal border */
-  --input-bg: #374151; /* Input background */
-  --input-border: #4b5563; /* Input border */
-  --primary: #60a5fa; /* Primary color */
-  --muted-foreground: #9ca3af; /* Muted text */
+  --background: 255 255 255; /* #ffffff */
+  --foreground: 23 23 23; /* #171717 */
+}
+
+.dark {
+  --background: 10 10 10; /* #0a0a0a */
+  --foreground: 237 237 237; /* #ededed */
 }
 
 /* Base styles */
@@ -26,35 +20,28 @@ body {
   padding: 0;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: var(--background);
-  color: var(--foreground);
-  line-height: 1.6;
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
 }
 
-/* Consistent typography */
-h1 {
-  font-size: 1.5rem; /* 24px */
-  font-weight: 700;
-  margin-bottom: 1.5rem;
-  line-height: 1.2;
+/* Add custom styles for elements not easily styled with Tailwind */
+textarea {
+  min-height: 100px;
 }
 
-h2 {
-  font-size: 1.25rem; /* 20px */
-  font-weight: 600;
-  margin-bottom: 1rem;
-  line-height: 1.3;
+/* Tutoring guide styles */
+.guide {
+  margin-top: 20px;
+  text-align: left;
 }
 
-h3 {
-  font-size: 1.125rem; /* 18px */
-  font-weight: 500;
-  margin-bottom: 0.75rem;
-  line-height: 1.4;
+.step {
+  margin-bottom: 20px;
 }
 
-p {
-  margin-bottom: 1rem;
+.step h3 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
 }
 
 /* Fade transition styles */
@@ -65,149 +52,56 @@ p {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateX(-20px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
   }
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: none; /* Simplify for mobile */
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
   h1 {
-    font-size: 1.25rem; /* 20px */
+    font-size: 1.5rem; /* Smaller heading on mobile */
   }
   h2 {
-    font-size: 1.125rem; /* 18px */
+    font-size: 1.25rem;
   }
   h3 {
-    font-size: 1rem; /* 16px */
+    font-size: 1rem;
+  }
+  button {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    min-height: 48px; /* Touch-friendly size */
+    width: 100%; /* Full-width buttons on mobile */
+  }
+  textarea {
+    font-size: 0.875rem;
+  }
+  img {
+    max-width: 150px; /* Smaller images on mobile */
   }
 }
 
-/* Custom styles for theme support */
-nav {
-  background: var(--background);
-  border-bottom: 1px solid var(--border-secondary);
-}
-
-a {
-  color: var(--primary);
-  transition: color 0.2s ease;
-}
-
-a:hover {
-  color: #3b82f6;
-}
-
-/* Ensure consistent spacing for containers */
-.max-w-3xl {
-  max-width: 48rem; /* 768px */
-  padding-left: 1rem;
-  padding-right: 1rem;
-}
-
-/* Style adjustments for cards */
-.card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-/* Style adjustments for chat message bubbles */
-.card.message {
-  border-radius: 1rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-/* Style adjustments for buttons */
-button[data-slot="button"] {
-  border-radius: 0.5rem;
-  transition: all 0.2s ease;
-}
-
-button[data-slot="button"][data-variant="default"] {
-  background: #3b82f6;
-  color: #ffffff;
-}
-
-button[data-slot="button"][data-variant="default"]:hover {
-  background: #2563eb;
-}
-
-button[data-slot="button"][data-variant="secondary"] {
-  background: var(--card-bg);
-  color: var(--foreground);
-  border: 1px solid var(--border-secondary);
-}
-
-button[data-slot="button"][data-variant="secondary"]:hover {
-  background: var(--assistant-bg);
-}
-
-button[data-slot="button"][data-variant="destructive"] {
-  background: #ef4444;
-  color: #ffffff;
-}
-
-button[data-slot="button"][data-variant="destructive"]:hover {
-  background: #dc2626;
-}
-
-button[data-slot="button"][data-variant="ghost"] {
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-button[data-slot="button"][data-variant="ghost"]:hover {
-  background: var(--card-bg);
-}
-
-/* Style adjustments for dialog (modal) */
-.dialog-content {
-  background: var(--modal-bg);
-  border: 1px solid var(--modal-border);
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.dialog-header {
-  border-bottom: 1px solid var(--border-secondary);
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
-}
-
-.dialog-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-/* Style adjustments for drop area in modal */
-.drop-area {
-  border: 2px dashed var(--border-secondary);
-  border-radius: 0.5rem;
-  padding: 2rem;
-  text-align: center;
-  transition: all 0.2s ease;
-}
-
-.drop-area.active {
-  border-color: #3b82f6;
-  background: var(--user-bg);
-}
-
-/* Chat-specific styles */
-.chat-container {
-  background: var(--background);
-  border-radius: 0.75rem;
-  padding: 1rem;
-}
-
-.input-message {
-  border: 1px solid var(--input-border);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  background: var(--input-bg);
+@media (min-width: 769px) {
+  button {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    width: auto; /* Buttons auto-size on desktop */
+  }
+  img {
+    max-width: 200px;
+  }
 }

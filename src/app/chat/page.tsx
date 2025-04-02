@@ -1,204 +1,202 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Chat } from "@/components/ui/chat";
+import useAppStore from "@/store";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Chat, ChatContainer, ChatForm, ChatMessages } from "@/components/ui/chat";
-import { MessageList } from "@/components/ui/message-list";
-import { MessageInput } from "@/components/ui/message-input";
-import useAppStore from "../../store";
+import { cn } from "@/utils";
 
 export default function ChatPage() {
   const {
+    step,
     problem,
     submittedProblem,
+    images,
     imageUrls,
     lesson,
     examples,
     quiz,
-    step,
-    shareableLink,
-    sessionEnded,
-    reset,
+    error,
+    loading,
+    quizAnswer,
+    quizIsCorrect,
+    quizCommentary,
+    quizFeedback,
+    hasSubmittedProblem,
     setStep,
-    setSessionId,
-    setSubmittedProblem,
+    setProblem,
     setImages,
     setImageUrls,
     setLesson,
     setExamples,
     setQuiz,
-    setShareableLink,
     setError,
     setLoading,
-    setHasSubmittedProblem,
-    setSessionEnded,
-    hasSubmittedProblem,    
+    handleExamplesRequest,
+    handleQuizSubmit,
+    handleValidate,
+    reset,
   } = useAppStore();
 
   const [messages, setMessages] = useState<any[]>([]);
 
-  // Handle session ID from URL
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionIdFromUrl = urlParams.get("sessionId");
-    if (sessionIdFromUrl) {
-      setSessionId(sessionIdFromUrl);
-      setStep("quizzes");
+    const newMessages: any[] = [];
+    if (submittedProblem) {
+      newMessages.push({ role: "user", content: submittedProblem });
     }
-  }, [setSessionId, setStep]);
-
-  // Add user-submitted problem to messages
-  useEffect(() => {
-    if (submittedProblem && hasSubmittedProblem) {
-      const problemContent = {
-        role: "user",
-        content: submittedProblem,
-        images: imageUrls,
-      };
-      setMessages((prev) => {
-        const hasProblemMessage = prev.some((msg) => msg.content === submittedProblem);
-        if (!hasProblemMessage) {
-          return [...prev, problemContent];
-        }
-        return prev;
-      });
-    }
-  }, [submittedProblem, imageUrls, hasSubmittedProblem]);
-
-  // Add lesson to messages
-  useEffect(() => {
     if (lesson) {
-      setMessages((prev) => {
-        const hasLessonMessage = prev.some((msg) => msg.content === lesson);
-        if (!hasLessonMessage) {
-          return [...prev, { role: "assistant", content: lesson }];
-        }
-        return prev;
+      newMessages.push({ role: "assistant", content: lesson });
+    }
+    if (examples) {
+      newMessages.push({
+        role: "assistant",
+        content: `<p><strong>New Example:</strong></p><p><strong>Problem:</strong> ${examples.problem}</p>${examples.solution.map((step: any) => `<p><strong>${step.title}:</strong> ${step.content}</p>`).join("")}`,
       });
     }
-  }, [lesson]);
-
-  // Add examples to messages
-  useEffect(() => {
-    if (examples) {
-      const exampleContent = {
+    if (quiz) {
+      newMessages.push({
         role: "assistant",
-        content: `**Example Problem:** ${examples.problem}\n\n${examples.solution
-          .map((step) => `**${step.title}**\n${step.content}`)
-          .join("\n\n")}`,
-      };
-      setMessages((prev) => [...prev, exampleContent]);
+        content: `<p><strong>Quiz:</strong></p><p>${quiz.problem}</p><ul>${quiz.options.map((option: string) => `<li><input type="radio" name="quiz" value="${option}" ${quizAnswer === option ? "checked" : ""} onChange={(e) => useAppStore.setState({ quizAnswer: e.target.value })} /> ${option}</li>`).join("")}</ul>`,
+      });
+      if (quizFeedback) {
+        newMessages.push({
+          role: "assistant",
+          content: `<p><strong>Feedback:</strong></p>${quizCommentary}${quizFeedback.solution ? quizFeedback.solution.map((step: any) => `<p><strong>${step.title}:</strong> ${step.content}</p>`).join("") : ""}`,
+        });
+      }
     }
-  }, [examples]);
+    if (error) {
+      newMessages.push({ role: "assistant", content: `<p class="text-destructive">${error}</p>` });
+    }
+    setMessages(newMessages);
+  }, [submittedProblem, lesson, examples, quiz, quizAnswer, quizFeedback, quizCommentary, error]);
 
-  // Reset session
-  const handleStartNewSession = () => {
-    reset();
-    setMessages([]);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!problem) {
+      setError("Please enter a problem.");
+      return;
+    }
+    setLoading(true);
+    setMessages([...messages, { role: "user", content: problem }]);
+    try {
+      const response = await fetch("/api/tutor", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": useAppStore.getState().sessionId || "",
+        },
+        body: JSON.stringify({ problem, images: imageUrls }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to fetch tutor lesson");
+      const newSessionId = response.headers.get("x-session-id");
+      if (newSessionId) useAppStore.setState({ sessionId: newSessionId });
+      setLesson(data.lesson);
+      setStep("examples");
+    } catch (err) {
+      setError(err.message || "Failed to fetch tutor lesson.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Handle message submission
-  const handleSubmit = async (
-    event?: { preventDefault?: () => void },
-    options?: { experimental_attachments?: FileList }
-  ) => {
-    if (event?.preventDefault) event.preventDefault();
-
-    const message = problem;
-    const files = options?.experimental_attachments
-      ? Array.from(options.experimental_attachments)
-      : [];
-
-    if (!message && files.length === 0) return;
-
+  const append = async (message: { role: string; content: string }) => {
+    setProblem(message.content);
+    setMessages([...messages, message]);
     setLoading(true);
     try {
-      // Handle file uploads if present
-      if (files.length > 0) {
-        const formData = new FormData();
-        files.forEach((file) => formData.append("files", file));
-
-        const response = await fetch("/api/upload-image", {
-          method: "POST",
-          body: formData,
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to upload images");
-        }
-
-        const newImageUrls = data.files.map((file: any) => file.url);
-        setImages(files);
-        setImageUrls(newImageUrls);
-        setSubmittedProblem(message || "Image-based problem");
-        setHasSubmittedProblem(true);
-      } else {
-        // Handle text-only submission
-        setSubmittedProblem(message);
-        setImageUrls([]);
-        setHasSubmittedProblem(true);
-      }
-
-      // Clear the input
-      setProblem("");
-      setImages([]);
+      const response = await fetch("/api/tutor", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": useAppStore.getState().sessionId || "",
+        },
+        body: JSON.stringify({ problem: message.content, images: imageUrls }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to fetch tutor lesson");
+      const newSessionId = response.headers.get("x-session-id");
+      if (newSessionId) useAppStore.setState({ sessionId: newSessionId });
+      setLesson(data.lesson);
+      setStep("examples");
     } catch (err) {
-      setError(err.message || "Failed to submit problem. Please try again.");
+      setError(err.message || "Failed to fetch tutor lesson.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <nav className="p-4 border-b border-border">
-        <div className="max-w-3xl mx-auto flex justify-between items-center">
-          <h1 className="text-lg font-bold">K12Beast</h1>
-          <div className="space-x-4">
-            <Link href="/chat" className="text-foreground hover:text-primary">
+    <div className="flex flex-col min-h-screen">
+      {/* Header/Navigation Bar */}
+      <header className="bg-card shadow-sm">
+        <div className="flex items-center justify-between py-4 px-6">
+          <h1 className="text-2xl font-bold">K12Beast</h1>
+          <nav className="flex gap-4">
+            <Link href="/" className="text-primary hover:underline">
+              Home
+            </Link>
+            <Link href="/chat" className="text-primary hover:underline">
               Chat
             </Link>
-            <Link href="/history" className="text-foreground hover:text-primary">
+            <Link href="/history" className="text-primary hover:underline">
               History
             </Link>
-          </div>
+          </nav>
         </div>
-      </nav>
-      <div className="flex-1 flex flex-col max-w-3xl mx-auto p-4 sm:p-6">
-        <ChatContainer className="flex-1">
-          <ChatMessages messages={messages}>
-            {messages.length === 0 && !sessionEnded ? (
-              <div className="text-center text-muted-foreground mt-8">
-                Enter a problem below to start a new session
-              </div>
-            ) : (
-              <MessageList
-                messages={messages}
-                isTyping={false}
-                messageOptions={() => ({ actions: null })}
-              />
+      </header>
+
+      {/* Main Content */}
+      <div className="flex flex-col flex-1">
+        <Chat
+          className="grow"
+          messages={messages}
+          handleSubmit={handleSubmit}
+          input={problem}
+          handleInputChange={(e) => setProblem(e.target.value)}
+          isGenerating={loading}
+          setMessages={setMessages}
+          append={append}
+          suggestions={[
+            "Enter a problem (e.g., Simplify 12(3y + x)) or attach an image",
+          ]}
+        />
+        {hasSubmittedProblem && (
+          <div className="flex gap-2 justify-center py-4">
+            <button
+              onClick={handleExamplesRequest}
+              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+              disabled={loading}
+            >
+              Request Example
+            </button>
+            <button
+              onClick={handleQuizSubmit}
+              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+              disabled={loading}
+            >
+              Take a Quiz
+            </button>
+            <button
+              onClick={() => useAppStore.getState().handleEndSession()}
+              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50"
+              disabled={loading}
+            >
+              End Session
+            </button>
+            {step === "quizzes" && quiz && !quizFeedback && (
+              <button
+                onClick={() => handleValidate(quizAnswer, quiz)}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+                disabled={loading || !quizAnswer}
+              >
+                Submit Quiz
+              </button>
             )}
-          </ChatMessages>
-          <ChatForm
-            className="mt-auto"
-            isPending={useAppStore.getState().loading}
-            handleSubmit={handleSubmit}
-          >
-            {({ files, setFiles }) => (
-              <MessageInput
-                value={problem}
-                onChange={(e) => setProblem(e.target.value)}
-                placeholder="Enter a problem or attach an image"
-                allowAttachments
-                files={files}
-                setFiles={setFiles}
-                isGenerating={useAppStore.getState().loading}
-              />
-            )}
-          </ChatForm>
-        </ChatContainer>
+          </div>
+        )}
       </div>
     </div>
   );

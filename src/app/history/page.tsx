@@ -1,109 +1,49 @@
-// src/app/history/page.tsx
-// This page lists all sessions for the user (route: /history)
-
-"use client";
-
-import { useEffect, useState } from "react";
-import supabase from "../../supabase/browserClient";
+import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
-export default function HistoryPage() {
-  const [sessions, setSessions] = useState([]);
-  const [error, setError] = useState(null);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-  useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError || !userData.user) {
-          setError("Please log in to view your session history.");
-          return;
-        }
+async function fetchSessions() {
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data;
+}
 
-        const { data, error } = await supabase
-          .from("sessions")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          throw new Error("Failed to fetch sessions: " + error.message);
-        }
-
-        setSessions(data || []);
-      } catch (err) {
-        setError(err.message || "Failed to load session history. Please try again.");
-      }
-    };
-
-    fetchSessions();
-  }, []);
-
-  const formatRelativeTime = (timestamp) => {
-    const now = new Date();
-    const date = new Date(timestamp);
-    const diffInSeconds = Math.floor((now - date) / 1000);
-
-    if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
-    const diffInMinutes = Math.floor(diffInSeconds / 60);
-    if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes !== 1 ? "s" : ""} ago`;
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours} hour${diffInHours !== 1 ? "s" : ""} ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays} day${diffInDays !== 1 ? "s" : ""} ago`;
-  };
-
-  if (error) {
-    return <div className="p-4 text-red-500">{error}</div>;
-  }
+export default async function HistoryPage() {
+  const sessions = await fetchSessions();
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <nav className="bg-gray-800 text-white p-4">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold">K12Beast</h1>
-          <div className="space-x-4">
-            <Link href="/chat" className="hover:underline">Chat</Link> {/* Updated to /chat */}
-            <Link href="/history" className="hover:underline">History</Link>
-          </div>
+    <div className="container">
+      <h1 className="text-2xl font-bold mb-6">Session History</h1>
+      {sessions.length === 0 ? (
+        <p className="text-muted-foreground">No sessions found. Start a new session in the <Link href="/chat" className="text-primary underline">Chat</Link> page.</p>
+      ) : (
+        <div className="space-y-4">
+          {sessions.map((session: any) => (
+            <Link
+              key={session.id}
+              href={`/session/${session.id}`}
+              className="block p-4 rounded-lg border bg-card hover:bg-muted transition"
+            >
+              <h2 className="text-lg font-semibold">
+                {session.problem || "Image-based Problem"}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {new Date(session.created_at).toLocaleString()}
+              </p>
+              <p className="text-sm mt-2">
+                {session.completed ? "Completed" : "In Progress"}
+              </p>
+            </Link>
+          ))}
         </div>
-      </nav>
-      <div className="flex-1 max-w-4xl mx-auto p-4">
-        <h1 className="text-2xl md:text-3xl font-bold mb-4">Session History</h1>
-        {sessions.length === 0 ? (
-          <p className="text-gray-500">No sessions found. Start a new session to begin learning!</p>
-        ) : (
-          <ul className="space-y-4">
-            {sessions.map((session) => {
-              const summary = session.problem
-                ? session.problem.length > 50
-                  ? session.problem.substring(0, 50) + "..."
-                  : session.problem
-                : "Untitled Session";
-              return (
-                <li
-                  key={session.id}
-                  className="p-4 bg-white rounded-lg shadow-sm flex justify-between items-center"
-                >
-                  <div>
-                    <Link href={`/session/${session.id}`} className="text-blue-500 hover:underline">
-                      {summary}
-                    </Link>
-                    <p className="text-sm text-gray-500">
-                      {formatRelativeTime(session.created_at)}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/session/${session.id}`}
-                    className="p-2 bg-blue-500 text-white rounded hover:bg-blue-700"
-                  >
-                    View
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+      )}
     </div>
   );
 }
