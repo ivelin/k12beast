@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import useAppStore from "../../store";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Chat } from "@/components/ui/chat"; // Import Chat from chat.tsx
-import { MessageList } from "@/components/ui/message-list"; // Import MessageList (was ListChat)
-import { MessageInput } from "@/components/ui/message-input"; // Import MessageInput (was InputMessage)
+import { Chat, ChatContainer, ChatForm, ChatMessages } from "@/components/ui/chat";
+import { MessageList } from "@/components/ui/message-list";
+import { MessageInput } from "@/components/ui/message-input";
+import useAppStore from "../../store";
 
 export default function ChatPage() {
   const {
@@ -23,11 +23,20 @@ export default function ChatPage() {
     setStep,
     setSessionId,
     setSubmittedProblem,
-    hasSubmittedProblem,
+    setImages,
+    setImageUrls,
+    setLesson,
+    setExamples,
+    setQuiz,
+    setShareableLink,
+    setError,
+    setLoading,
+    setHasSubmittedProblem,
+    setSessionEnded,
+    hasSubmittedProblem,    
   } = useAppStore();
 
-  const [messages, setMessages] = useState([]);
-  const chatEndRef = useRef(null);
+  const [messages, setMessages] = useState<any[]>([]);
 
   // Handle session ID from URL
   useEffect(() => {
@@ -41,7 +50,7 @@ export default function ChatPage() {
 
   // Add user-submitted problem to messages
   useEffect(() => {
-    if (submittedProblem && imageUrls && hasSubmittedProblem) {
+    if (submittedProblem && hasSubmittedProblem) {
       const problemContent = {
         role: "user",
         content: submittedProblem,
@@ -83,11 +92,6 @@ export default function ChatPage() {
     }
   }, [examples]);
 
-  // Auto-scroll to the latest message
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   // Reset session
   const handleStartNewSession = () => {
     reset();
@@ -95,15 +99,26 @@ export default function ChatPage() {
   };
 
   // Handle message submission
-  const handleSendMessage = async (message, files) => {
-    if (!message && (!files || files.length === 0)) return;
+  const handleSubmit = async (
+    event?: { preventDefault?: () => void },
+    options?: { experimental_attachments?: FileList }
+  ) => {
+    if (event?.preventDefault) event.preventDefault();
 
-    // Simulate file upload if files are present
-    if (files && files.length > 0) {
-      const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
+    const message = problem;
+    const files = options?.experimental_attachments
+      ? Array.from(options.experimental_attachments)
+      : [];
 
-      try {
+    if (!message && files.length === 0) return;
+
+    setLoading(true);
+    try {
+      // Handle file uploads if present
+      if (files.length > 0) {
+        const formData = new FormData();
+        files.forEach((file) => formData.append("files", file));
+
         const response = await fetch("/api/upload-image", {
           method: "POST",
           body: formData,
@@ -114,62 +129,76 @@ export default function ChatPage() {
           throw new Error(data.error || "Failed to upload images");
         }
 
-        const newImageUrls = data.files.map((file) => file.url);
-        useAppStore.setState({
-          imageUrls: newImageUrls,
-          submittedProblem: message || "Image-based problem",
-          hasSubmittedProblem: true,
-        });
-      } catch (err) {
-        useAppStore.setState({ error: err.message || "Failed to upload images. Please try again." });
+        const newImageUrls = data.files.map((file: any) => file.url);
+        setImages(files);
+        setImageUrls(newImageUrls);
+        setSubmittedProblem(message || "Image-based problem");
+        setHasSubmittedProblem(true);
+      } else {
+        // Handle text-only submission
+        setSubmittedProblem(message);
+        setImageUrls([]);
+        setHasSubmittedProblem(true);
       }
-    } else {
-      // Handle text-only submission
-      useAppStore.setState({
-        submittedProblem: message,
-        imageUrls: [],
-        hasSubmittedProblem: true,
-      });
+
+      // Clear the input
+      setProblem("");
+      setImages([]);
+    } catch (err) {
+      setError(err.message || "Failed to submit problem. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <nav className="p-4">
-        <div className="max-w-xl mx-auto flex justify-between items-center">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
+      <nav className="p-4 border-b border-border">
+        <div className="max-w-3xl mx-auto flex justify-between items-center">
           <h1 className="text-lg font-bold">K12Beast</h1>
           <div className="space-x-4">
-            <Link href="/chat">Chat</Link>
-            <Link href="/history">History</Link>
+            <Link href="/chat" className="text-foreground hover:text-primary">
+              Chat
+            </Link>
+            <Link href="/history" className="text-foreground hover:text-primary">
+              History
+            </Link>
           </div>
         </div>
       </nav>
-      <div className="flex-1 flex flex-col max-w-xl mx-auto p-4 sm:p-6">
-        <div className="flex justify-end mb-4">
-          <Button onClick={handleStartNewSession} className="h-9 px-3 text-sm">
-            Start New Session
-          </Button>
-        </div>
-        <MessageList
-          messages={messages}
-          isTyping={false}
-          messageOptions={() => ({ actions: null })}
-        >
-          {messages.length === 0 ? (
-            <div className="text-center text-[var(--text-secondary)]">
-              Enter a problem below to start a new session
-            </div>
-          ) : (
-            <Chat messages={messages} />
-          )}
-        </MessageList>
-        <MessageInput
-          placeholder="Enter a problem or attach an image"
-          onSend={handleSendMessage}
-          disabled={useAppStore.getState().loading}
-          allowAttachments
-        />
-        <div ref={chatEndRef} />
+      <div className="flex-1 flex flex-col max-w-3xl mx-auto p-4 sm:p-6">
+        <ChatContainer className="flex-1">
+          <ChatMessages messages={messages}>
+            {messages.length === 0 && !sessionEnded ? (
+              <div className="text-center text-muted-foreground mt-8">
+                Enter a problem below to start a new session
+              </div>
+            ) : (
+              <MessageList
+                messages={messages}
+                isTyping={false}
+                messageOptions={() => ({ actions: null })}
+              />
+            )}
+          </ChatMessages>
+          <ChatForm
+            className="mt-auto"
+            isPending={useAppStore.getState().loading}
+            handleSubmit={handleSubmit}
+          >
+            {({ files, setFiles }) => (
+              <MessageInput
+                value={problem}
+                onChange={(e) => setProblem(e.target.value)}
+                placeholder="Enter a problem or attach an image"
+                allowAttachments
+                files={files}
+                setFiles={setFiles}
+                isGenerating={useAppStore.getState().loading}
+              />
+            )}
+          </ChatForm>
+        </ChatContainer>
       </div>
     </div>
   );

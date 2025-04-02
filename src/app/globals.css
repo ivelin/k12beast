@@ -4,35 +4,20 @@
 
 /* Define CSS variables for light and dark themes */
 :root {
-  --background: #ffffff;
-  --foreground: #1f2937;
-  --card-bg: #f9fafb;
-  --card-border: #e5e7eb;
-  --user-bg: #e0f2fe;
-  --assistant-bg: #f3f4f6;
-  --text-secondary: #4b5563;
-  --border-secondary: #d1d5db;
-  --modal-bg: #ffffff;
-  --modal-border: #e5e7eb;
-  --input-bg: #f9fafb;
-  --input-border: #d1d5db;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #1a1a1a;
-    --foreground: #e5e7eb;
-    --card-bg: #2d2d2d;
-    --card-border: #3f3f3f;
-    --user-bg: #1e3a8a;
-    --assistant-bg: #374151;
-    --text-secondary: #9ca3af;
-    --border-secondary: #4b5563;
-    --modal-bg: #2d2d2d;
-    --modal-border: #4b5563;
-    --input-bg: #374151;
-    --input-border: #4b5563;
-  }
+  --background: #1a1a1a; /* Dark background */
+  --foreground: #e5e7eb; /* Light text */
+  --card-bg: #2d2d2d; /* Card background */
+  --card-border: #3f3f3f; /* Card border */
+  --user-bg: #1e3a8a; /* User message background */
+  --assistant-bg: #374151; /* Assistant message background */
+  --text-secondary: #9ca3af; /* Secondary text */
+  --border-secondary: #4b5563; /* Secondary border */
+  --modal-bg: #2d2d2d; /* Modal background */
+  --modal-border: #4b5563; /* Modal border */
+  --input-bg: #374151; /* Input background */
+  --input-border: #4b5563; /* Input border */
+  --primary: #60a5fa; /* Primary color */
+  --muted-foreground: #9ca3af; /* Muted text */
 }
 
 /* Base styles */
@@ -108,7 +93,7 @@ nav {
 }
 
 a {
-  color: #60a5fa;
+  color: var(--primary);
   transition: color 0.2s ease;
 }
 
@@ -117,8 +102,8 @@ a:hover {
 }
 
 /* Ensure consistent spacing for containers */
-.max-w-2xl {
-  max-width: 42rem; /* 672px */
+.max-w-3xl {
+  max-width: 48rem; /* 768px */
   padding-left: 1rem;
   padding-right: 1rem;
 }
@@ -135,18 +120,6 @@ a:hover {
 .card.message {
   border-radius: 1rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-/* Style adjustments for input area */
-.input-container {
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: 0.75rem;
-  transition: border-color 0.2s ease;
-}
-
-.input-container:focus-within {
-  border-color: #3b82f6;
 }
 
 /* Style adjustments for buttons */
@@ -225,28 +198,16 @@ button[data-slot="button"][data-variant="ghost"]:hover {
   background: var(--user-bg);
 }
 
-:root {
-  --chat-bg: #ffffff; /* Light theme background */
-  --input-border: #e2e8f0; /* Input border color */
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --chat-bg: #1a1a1a; /* Dark theme background */
-    --input-border: #4b5563; /* Dark input border */
-  }
-}
-
-/* Chat container styling */
+/* Chat-specific styles */
 .chat-container {
-  background: var(--chat-bg);
+  background: var(--background);
   border-radius: 0.75rem;
   padding: 1rem;
 }
 
-/* Input area styling */
 .input-message {
   border: 1px solid var(--input-border);
   border-radius: 0.5rem;
   padding: 0.5rem;
+  background: var(--input-bg);
 }
