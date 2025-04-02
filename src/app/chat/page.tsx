@@ -129,10 +129,10 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="min-h-screen flex flex-col">
       {/* Header/Navigation Bar */}
       <header className="bg-card shadow-sm">
-        <div className="flex items-center justify-between py-4 px-6">
+        <div className="max-w-3xl mx-auto w-full px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold">K12Beast</h1>
           <nav className="flex gap-4">
             <Link href="/" className="text-primary hover:underline">
@@ -149,58 +149,58 @@ export default function ChatPage() {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex justify-center">
-        <div className="max-w-3xl mx-auto w-full px-4 py-6">
-          <div className="flex flex-col h-[calc(100vh-8rem)] w-full">
-            <Chat
-              className="grow"
-              messages={messages}
-              handleSubmit={handleSubmit}
-              input={problem}
-              handleInputChange={(e) => setProblem(e.target.value)}
-              isGenerating={loading}
-              setMessages={setMessages}
-              append={append}
-              suggestions={[
-                "Enter a problem (e.g., Simplify 12(3y + x)) or attach an image",
-              ]}
-            />
-            {hasSubmittedProblem && (
-              <div className="flex gap-2 justify-center py-4">
-                <button
-                  onClick={handleExamplesRequest}
-                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
-                  disabled={loading}
-                >
-                  Request Example
-                </button>
-                <button
-                  onClick={handleQuizSubmit}
-                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
-                  disabled={loading}
-                >
-                  Take a Quiz
-                </button>
-                <button
-                  onClick={() => useAppStore.getState().handleEndSession()}
-                  className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50"
-                  disabled={loading}
-                >
-                  End Session
-                </button>
-                {step === "quizzes" && quiz && !quizFeedback && (
-                  <button
-                    onClick={() => handleValidate(quizAnswer, quiz)}
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-                    disabled={loading || !quizAnswer}
-                  >
-                    Submit Quiz
-                  </button>
-                )}
-              </div>
+      <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-6 flex flex-col">
+        <div className="flex-1 bg-card border border-input rounded-lg shadow-sm p-4">
+          <Chat
+            messages={messages}
+            handleSubmit={handleSubmit}
+            input={problem}
+            handleInputChange={(e) => setProblem(e.target.value)}
+            isGenerating={loading}
+            setMessages={setMessages}
+            append={append}
+            suggestions={[
+              "Enter a problem (e.g., Simplify 12(3y + x)) or attach an image",
+            ]}
+            allowAttachments={true}
+            files={images}
+            setFiles={(files) => setImages(files || [])}
+          />
+        </div>
+        {hasSubmittedProblem && (
+          <div className="flex gap-2 justify-center py-4">
+            <button
+              onClick={handleExamplesRequest}
+              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+              disabled={loading}
+            >
+              Request Example
+            </button>
+            <button
+              onClick={handleQuizSubmit}
+              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
+              disabled={loading}
+            >
+              Take a Quiz
+            </button>
+            <button
+              onClick={() => useAppStore.getState().handleEndSession()}
+              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50"
+              disabled={loading}
+            >
+              End Session
+            </button>
+            {step === "quizzes" && quiz && !quizFeedback && (
+              <button
+                onClick={() => handleValidate(quizAnswer, quiz)}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+                disabled={loading || !quizAnswer}
+              >
+                Submit Quiz
+              </button>
             )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
