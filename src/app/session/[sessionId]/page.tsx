@@ -1,3 +1,6 @@
+// src/app/session/[sessionId]/page.tsx
+// This page displays the details of a specific session (route: /session/[sessionId])
+
 import Link from "next/link";
 import supabase from "../../../supabase/serverClient"; // Use the existing server-side client
 
@@ -37,7 +40,7 @@ export default async function SessionPage({ params }) {
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
         <h1 className="text-2xl font-bold mb-4">Error</h1>
         <p className="text-red-500">{error}</p>
-        <Link href="/upload" className="mt-4 p-2 bg-blue-500 text-white rounded hover:bg-blue-700">
+        <Link href="/chat" className="mt-4 p-2 bg-blue-500 text-white rounded hover:bg-blue-700"> {/* Updated to /chat */}
           Start a New Session
         </Link>
       </div>
@@ -50,8 +53,8 @@ export default async function SessionPage({ params }) {
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold">K12Beast</h1>
           <div className="space-x-4">
-            <Link href="/upload" className="hover:underline">Chat</Link>
-            <Link href="/sessions" className="hover:underline">Sessions</Link>
+            <Link href="/chat" className="hover:underline">Chat</Link> {/* Updated to /chat */}
+            <Link href="/history" className="hover:underline">History</Link>
           </div>
         </div>
       </nav>
@@ -97,6 +100,26 @@ export default async function SessionPage({ params }) {
               <div dangerouslySetInnerHTML={{ __html: session.lesson }} />
             </div>
           )}
+          {session.examples && session.examples.length > 0 && (
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold">Examples</h2>
+              {session.examples.map((example, index) => (
+                <div key={index} className="mb-2">
+                  <p><strong>Example Problem:</strong> {example.problem}</p>
+                  {example.solution && example.solution.length > 0 && (
+                    <div className="mt-2">
+                      {example.solution.map((step, stepIndex) => (
+                        <div key={stepIndex} className="mt-1">
+                          <h5 className="font-medium">{step.title}</h5>
+                          <div dangerouslySetInnerHTML={{ __html: step.content }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           {session.quizzes && session.quizzes.length > 0 && (
             <div className="mb-4">
               <h2 className="text-lg font-semibold">Quizzes</h2>
@@ -133,7 +156,7 @@ export default async function SessionPage({ params }) {
           )}
         </div>
         <div className="mt-4 flex justify-center">
-          <Link href="/upload" className="p-2 bg-blue-500 text-white rounded hover:bg-blue-700">
+          <Link href="/chat" className="p-2 bg-blue-500 text-white rounded hover:bg-blue-700"> {/* Updated to /chat */}
             Start a New Session
           </Link>
         </div>

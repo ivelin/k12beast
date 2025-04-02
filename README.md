@@ -117,6 +117,12 @@ Once your environment is set up, you can start the K12Beast development server:
 1. Open your browser and navigate to `http://localhost:3000` to access the app.
 1. You should see the login page. Sign up or log in to start using K12Beast.
 
+## Navigating the App
+
+- **Chat Page (`/chat`)**: This is the main page where you can submit a problem (text or images) to start a tutoring session. After submitting a problem, you can request more examples, take a quiz, or end the session.
+- **Session Detail Page (`/session/[sessionId]`)**: This page displays the details of a specific session, including the original problem, lesson, examples, quizzes, and notes.
+- **Session History Page (`/history`)**: This page lists all your past sessions, allowing you to view their details by clicking on a session.
+
 ## Troubleshooting
 
 Here are solutions to common issues when setting up K12Beast:

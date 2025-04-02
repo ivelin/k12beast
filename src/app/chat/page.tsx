@@ -1,13 +1,14 @@
+// src/app/chat/page.tsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import ProblemSubmission from "./ProblemSubmission";
-import QuizSection from "./QuizSection";
-import SessionEnd from "./SessionEnd";
+import ProblemSubmission from "./ProblemSubmission"; // Updated import path
+import QuizSection from "./QuizSection"; // Updated import path
+import SessionEnd from "./SessionEnd"; // Updated import path
 import useAppStore from "../../store";
 import Link from "next/link";
 
-export default function UploadPage() {
+export default function ChatPage() { // Renamed function to ChatPage
   const {
     problem,
     submittedProblem,
@@ -156,8 +157,8 @@ export default function UploadPage() {
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold">K12Beast</h1>
           <div className="space-x-4">
-            <Link href="/upload" className="hover:underline">Chat</Link>
-            <Link href="/sessions" className="hover:underline">Sessions</Link>
+            <Link href="/chat" className="hover:underline">Chat</Link> {/* Updated to /chat */}
+            <Link href="/history" className="hover:underline">History</Link>
           </div>
         </div>
       </nav>

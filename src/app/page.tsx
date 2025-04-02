@@ -1,3 +1,4 @@
+// src/app/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,7 +17,7 @@ export default function Login() {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        router.push("/upload");
+        router.push("/chat"); // Updated redirect to /chat
       }
     };
     checkUser();
@@ -37,7 +38,7 @@ export default function Login() {
         password,
       });
       if (error) setMessage(error.message);
-      else router.push("/upload");
+      else router.push("/chat"); // Updated redirect to /chat
     }
   };
 
@@ -47,8 +48,8 @@ export default function Login() {
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold">K12Beast</h1>
           <div className="space-x-4">
-            <Link href="/upload" className="hover:underline">Chat</Link>
-            <Link href="/sessions" className="hover:underline">Sessions</Link>
+            <Link href="/chat" className="hover:underline">Chat</Link> {/* Updated to /chat */}
+            <Link href="/history" className="hover:underline">History</Link>
           </div>
         </div>
       </nav>

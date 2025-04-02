@@ -1,10 +1,13 @@
+// src/app/history/page.tsx
+// This page lists all sessions for the user (route: /history)
+
 "use client";
 
 import { useEffect, useState } from "react";
 import supabase from "../../supabase/browserClient";
 import Link from "next/link";
 
-export default function SessionsPage() {
+export default function HistoryPage() {
   const [sessions, setSessions] = useState([]);
   const [error, setError] = useState(null);
 
@@ -13,7 +16,7 @@ export default function SessionsPage() {
       try {
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError || !userData.user) {
-          setError("Please log in to view your sessions.");
+          setError("Please log in to view your session history.");
           return;
         }
 
@@ -28,7 +31,7 @@ export default function SessionsPage() {
 
         setSessions(data || []);
       } catch (err) {
-        setError(err.message || "Failed to load sessions. Please try again.");
+        setError(err.message || "Failed to load session history. Please try again.");
       }
     };
 
@@ -59,13 +62,13 @@ export default function SessionsPage() {
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold">K12Beast</h1>
           <div className="space-x-4">
-            <Link href="/upload" className="hover:underline">Chat</Link>
-            <Link href="/sessions" className="hover:underline">Sessions</Link>
+            <Link href="/chat" className="hover:underline">Chat</Link> {/* Updated to /chat */}
+            <Link href="/history" className="hover:underline">History</Link>
           </div>
         </div>
       </nav>
       <div className="flex-1 max-w-4xl mx-auto p-4">
-        <h1 className="text-2xl md:text-3xl font-bold mb-4">Your Sessions</h1>
+        <h1 className="text-2xl md:text-3xl font-bold mb-4">Session History</h1>
         {sessions.length === 0 ? (
           <p className="text-gray-500">No sessions found. Start a new session to begin learning!</p>
         ) : (
