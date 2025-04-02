@@ -5,13 +5,48 @@
 
 /* Define CSS variables for light and dark modes */
 :root {
-  --background: 255 255 255; /* #ffffff */
-  --foreground: 23 23 23; /* #171717 */
+  --background: 0 0% 100%; /* #ffffff */
+  --foreground: 222.2 84% 4.9%; /* #0f172a */
+  --card: 0 0% 100%; /* #ffffff */
+  --card-foreground: 222.2 84% 4.9%; /* #0f172a */
+  --popover: 0 0% 100%; /* #ffffff */
+  --popover-foreground: 222.2 84% 4.9%; /* #0f172a */
+  --primary: 222.2 47.4% 11.2%; /* #1e293b */
+  --primary-foreground: 210 40% 98%; /* #f8fafc */
+  --secondary: 210 40% 96.1%; /* #f1f5f9 */
+  --secondary-foreground: 222.2 47.4% 11.2%; /* #1e293b */
+  --muted: 210 40% 96.1%; /* #f1f5f9 */
+  --muted-foreground: 215.4 16.3% 46.9%; /* #64748b */
+  --accent: 210 40% 96.1%; /* #f1f5f9 */
+  --accent-foreground: 222.2 47.4% 11.2%; /* #1e293b */
+  --destructive: 0 84.2% 60.2%; /* #ef4444 */
+  --destructive-foreground: 210 40% 98%; /* #f8fafc */
+  --border: 214.3 31.8% 91.4%; /* #e2e8f0 */
+  --input: 214.3 31.8% 91.4%; /* #e2e8f0 */
+  --ring: 222.2 84% 4.9%; /* #0f172a */
+  --radius: 0.5rem;
 }
 
 .dark {
-  --background: 10 10 10; /* #0a0a0a */
-  --foreground: 237 237 237; /* #ededed */
+  --background: 222.2 84% 4.9%; /* #0f172a */
+  --foreground: 210 40% 98%; /* #f8fafc */
+  --card: 222.2 84% 4.9%; /* #0f172a */
+  --card-foreground: 210 40% 98%; /* #f8fafc */
+  --popover: 222.2 84% 4.9%; /* #0f172a */
+  --popover-foreground: 210 40% 98%; /* #f8fafc */
+  --primary: 210 40% 98%; /* #f8fafc */
+  --primary-foreground: 222.2 47.4% 11.2%; /* #1e293b */
+  --secondary: 217.2 32.6% 17.5%; /* #1e293b */
+  --secondary-foreground: 210 40% 98%; /* #f8fafc */
+  --muted: 217.2 32.6% 17.5%; /* #1e293b */
+  --muted-foreground: 215 20.2% 65.1%; /* #94a3b8 */
+  --accent: 217.2 32.6% 17.5%; /* #1e293b */
+  --accent-foreground: 210 40% 98%; /* #f8fafc */
+  --destructive: 0 62.8% 30.6%; /* #7f1d1d */
+  --destructive-foreground: 210 40% 98%; /* #f8fafc */
+  --border: 217.2 32.6% 17.5%; /* #1e293b */
+  --input: 217.2 32.6% 17.5%; /* #1e293b */
+  --ring: 212.7 26.8% 83.9%; /* #cbd5e1 */
 }
 
 /* Base styles */
@@ -20,8 +55,8 @@ body {
   padding: 0;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: rgb(var(--background));
-  color: rgb(var(--foreground));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 /* Add custom styles for elements not easily styled with Tailwind */
