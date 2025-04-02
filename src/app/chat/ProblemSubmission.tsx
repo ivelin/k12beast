@@ -1,8 +1,20 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
+import { isMobile } from "react-device-detect";
 import useAppStore from "../../store";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Paperclip } from "lucide-react";
 
 export default function ProblemSubmission() {
   const {
@@ -20,6 +32,8 @@ export default function ProblemSubmission() {
     setStep,
     setLoading,
   } = useAppStore();
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const onDrop = useCallback(
     async (acceptedFiles) => {
@@ -53,6 +67,7 @@ export default function ProblemSubmission() {
 
         setImages([...images, ...newImages]);
         setImageUrls([...imageUrls, ...data.files.map((file) => file.url)]);
+        setIsDialogOpen(false);
       } catch (err) {
         setError(err.message || "Failed to upload images. Please try again.");
       } finally {
@@ -67,6 +82,11 @@ export default function ProblemSubmission() {
     accept: { "image/*": [] },
     maxFiles: 5,
   });
+
+  const handleFileInputChange = async (e) => {
+    const files = Array.from(e.target.files);
+    await onDrop(files);
+  };
 
   const handleTutorRequest = async () => {
     try {
@@ -105,42 +125,94 @@ export default function ProblemSubmission() {
   };
 
   return (
-    <div>
-      <h2 className="text-xl mb-2">Upload Your Problem</h2>
-      {useAppStore.getState().loading && <p className="text-blue-500">Loading... Please wait.</p>}
-      <div {...getRootProps()} className="border-2 border-dashed border-gray-300 p-5 mb-5">
-        <input {...getInputProps()} />
-        {isDragActive ? (
-          <p>Drop the images here ...</p>
-        ) : (
-          <p>Drag up to 5 images here (max 5MB each), or click to select</p>
+    <Card className="w-full">
+      <CardContent className="pt-4 space-y-4">
+        {useAppStore.getState().loading && (
+          <p className="text-blue-500 text-center">Loading... Please wait.</p>
         )}
-      </div>
-      {images.length > 0 && (
-        <div>
-          <h3 className="text-lg mb-2">Uploaded Images:</h3>
-          <ul>
-            {images.map((file, index) => (
-              <li key={index}>{file.name}</li>
-            ))}
-          </ul>
+        <div className="relative input-container">
+          <Textarea
+            value={problem}
+            onChange={(e) => setProblem(e.target.value)}
+            placeholder="Enter a problem (e.g., Simplify 12(3y + x)) or attach an image"
+            rows={3}
+            disabled={useAppStore.getState().loading}
+            className="resize-none border-none rounded-lg focus:ring-0 focus-visible:ring-0 pr-12 pl-4 py-3"
+          />
+          {isMobile ? (
+            <label className="absolute right-3 bottom-3">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileInputChange}
+                className="hidden"
+                capture="environment"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={useAppStore.getState().loading}
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+            </label>
+          ) : (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-3 bottom-3 h-6 w-6"
+                  disabled={useAppStore.getState().loading}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Upload Images</DialogTitle>
+                </DialogHeader>
+                <div
+                  {...getRootProps()}
+                  className={`drop-area ${
+                    isDragActive ? "active" : ""
+                  }`}
+                >
+                  <input {...getInputProps()} />
+                  <p className="text-[var(--text-secondary)]">
+                    {isDragActive
+                      ? "Drop the images here ..."
+                      : "Drag up to 5 images here (max 5MB each), or click to select"}
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
-      )}
-      <textarea
-        value={problem}
-        onChange={(e) => setProblem(e.target.value)}
-        placeholder="Enter a problem (e.g., Simplify 12(3y + x))"
-        rows={5}
-        className="w-full p-2 mb-2 border border-gray-300 rounded"
-        disabled={useAppStore.getState().loading}
-      />
-      <button
-        onClick={handleTutorRequest}
-        disabled={useAppStore.getState().loading}
-        className="p-2 bg-blue-500 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
-      >
-        Submit Problem
-      </button>
-    </div>
+        {images.length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium mb-2">Uploaded Images:</h3>
+            <ul className="list-disc list-inside text-[var(--text-secondary)]">
+              {images.map((file, index) => (
+                <li key={index} className="text-sm">
+                  {file.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button
+            onClick={handleTutorRequest}
+            disabled={useAppStore.getState().loading}
+            className="h-9 px-3 text-sm"
+          >
+            Submit Problem
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

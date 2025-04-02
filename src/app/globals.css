@@ -1,18 +1,37 @@
-/* src/app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Define CSS variables for light and dark modes */
+/* Define CSS variables for light and dark themes */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1f2937;
+  --card-bg: #f9fafb;
+  --card-border: #e5e7eb;
+  --user-bg: #e0f2fe;
+  --assistant-bg: #f3f4f6;
+  --text-secondary: #4b5563;
+  --border-secondary: #d1d5db;
+  --modal-bg: #ffffff;
+  --modal-border: #e5e7eb;
+  --input-bg: #f9fafb;
+  --input-border: #d1d5db;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1a1a1a;
+    --foreground: #e5e7eb;
+    --card-bg: #2d2d2d;
+    --card-border: #3f3f3f;
+    --user-bg: #1e3a8a;
+    --assistant-bg: #374151;
+    --text-secondary: #9ca3af;
+    --border-secondary: #4b5563;
+    --modal-bg: #2d2d2d;
+    --modal-border: #4b5563;
+    --input-bg: #374151;
+    --input-border: #4b5563;
   }
 }
 
@@ -24,26 +43,33 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   background: var(--background);
   color: var(--foreground);
+  line-height: 1.6;
 }
 
-/* Add custom styles for elements not easily styled with Tailwind */
-textarea {
-  min-height: 100px;
+/* Consistent typography */
+h1 {
+  font-size: 1.5rem; /* 24px */
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  line-height: 1.2;
 }
 
-/* Tutoring guide styles */
-.guide {
-  margin-top: 20px;
-  text-align: left;
+h2 {
+  font-size: 1.25rem; /* 20px */
+  font-weight: 600;
+  margin-bottom: 1rem;
+  line-height: 1.3;
 }
 
-.step {
-  margin-bottom: 20px;
+h3 {
+  font-size: 1.125rem; /* 18px */
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
 }
 
-.step h3 {
-  font-size: 1.2rem;
-  margin-bottom: 10px;
+p {
+  margin-bottom: 1rem;
 }
 
 /* Fade transition styles */
@@ -54,56 +80,173 @@ textarea {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateX(-20px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: none; /* Simplify for mobile */
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
   h1 {
-    font-size: 1.5rem; /* Smaller heading on mobile */
+    font-size: 1.25rem; /* 20px */
   }
   h2 {
-    font-size: 1.25rem;
+    font-size: 1.125rem; /* 18px */
   }
   h3 {
-    font-size: 1rem;
-  }
-  button {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    min-height: 48px; /* Touch-friendly size */
-    width: 100%; /* Full-width buttons on mobile */
-  }
-  textarea {
-    font-size: 0.875rem;
-  }
-  img {
-    max-width: 150px; /* Smaller images on mobile */
+    font-size: 1rem; /* 16px */
   }
 }
 
-@media (min-width: 769px) {
-  button {
-    padding: 0.75rem 1.5rem;
-    font-size: 1rem;
-    width: auto; /* Buttons auto-size on desktop */
+/* Custom styles for theme support */
+nav {
+  background: var(--background);
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+a {
+  color: #60a5fa;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: #3b82f6;
+}
+
+/* Ensure consistent spacing for containers */
+.max-w-2xl {
+  max-width: 42rem; /* 672px */
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Style adjustments for cards */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Style adjustments for chat message bubbles */
+.card.message {
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Style adjustments for input area */
+.input-container {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 0.75rem;
+  transition: border-color 0.2s ease;
+}
+
+.input-container:focus-within {
+  border-color: #3b82f6;
+}
+
+/* Style adjustments for buttons */
+button[data-slot="button"] {
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+button[data-slot="button"][data-variant="default"] {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+button[data-slot="button"][data-variant="default"]:hover {
+  background: #2563eb;
+}
+
+button[data-slot="button"][data-variant="secondary"] {
+  background: var(--card-bg);
+  color: var(--foreground);
+  border: 1px solid var(--border-secondary);
+}
+
+button[data-slot="button"][data-variant="secondary"]:hover {
+  background: var(--assistant-bg);
+}
+
+button[data-slot="button"][data-variant="destructive"] {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+button[data-slot="button"][data-variant="destructive"]:hover {
+  background: #dc2626;
+}
+
+button[data-slot="button"][data-variant="ghost"] {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+button[data-slot="button"][data-variant="ghost"]:hover {
+  background: var(--card-bg);
+}
+
+/* Style adjustments for dialog (modal) */
+.dialog-content {
+  background: var(--modal-bg);
+  border: 1px solid var(--modal-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dialog-header {
+  border-bottom: 1px solid var(--border-secondary);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dialog-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* Style adjustments for drop area in modal */
+.drop-area {
+  border: 2px dashed var(--border-secondary);
+  border-radius: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.drop-area.active {
+  border-color: #3b82f6;
+  background: var(--user-bg);
+}
+
+:root {
+  --chat-bg: #ffffff; /* Light theme background */
+  --input-border: #e2e8f0; /* Input border color */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --chat-bg: #1a1a1a; /* Dark theme background */
+    --input-border: #4b5563; /* Dark input border */
   }
-  img {
-    max-width: 200px;
-  }
+}
+
+/* Chat container styling */
+.chat-container {
+  background: var(--chat-bg);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+/* Input area styling */
+.input-message {
+  border: 1px solid var(--input-border);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
 }
