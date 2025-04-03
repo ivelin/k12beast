@@ -169,26 +169,28 @@ export default function ChatPage() {
 
       {/* Main Content */}
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-6 flex flex-col">
-        <ChatContainer className="flex-1 bg-card border border-input rounded-lg shadow-sm p-4">
+        <ChatContainer className="flex-1">
           {(step === "problem" && !hasSubmittedProblem) && (
             <PromptSuggestions
-              label="Try these prompts"
+              className="mb-8"
+              label="Try these prompts ✨"
               append={append}
               suggestions={[
-                "What is the weather in San Francisco?",
                 "Explain step-by-step how to solve this math problem: if x * x + 9 = 25, what is x?",
-                "Design a simple algorithm to find the longest palindrome in a string.",
+                "Problem: Room 1 is at 18'C. Room 2 is at 22'C. Which direction will heat flow?.",
+                "Problem: Simplify 3(4x + 6z). I think the answer is: 12x+19z",
               ]}
             />
           )}
           {(step === "lesson" || step === "examples") && (
             <PromptSuggestions
+              className="mb-8"
               label="What would you like to do next?"
               append={(message) => handleSuggestionAction(message.content)}
               suggestions={["Request Example", "Take a Quiz", "End Session"]}
             />
           )}
-          <ChatMessages>
+          <ChatMessages className="flex flex-col items-start">
             <MessageList messages={messages} isTyping={loading} />
           </ChatMessages>
           {(step === "problem" && !hasSubmittedProblem) && (
@@ -205,7 +207,7 @@ export default function ChatPage() {
                   files={images}
                   setFiles={(files) => setImages(files || [])}
                   isGenerating={loading}
-                  placeholder="Ask AI..."
+                  placeholder="Ask k12beast AI..."
                 />
               )}
             </ChatForm>
