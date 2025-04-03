@@ -148,28 +148,13 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header/Navigation Bar */}
-      <header className="bg-card shadow-sm">
-        <div className="max-w-3xl mx-auto w-full px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">K12Beast</h1>
-          <nav className="flex gap-4">
-            <Link href="/" className="text-primary hover:underline">
-              Home
-            </Link>
-            <Link href="/chat" className="text-primary hover:underline">
-              Chat
-            </Link>
-            <Link href="/history" className="text-primary hover:underline">
-              History
-            </Link>
-          </nav>
-        </div>
-      </header>
-
+    <div className="h-[calc(100vh-4rem)] flex flex-col">
       {/* Main Content */}
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-6 flex flex-col">
         <ChatContainer className="flex-1">
+          <ChatMessages className="flex flex-col items-start">
+            <MessageList messages={messages} isTyping={loading} />
+          </ChatMessages>
           {(step === "problem" && !hasSubmittedProblem) && (
             <PromptSuggestions
               className="mb-8"
@@ -190,9 +175,6 @@ export default function ChatPage() {
               suggestions={["Request Example", "Take a Quiz", "End Session"]}
             />
           )}
-          <ChatMessages className="flex flex-col items-start">
-            <MessageList messages={messages} isTyping={loading} />
-          </ChatMessages>
           {(step === "problem" && !hasSubmittedProblem) && (
             <ChatForm
               className="mt-auto"

@@ -1,11 +1,5 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 // Utility to get a cookie by name
 const getCookie = (name: string, cookies: string): string | null => {
@@ -21,12 +15,13 @@ export async function middleware(request: NextRequest) {
 
   let user = null;
   if (token) {
-    // Use the token to authenticate the user
-    const { data: { user: fetchedUser }, error } = await supabase.auth.getUser(token);
-    console.log("Middleware: User fetched with token -", fetchedUser, "Error -", error);
-    if (fetchedUser) {
-      user = fetchedUser;
+    const res = await fetch(`${request.nextUrl.origin}/api/auth/user`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      user = await res.json();
     }
+    console.log("Middleware: User fetched from API -", user);
   }
 
   const pathname = request.nextUrl.pathname;

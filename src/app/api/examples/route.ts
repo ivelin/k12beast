@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendXAIRequest, handleXAIError } from "../../../utils/xai";
+import { sendXAIRequest, handleXAIError } from "../../../utils/xaiClient";
 import supabase from "../../../supabase/serverClient";
 
 const responseFormat = `Return a JSON object with a new example problem and its solution, related to the same topic as the original input problem or image (e.g., if the input is about heat transfer, the example must also be about heat transfer). Structure: {"problem": "Example problem text", "solution": [{"title": "Step 1", "content": "<p>Step content...</p>"}, ...]}. Do not repeat problems from the session history or the original input problem. Do not reference images in the response unless explicitly provided in the current request.`;
