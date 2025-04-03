@@ -2,6 +2,20 @@
 
 K12Beast is a personalized tutoring app for K12 students, designed to help them master concepts through tailored lessons, examples, and quizzes based on their test results. 
 
+At a high level the student experience flows like this: 
+  - Problem Input:
+    - Student inputs problem and optionally a proposed solution via text or images.
+  - Tutoring Lesson: 
+    - AI offers a personalized analysis of the problem, proposed solution (when present) and a  subject lesson.
+  - Example Problems with  Solutions:
+    - Upon student request AI presents similar problem examples with solutions for self study
+  - Quizzes:
+    - Upon student request AI presents optional Quizzes for self testing
+  - End Session: 
+    - Student ends session when they feel ready
+  - Share:
+    - Student can share session with their parents and teachers
+
 Built with Super Grok 3, Next.js, it leverages Supabase (or any PostgreSQL database) for data storage and the Grok/X xAI API for generating educational content. 
 This guide will walk you through setting up a local instance of the app from scratch.
 

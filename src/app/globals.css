@@ -44,15 +44,15 @@
     --primary: 0 0% 98%;
     --primary-foreground: 240 5.9% 10%;
     --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%; /* Updated to match demo for button text/icon contrast */
+    --secondary-foreground: 240 5.9% 10%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
     --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
+    --border: 240 5.9% 26.1%;
+    --input: 240 5.9% 26.1%;
     --ring: 240 4.9% 83.9%;
     --radius: 0.75rem;
     --chart-1: 220 70% 50%;
@@ -81,6 +81,29 @@ button[type="submit"]:hover {
 .chat-message-assistant {
   background-color: hsl(var(--secondary)) !important; /* Light gray for assistant messages */
   color: hsl(var(--secondary-foreground)) !important;
+}
+
+/* Custom styles for input area */
+.message-input textarea {
+  background-color: hsl(var(--input)) !important;
+  border-color: hsl(var(--border)) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.message-input textarea::placeholder {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Style the icons/buttons in the input area */
+.message-input .absolute.right-3.top-3 button {
+  background-color: hsl(var(--secondary)) !important;
+  color: hsl(var(--secondary-foreground)) !important;
+  border: none !important;
+}
+
+.message-input .absolute.right-3.top-3 button:hover {
+  background-color: hsl(var(--muted)) !important;
 }
 
 /* Essential animations */

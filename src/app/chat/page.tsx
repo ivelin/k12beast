@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Chat } from "@/components/ui/chat";
-import useAppStore from "@/store";
 import Link from "next/link";
-import { cn } from "@/utils";
+import { ChatContainer, ChatMessages, ChatForm } from "@/components/ui/chat";
+import { MessageList } from "@/components/ui/message-list";
+import { MessageInput } from "@/components/ui/message-input";
+import { PromptSuggestions } from "@/components/ui/prompt-suggestions";
+import useAppStore from "@/store";
 
 export default function ChatPage() {
   const {
@@ -35,6 +37,7 @@ export default function ChatPage() {
     handleExamplesRequest,
     handleQuizSubmit,
     handleValidate,
+    handleEndSession,
     reset,
   } = useAppStore();
 
@@ -128,6 +131,22 @@ export default function ChatPage() {
     }
   };
 
+  const handleSuggestionAction = (action: string) => {
+    switch (action) {
+      case "Request Example":
+        handleExamplesRequest();
+        break;
+      case "Take a Quiz":
+        handleQuizSubmit();
+        break;
+      case "End Session":
+        handleEndSession();
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header/Navigation Bar */}
@@ -150,55 +169,57 @@ export default function ChatPage() {
 
       {/* Main Content */}
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 py-6 flex flex-col">
-        <div className="flex-1 bg-card border border-input rounded-lg shadow-sm p-4">
-          <Chat
-            messages={messages}
-            handleSubmit={handleSubmit}
-            input={problem}
-            handleInputChange={(e) => setProblem(e.target.value)}
-            isGenerating={loading}
-            setMessages={setMessages}
-            append={append}
-            suggestions={[
-              "Enter a problem (e.g., Simplify 12(3y + x)) or attach an image",
-            ]}
-            allowAttachments={true}
-            files={images}
-            setFiles={(files) => setImages(files || [])}
-          />
-        </div>
-        {hasSubmittedProblem && (
+        <ChatContainer className="flex-1 bg-card border border-input rounded-lg shadow-sm p-4">
+          {(step === "problem" && !hasSubmittedProblem) && (
+            <PromptSuggestions
+              label="Try these prompts"
+              append={append}
+              suggestions={[
+                "What is the weather in San Francisco?",
+                "Explain step-by-step how to solve this math problem: if x * x + 9 = 25, what is x?",
+                "Design a simple algorithm to find the longest palindrome in a string.",
+              ]}
+            />
+          )}
+          {(step === "lesson" || step === "examples") && (
+            <PromptSuggestions
+              label="What would you like to do next?"
+              append={(message) => handleSuggestionAction(message.content)}
+              suggestions={["Request Example", "Take a Quiz", "End Session"]}
+            />
+          )}
+          <ChatMessages>
+            <MessageList messages={messages} isTyping={loading} />
+          </ChatMessages>
+          {(step === "problem" && !hasSubmittedProblem) && (
+            <ChatForm
+              className="mt-auto"
+              isPending={loading}
+              handleSubmit={handleSubmit}
+            >
+              {({ files, setFiles }) => (
+                <MessageInput
+                  value={problem}
+                  onChange={(e) => setProblem(e.target.value)}
+                  allowAttachments={true}
+                  files={images}
+                  setFiles={(files) => setImages(files || [])}
+                  isGenerating={loading}
+                  placeholder="Ask AI..."
+                />
+              )}
+            </ChatForm>
+          )}
+        </ChatContainer>
+        {step === "quizzes" && quiz && !quizFeedback && (
           <div className="flex gap-2 justify-center py-4">
             <button
-              onClick={handleExamplesRequest}
-              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
-              disabled={loading}
+              onClick={() => handleValidate(quizAnswer, quiz)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+              disabled={loading || !quizAnswer}
             >
-              Request Example
+              Submit Quiz
             </button>
-            <button
-              onClick={handleQuizSubmit}
-              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
-              disabled={loading}
-            >
-              Take a Quiz
-            </button>
-            <button
-              onClick={() => useAppStore.getState().handleEndSession()}
-              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50"
-              disabled={loading}
-            >
-              End Session
-            </button>
-            {step === "quizzes" && quiz && !quizFeedback && (
-              <button
-                onClick={() => handleValidate(quizAnswer, quiz)}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-                disabled={loading || !quizAnswer}
-              >
-                Submit Quiz
-              </button>
-            )}
           </div>
         )}
       </div>

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 interface AppState {
-  step: string;
+  step: "problem" | "lesson" | "examples" | "quizzes" | "end"; // Added "examples"
   sessionId: string | null;
   problem: string;
   submittedProblem: string | null;
@@ -93,6 +93,7 @@ const useAppStore = create<AppState>((set, get) => ({
         throw new Error(data.error || "Failed to fetch examples");
       }
       setExamples(data);
+      set({ step: "examples" }); // Transition to examples step
     } catch (err) {
       setError(err.message || "Failed to fetch examples. Please try again.");
     } finally {
