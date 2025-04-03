@@ -133,16 +133,17 @@ Ensure the response is valid JSON without any additional text, whitespace, or fo
     rawContent = match[1].trim();
   }
 
-  // Try to parse the content as JSON
+  // Try to parse the content as JSON, fixing unescaped backslashes
   try {
+    // Replace unescaped backslashes with escaped ones (e.g., \( -> \\()
+    rawContent = rawContent.replace(/\\(?![\\"])/g, "\\\\");
     content = JSON.parse(rawContent);
   } catch (err) {
-    // If parsing fails, treat the content as plain text and return the default response
+    // If parsing fails, treat the content as plain text and return a fallback response
     console.warn("xAI API response is not valid JSON, treating as plain text:", rawContent);
     content = {
       ...defaultResponse,
-      lesson: defaultResponse.lesson ? `<p>${rawContent.replace(/\n/g, "<br>")}</p>` : undefined,
-      problem: defaultResponse.problem || rawContent,
+      lesson: `<p>${rawContent.replace(/\n/g, "<br>")}</p>`, // Preserve the raw content as the lesson
     };
   }
 

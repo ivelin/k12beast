@@ -1,43 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import supabase from "../../../supabase/serverClient";
+import { createClient } from "@supabase/supabase-js";
 
-export async function POST(req: NextRequest) {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(request: NextRequest) {
+  const sessionId = request.headers.get("x-session-id");
+  const { sessionId: bodySessionId } = await request.json();
+
   try {
-    const { sessionId } = await req.json();
-
-    if (!sessionId) {
-      return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
+    if (!sessionId && !bodySessionId) {
+      throw new Error("Session ID is required");
     }
 
-    // Mark the session as completed in Supabase
-    const { data, error } = await supabase
+    const id = sessionId || bodySessionId;
+
+    const { error } = await supabase
       .from("sessions")
       .update({
         completed: true,
         completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
-      .eq("id", sessionId)
-      .select()
-      .single();
+      .eq("id", id);
 
     if (error) {
-      console.error("Error updating session in Supabase:", error.message);
-      return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
+      throw new Error(`Failed to end session: ${error.message}`);
     }
 
-    if (!data) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
-    }
+    // Construct a fully qualified shareable link
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const shareableLink = `${baseUrl}/session/${id}`;
 
-    console.log("Session marked as completed successfully:", data);
-
-    // Generate the shareable link
-    const shareableLink = `/session/${sessionId}`;
-
-    return NextResponse.json({ success: true, shareableLink }, { status: 200 });
-  } catch (err) {
-    console.error("Error in end-session route:", err.message); // Log only the error message
-    return NextResponse.json({ error: "Unexpected error ending session" }, { status: 500 });
+    return NextResponse.json({ shareableLink });
+  } catch (error) {
+    console.error("Error ending session:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to end session" },
+      { status: 500 }
+    );
   }
 }

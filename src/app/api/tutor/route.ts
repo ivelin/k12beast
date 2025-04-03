@@ -41,7 +41,12 @@ export async function POST(req: NextRequest) {
       sessionId = uuidv4();
       const { data, error } = await supabase
         .from("sessions")
-        .insert({ id: sessionId, created_at: new Date().toISOString() })
+        .insert({
+          id: sessionId,
+          problem: problem || null, // Store the problem
+          images: images || null,   // Store the images
+          created_at: new Date().toISOString(),
+        })
         .select()
         .single();
 
@@ -50,7 +55,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
       }
       sessionHistory = data;
-      console.log("Created new session:", sessionId);
+      console.log("Created new session:", sessionId, "Data:", sessionHistory);
     }
 
     const content = await sendXAIRequest({
@@ -67,6 +72,8 @@ export async function POST(req: NextRequest) {
       const { data, error } = await supabase
         .from("sessions")
         .update({
+          problem: problem || null, // Ensure problem is preserved
+          images: images || null,   // Ensure images are preserved
           lesson: content.lesson,
           updated_at: new Date().toISOString(),
         })

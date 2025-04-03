@@ -1,61 +1,66 @@
-// src/app/session/[sessionId]/page.tsx
-"use client";
+import { createClient } from "@supabase/supabase-js";
+import { MessageList } from "@/components/ui/message-list";
+import { AnimatePresence, motion } from "framer-motion";
+import Link from "next/link";
 
-import { useState, useEffect } from "react";
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-export default function SessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
-  const [session, setSession] = useState(null);
-  const [error, setError] = useState(null);
+async function fetchSession(sessionId: string) {
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .single();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Session not found");
+  return data;
+}
 
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const { sessionId } = await params; // Await params to access sessionId
-        const response = await fetch(`/api/session/${sessionId}`);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch session: ${response.status} ${response.statusText}`);
-        }
+export default async function SessionDetailPage({ params }: { params: { sessionId: string } }) {
+  const session = await fetchSession(params.sessionId);
 
-        const data = await response.json();
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        if (!data.session) {
-          throw new Error("Session not found");
-        }
-
-        setSession(data.session);
-      } catch (err) {
-        console.error("Error fetching session:", err);
-        setError("Failed to load session history. Please try again.");
-      }
-    };
-
-    fetchSession();
-  }, [params]);
-
-  if (error) {
-    return <div>{error}</div>;
-  }
-
-  if (!session) {
-    return <div>Loading...</div>;
-  }
+  const messages = [
+    { role: "user", content: session.problem || "Image-based problem" },
+    ...(session.lesson ? [{ role: "assistant", content: session.lesson }] : []),
+    ...(session.examples || []).map((example: any) => ({
+      role: "assistant",
+      content: `<p><strong>Example:</strong></p><p><strong>Problem:</strong> ${example.problem}</p>${example.solution.map((step: any) => `<p><strong>${step.title}:</strong> ${step.content}</p>`).join("")}`,
+    })),
+    ...(session.quizzes || []).map((quiz: any) => ({
+      role: "assistant",
+      content: `<p><strong>Quiz:</strong></p><p>${quiz.problem}</p><ul>${quiz.options.map((option: string) => `<li>${option}${quiz.answer === option ? ` (Your answer: ${quiz.isCorrect ? "Correct" : "Incorrect"})` : ""}</li>`).join("")}</ul>${quiz.commentary ? `<p><strong>Feedback:</strong> ${quiz.commentary}</p>` : ""}${quiz.solution ? quiz.solution.map((step: any) => `<p><strong>${step.title}:</strong> ${step.content}</p>`).join("") : ""}`,
+    })),
+  ];
 
   return (
-    <div>
-      <h1>Session History</h1>
-      <p>Session ID: {session.id}</p>
-      <p>Status: {session.completed ? "Completed" : "In Progress"}</p>
-      {session.completed && <p>Completed At: {new Date(session.completed_at).toLocaleString()}</p>}
-      <p>Lesson: {session.lesson || "N/A"}</p>
-      <h2>Examples</h2>
-      <pre>{JSON.stringify(session.examples, null, 2)}</pre>
-      <h2>Quizzes</h2>
-      <pre>{JSON.stringify(session.quizzes, null, 2)}</pre>
-      <h2>Performance History</h2>
-      <pre>{JSON.stringify(session.performanceHistory, null, 2)}</pre>
+    <div className="container flex flex-col h-screen">
+      <h1 className="text-2xl font-bold mb-4">
+        Session Details
+        <Link href="/history" className="text-sm text-primary underline ml-4">
+          Back to History
+        </Link>
+      </h1>
+      <div className="flex-1 overflow-y-auto">
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <MessageList messages={messages} showTimeStamps={false} />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+      {session.notes && (
+        <div className="mt-4 p-4 rounded-lg border bg-muted">
+          <h2 className="text-lg font-semibold">Notes</h2>
+          <p>{session.notes}</p>
+        </div>
+      )}
     </div>
   );
 }

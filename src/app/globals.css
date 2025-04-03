@@ -1,109 +1,128 @@
 /* src/app/globals.css */
+@config "../../tailwind.config.js";
+@import "tailwindcss";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Define CSS variables for light and dark modes */
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.75rem;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 26.1%;
+    --input: 240 5.9% 26.1%;
+    --ring: 240 4.9% 83.9%;
+    --radius: 0.75rem;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
   }
 }
 
-/* Base styles */
-html,
-body {
-  padding: 0;
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: var(--background);
-  color: var(--foreground);
+/* Custom styles for submit button */
+button[type="submit"] {
+  background-color: hsl(var(--secondary)) !important;
+  color: hsl(var(--secondary-foreground)) !important;
 }
 
-/* Add custom styles for elements not easily styled with Tailwind */
-textarea {
-  min-height: 100px;
+button[type="submit"]:hover {
+  background-color: hsl(var(--muted)) !important;
 }
 
-/* Tutoring guide styles */
-.guide {
-  margin-top: 20px;
-  text-align: left;
+/* Custom styles for message bubbles */
+.chat-message-user {
+  color: hsl(var(--foreground)) !important; /* White for user messages */
 }
 
-.step {
-  margin-bottom: 20px;
+.chat-message-assistant {
+  background-color: hsl(var(--secondary)) !important; /* Light gray for assistant messages */
+  color: hsl(var(--secondary-foreground)) !important;
 }
 
-.step h3 {
-  font-size: 1.2rem;
-  margin-bottom: 10px;
+/* Custom styles for input area */
+.message-input textarea {
+  background-color: hsl(var(--input)) !important;
+  border-color: hsl(var(--border)) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  color: hsl(var(--foreground)) !important;
 }
 
-/* Fade transition styles */
-.fade {
-  animation: fadeIn 300ms ease-out;
+.message-input textarea::placeholder {
+  color: hsl(var(--muted-foreground)) !important;
 }
 
+/* Style the icons/buttons in the input area */
+.message-input .absolute.right-3.top-3 button {
+  background-color: hsl(var(--secondary)) !important;
+  color: hsl(var(--secondary-foreground)) !important;
+  border: none !important;
+}
+
+.message-input .absolute.right-3.top-3 button:hover {
+  background-color: hsl(var(--muted)) !important;
+}
+
+/* Essential animations */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: none; /* Simplify for mobile */
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
+@layer utilities {
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
   }
-  h1 {
-    font-size: 1.5rem; /* Smaller heading on mobile */
-  }
-  h2 {
-    font-size: 1.25rem;
-  }
-  h3 {
-    font-size: 1rem;
-  }
-  button {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    min-height: 48px; /* Touch-friendly size */
-    width: 100%; /* Full-width buttons on mobile */
-  }
-  textarea {
-    font-size: 0.875rem;
-  }
-  img {
-    max-width: 150px; /* Smaller images on mobile */
-  }
-}
 
-@media (min-width: 769px) {
-  button {
-    padding: 0.75rem 1.5rem;
-    font-size: 1rem;
-    width: auto; /* Buttons auto-size on desktop */
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
   }
-  img {
-    max-width: 200px;
-  }
+
+  .animate-accordion-down { animation: accordion-down 0.2s ease-out; }
+  .animate-accordion-up { animation: accordion-up 0.2s ease-out; }
 }
