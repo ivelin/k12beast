@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendXAIRequest, handleXAIError } from "../../../utils/xai";
+import { sendXAIRequest, handleXAIError } from "../../../utils/xaiClient";
 import supabase from "../../../supabase/serverClient";
 import { v4 as uuidv4 } from "uuid";
 
