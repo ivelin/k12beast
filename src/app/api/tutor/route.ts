@@ -8,6 +8,7 @@ const responseFormat = `Return a JSON object with the tutoring lesson based on t
 and original input problem or image. The response must include an evaluation of the student's problem and
 proposed solution (if provided), followed by a personalized lesson. Structure: {"isK12": true, "lesson":"..."}. 
 If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn.
+Encourage the student to requet more examples and quizzes when ready. Do not quiz them yet.
 If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}.`;
 
 const defaultResponse = {

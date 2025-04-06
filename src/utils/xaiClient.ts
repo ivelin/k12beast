@@ -107,15 +107,7 @@ Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
       let rawContent = response.choices[0].message.content.trim();
 
       let content: XAIResponse;
-      // Escape control characters in the JSON string
-      // Sanitize and parse
-      // const sanitizedInput = rawContent.replace(/[\x00-\x1F\x7F-\x9F]/g, '');      
-      // Sanitize: Remove only problematic control characters, preserve \n (10) and \t (9)
-      const sanitizedInput = rawContent
-      .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '') // Remove bad controls
-      .replace(/\n/g, '\\n') // Escape raw newlines
-      .replace(/\t/g, '\\t'); // Escape raw tabs
-      content = JSON.parse(sanitizedInput);
+      content = JSON.parse(rawContent);
 
       console.log("xAI API response content object:", content);
 

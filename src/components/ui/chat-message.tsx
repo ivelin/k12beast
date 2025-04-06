@@ -1,9 +1,11 @@
+// src/components/ui/chat-message.tsx
 "use client"
 
 import React, { useMemo, useState } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { motion } from "framer-motion"
 import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react"
+import DOMPurify from "dompurify"
 
 import { cn } from "@/utils"
 import {
@@ -113,6 +115,7 @@ export interface Message {
   experimental_attachments?: Attachment[]
   toolInvocations?: ToolInvocation[]
   parts?: MessagePart[]
+  renderAs?: "markdown" | "html"  // New attribute to control rendering
 }
 
 export interface ChatMessageProps extends Message {
@@ -131,6 +134,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   experimental_attachments,
   toolInvocations,
   parts,
+  renderAs = "markdown",  // Default to markdown rendering
 }) => {
   const files = useMemo(() => {
     return experimental_attachments?.map((attachment) => {
@@ -233,7 +237,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-        <MarkdownRenderer>{content}</MarkdownRenderer>
+        {renderAs === "html" ? (
+          // Render as safe HTML using DOMPurify
+          <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} />
+        ) : (
+          // Render as Markdown using MarkdownRenderer
+          <MarkdownRenderer>{content}</MarkdownRenderer>
+        )}
         {actions ? (
           <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
             {actions}

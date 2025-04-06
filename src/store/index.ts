@@ -1,3 +1,4 @@
+// src/store/index.ts
 import { create } from 'zustand';
 
 type Step = "problem" | "lesson" | "examples" | "quizzes" | "end" | "share";
@@ -15,9 +16,9 @@ interface AppState {
   loading: boolean;
   quizAnswer: string;
   quizFeedback: any;
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  messages: Array<{ role: "user" | "assistant"; content: string; renderAs?: "markdown" | "html" }>;
   set: (updates: Partial<AppState>) => void;
-  addMessage: (message: { role: string; content: string }) => void;
+  addMessage: (message: { role: string; content: string; renderAs?: "markdown" | "html" }) => void;
   handleSubmit: (problem: string, imageUrls: string[]) => Promise<void>;
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
@@ -58,16 +59,13 @@ const useAppStore = create<AppState>((set, get) => ({
       // Extract the content string from the nested structure
       const contentString = await res.text();
 
-      // Parse the content string into a JSON object
-      // const content = JSON.parse(contentString);
-
       // Update the state with the lesson content and proceed to the lesson step
       set({
         sessionId: res.headers.get("x-session-id") || sessionId,
         lesson: contentString,
         step: "lesson",
       });
-      addMessage({ role: "assistant", content: contentString });
+      addMessage({ role: "assistant", content: contentString, renderAs: "html" });
     } catch (err) {
       console.error("Error in handleSubmit:", err);
       set({ error: err.message || "Failed to fetch lesson" });
