@@ -1,4 +1,3 @@
-// src/store/index.ts
 import { create } from 'zustand';
 
 type Step = "problem" | "lesson" | "examples" | "quizzes" | "end" | "share";
@@ -55,16 +54,22 @@ const useAppStore = create<AppState>((set, get) => ({
         headers: { "Content-Type": "application/json", "x-session-id": sessionId || "" },
         body: JSON.stringify({ problem, images: imageUrls }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to fetch lesson");
-      if (!data.isK12) throw new Error(data.error || "Prompt must be K12-related");
+
+      // Extract the content string from the nested structure
+      const contentString = await res.text();
+
+      // Parse the content string into a JSON object
+      // const content = JSON.parse(contentString);
+
+      // Update the state with the lesson content and proceed to the lesson step
       set({
         sessionId: res.headers.get("x-session-id") || sessionId,
-        lesson: data.lesson,
+        lesson: contentString,
         step: "lesson",
       });
-      addMessage({ role: "assistant", content: data.lesson });
+      addMessage({ role: "assistant", content: contentString });
     } catch (err) {
+      console.error("Error in handleSubmit:", err);
       set({ error: err.message || "Failed to fetch lesson" });
     } finally {
       set({ loading: false });

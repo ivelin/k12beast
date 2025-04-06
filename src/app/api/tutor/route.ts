@@ -1,16 +1,14 @@
+// src/app/api/tutor/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { sendXAIRequest, handleXAIError } from "../../../utils/xaiClient";
+import { sendXAIRequest } from "../../../utils/xaiClient";
 import supabase from "../../../supabase/serverClient";
 import { v4 as uuidv4 } from "uuid";
 
 const responseFormat = `Return a JSON object with the tutoring lesson based on the provided chat history
 and original input problem or image. The response must include an evaluation of the student's problem and
-proposed solution (if provided), followed by a personalized lesson. Structure: {"isK12": true, "lesson":
-"**Evaluation:** Evaluation comments...\n\n**Lesson:** Lesson content..."}. Use pure Markdown for formatting
-(e.g., **bold**, *italic*, - for lists). Do not include HTML tags (e.g., <p>, <strong>). Use double newlines
-for paragraph breaks. If no proposed solution is provided, the evaluation section should explain the
-problem's context and what the student needs to learn. If not K12-related, return {"isK12": false, "error":
-"Prompt must be related to K12 education"}.`;
+proposed solution (if provided), followed by a personalized lesson. Structure: {"isK12": true, "lesson":"..."}. 
+If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn.
+If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}.`;
 
 const defaultResponse = {
   isK12: true,
@@ -25,7 +23,6 @@ export async function POST(req: NextRequest) {
     console.log("Tutor request body:", { problem, images });
     console.log("Tutor session ID from header:", sessionId);
 
-    // Fetch or create session
     let sessionHistory = null;
     if (sessionId) {
       const { data, error } = await supabase
@@ -78,13 +75,20 @@ export async function POST(req: NextRequest) {
       chatHistory: sessionHistory?.messages || [],
     });
 
+    console.log("tutor/route xAI API response content object:", content);
+    console.log("tutor/route xAI API response content object content.isK12:", content.isK12);
+    console.log("tutor/route xAI API response content object content.isK12:", content["isK12"]);
+    console.log("Type of content:", typeof content);
+    console.log("Content keys:", Object.keys(content));
+
     if (content.isK12) {
+      const lessonContent = content.lesson;
       const { data, error } = await supabase
         .from("sessions")
         .update({
           problem: problem || null,
           images: images || null,
-          lesson: content.lesson,
+          lesson: lessonContent,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sessionId)
@@ -93,18 +97,29 @@ export async function POST(req: NextRequest) {
 
       if (error) {
         console.error("Error updating session with lesson:", error.message);
-      } else {
-        console.log("Session updated with lesson for ID:", sessionId,
-          "Updated data:", data);
+        return NextResponse.json(
+          { error: "Failed to update session" },
+          { status: 500 }
+        );
       }
-    }
+      console.log("Session updated with lesson for ID:", sessionId,
+        "Updated data:", data);
 
-    return NextResponse.json(content, {
-      status: 200,
-      headers: { "x-session-id": sessionId },
-    });
+      return new NextResponse(lessonContent, {
+        status: 200,
+        headers: { "x-session-id": sessionId },
+      });
+    } else {
+      return NextResponse.json(
+        { error: content.error || "Prompt must be related to K12 education" },
+        { status: 400 }
+      );
+    }
   } catch (err) {
     console.error("Unexpected error in tutor route:", err);
-    return handleXAIError(err);
+    return NextResponse.json(
+      { error: err.message || "Unexpected error in tutor route" },
+      { status: 500 }
+    );
   }
 }

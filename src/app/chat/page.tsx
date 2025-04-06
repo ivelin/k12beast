@@ -34,16 +34,15 @@ export default function ChatPage() {
   } = useAppStore();
 
   useEffect(() => {
-    // Reset state only if we're starting a new chat session
     if (step === "problem" && !hasSubmittedProblem) {
       useAppStore.getState().reset();
     }
   }, [step, hasSubmittedProblem]);
 
   useEffect(() => {
-    // Debug log to confirm loading state
-    console.log("Loading state:", loading);
-  }, [loading]);
+    console.log("ChatPage messages:", messages);
+    console.log("ChatPage loading:", loading);
+  }, [messages, loading]);
 
   const handleSuggestionAction = (action: string) => {
     switch (action) {
@@ -63,7 +62,6 @@ export default function ChatPage() {
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
-      {/* Main Content */}
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 flex flex-col">
         <ChatContainer className="flex-1">
           <ChatMessages className="flex flex-col items-start">

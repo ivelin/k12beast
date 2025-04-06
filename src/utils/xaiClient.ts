@@ -1,3 +1,4 @@
+// src/utils/xaiClient.ts
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
 
@@ -26,14 +27,6 @@ interface XAIRequestOptions {
   maxTokens?: number;
   validateK12?: boolean;
   chatHistory?: { role: string; content: string }[];
-}
-
-function stripHtmlTags(text: string): string {
-  const htmlTagRegex = /<\/?[^>]+(>|$)/g;
-  if (htmlTagRegex.test(text)) {
-    console.warn("HTML tags detected in AI response, stripping them:", text);
-  }
-  return text.replace(htmlTagRegex, "");
 }
 
 export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
@@ -67,17 +60,15 @@ avoid repeating examples or quiz problems already given, and adjust difficulty b
 If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the
 student answered correctly, or simpler content if they answered incorrectly.`;
 
-  const systemMessage = `You are a highly professional K12 tutor. Your role is to assist students with
-educational queries related to K12 subjects. Validate inputs and respond only to valid K12 queries using
-the chat history for context.
-
-Always return valid JSON with responses in pure Markdown format (e.g., use **bold**, *italic*, - for lists).
-Do not include any HTML tags (e.g., <p>, <strong>), JavaScript, extra formatting, or code blocks. Use
-Markdown syntax for all formatting (e.g., **bold** instead of <strong>bold</strong>). For paragraph breaks,
-use double newlines to separate paragraphs. Do not escape newlines (e.g., do not use \\n or \\n\\n; use
-actual newlines instead). Ensure the response contains only the JSON object with the Markdown content in the
-appropriate field (e.g., {"lesson": "Line 1\n\nLine 2"}), without additional text, whitespace, or formatting
-outside the JSON object. Do not wrap the JSON in code blocks (e.g., do not use triple backticks with json).`;
+  const systemMessage = `You are a K12 tutor. Assist with educational queries related to K12 subjects.
+Respond only to valid K12 queries using the chat history for context. 
+Respond in a conversational style as if you are speaking directly with a K12 student.
+Return a raw JSON object
+(formatted for JSON.parse()) with response fields in 
+a string with plain text or minimal HTML formatting (use only <p>, <strong>, <ul>, <li> tags, no attributes or scripts). 
+Ensure all quotes are escaped (e.g., \") and no raw control characters are included.
+Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
+`;
 
   const messages: any[] = [
     {
@@ -113,44 +104,20 @@ outside the JSON object. Do not wrap the JSON in code blocks (e.g., do not use t
       const response = await openai.chat.completions.create(requestPayload);
       console.log("Full xAI API response:", JSON.stringify(response, null, 2));
 
+      let rawContent = response.choices[0].message.content.trim();
+
       let content: XAIResponse;
-      let rawContent = response.choices[0].message.content;
+      // Escape control characters in the JSON string
+      // Sanitize and parse
+      // const sanitizedInput = rawContent.replace(/[\x00-\x1F\x7F-\x9F]/g, '');      
+      // Sanitize: Remove only problematic control characters, preserve \n (10) and \t (9)
+      const sanitizedInput = rawContent
+      .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '') // Remove bad controls
+      .replace(/\n/g, '\\n') // Escape raw newlines
+      .replace(/\t/g, '\\t'); // Escape raw tabs
+      content = JSON.parse(sanitizedInput);
 
-      const codeBlockRegex = /^```json\n([\s\S]*?)\n```$/;
-      const match = rawContent.match(codeBlockRegex);
-      if (match) {
-        rawContent = match[1].trim();
-      }
-
-      try {
-        rawContent = rawContent.replace(/\\(?![\\"])/g, "\\\\");
-        content = JSON.parse(rawContent);
-      } catch (err) {
-        console.warn("xAI API response is not valid JSON, treating as plain text:", rawContent);
-        content = {
-          ...defaultResponse,
-          lesson: stripHtmlTags(rawContent),
-        };
-      }
-
-      if (content.lesson) content.lesson = stripHtmlTags(content.lesson);
-      if (content.error) content.error = stripHtmlTags(content.error);
-      if (content.problem) content.problem = stripHtmlTags(content.problem);
-      if (content.solution) {
-        content.solution = content.solution.map(step => ({
-          ...step,
-          title: stripHtmlTags(step.title),
-          content: stripHtmlTags(step.content),
-        }));
-      }
-      if (content.options) {
-        content.options = content.options.map(option => stripHtmlTags(option));
-      }
-      if (content.correctAnswer) content.correctAnswer = stripHtmlTags(content.correctAnswer);
-
-      if (validateK12 && content.isK12 === false) {
-        throw new Error(content.error || "Prompt must be related to K12 education");
-      }
+      console.log("xAI API response content object:", content);
 
       return content;
     } catch (error) {
@@ -159,4 +126,5 @@ outside the JSON object. Do not wrap the JSON in code blocks (e.g., do not use t
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
+  throw new Error("Failed to get a response after maximum retries");
 }
