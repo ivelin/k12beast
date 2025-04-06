@@ -1,6 +1,7 @@
+// src/app/chat/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { ChatContainer, ChatMessages, ChatForm } from "@/components/ui/chat";
 import { MessageList } from "@/components/ui/message-list";
@@ -12,124 +13,31 @@ export default function ChatPage() {
   const {
     step,
     problem,
-    submittedProblem,
+    messages,
     images,
     imageUrls,
-    lesson,
-    examples,
     quiz,
-    error,
     loading,
     quizAnswer,
-    quizIsCorrect,
-    quizCommentary,
     quizFeedback,
     hasSubmittedProblem,
     setStep,
     setProblem,
     setImages,
-    setImageUrls,
-    setLesson,
-    setExamples,
-    setQuiz,
-    setError,
-    setLoading,
     handleExamplesRequest,
     handleQuizSubmit,
     handleValidate,
     handleEndSession,
-    reset,
+    handleSubmit,
+    append,
   } = useAppStore();
 
-  const [messages, setMessages] = useState<any[]>([]);
-
   useEffect(() => {
-    const newMessages: any[] = [];
-    if (submittedProblem) {
-      newMessages.push({ role: "user", content: submittedProblem });
+    // Reset state if we're starting a new chat session
+    if (step === "problem" && !hasSubmittedProblem) {
+      useAppStore.getState().reset();
     }
-    if (lesson) {
-      newMessages.push({ role: "assistant", content: lesson });
-    }
-    if (examples) {
-      newMessages.push({
-        role: "assistant",
-        content: `<p><strong>New Example:</strong></p><p><strong>Problem:</strong> ${examples.problem}</p>${examples.solution.map((step: any) => `<p><strong>${step.title}:</strong> ${step.content}</p>`).join("")}`,
-      });
-    }
-    if (quiz) {
-      newMessages.push({
-        role: "assistant",
-        content: `<p><strong>Quiz:</strong></p><p>${quiz.problem}</p><ul>${quiz.options.map((option: string) => `<li><input type="radio" name="quiz" value="${option}" ${quizAnswer === option ? "checked" : ""} onChange={(e) => useAppStore.setState({ quizAnswer: e.target.value })} /> ${option}</li>`).join("")}</ul>`,
-      });
-      if (quizFeedback) {
-        newMessages.push({
-          role: "assistant",
-          content: `<p><strong>Feedback:</strong></p>${quizCommentary}${quizFeedback.solution ? quizFeedback.solution.map((step: any) => `<p><strong>${step.title}:</strong> ${step.content}</p>`).join("") : ""}`,
-        });
-      }
-    }
-    if (error) {
-      newMessages.push({ role: "assistant", content: `<p class="text-destructive">${error}</p>` });
-    }
-    setMessages(newMessages);
-  }, [submittedProblem, lesson, examples, quiz, quizAnswer, quizFeedback, quizCommentary, error]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!problem) {
-      setError("Please enter a problem.");
-      return;
-    }
-    setLoading(true);
-    setMessages([...messages, { role: "user", content: problem }]);
-    try {
-      const response = await fetch("/api/tutor", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": useAppStore.getState().sessionId || "",
-        },
-        body: JSON.stringify({ problem, images: imageUrls }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to fetch tutor lesson");
-      const newSessionId = response.headers.get("x-session-id");
-      if (newSessionId) useAppStore.setState({ sessionId: newSessionId });
-      setLesson(data.lesson);
-      setStep("examples");
-    } catch (err) {
-      setError(err.message || "Failed to fetch tutor lesson.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const append = async (message: { role: string; content: string }) => {
-    setProblem(message.content);
-    setMessages([...messages, message]);
-    setLoading(true);
-    try {
-      const response = await fetch("/api/tutor", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": useAppStore.getState().sessionId || "",
-        },
-        body: JSON.stringify({ problem: message.content, images: imageUrls }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to fetch tutor lesson");
-      const newSessionId = response.headers.get("x-session-id");
-      if (newSessionId) useAppStore.setState({ sessionId: newSessionId });
-      setLesson(data.lesson);
-      setStep("examples");
-    } catch (err) {
-      setError(err.message || "Failed to fetch tutor lesson.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [step, hasSubmittedProblem]);
 
   const handleSuggestionAction = (action: string) => {
     switch (action) {
@@ -159,7 +67,7 @@ export default function ChatPage() {
             <PromptSuggestions
               className="mb-8"
               label="Try these prompts ✨"
-              append={append}
+              append={(message) => append(message, imageUrls)}
               suggestions={[
                 "Explain step-by-step how to solve this math problem: if x * x + 9 = 25, what is x?",
                 "Problem: Room 1 is at 18'C. Room 2 is at 22'C. Which direction will heat flow?.",
@@ -179,7 +87,10 @@ export default function ChatPage() {
             <ChatForm
               className="mt-auto"
               isPending={loading}
-              handleSubmit={handleSubmit}
+              handleSubmit={(e) => {
+                e.preventDefault();
+                handleSubmit(problem, imageUrls);
+              }}
             >
               {({ files, setFiles }) => (
                 <MessageInput

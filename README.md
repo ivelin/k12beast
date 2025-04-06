@@ -2,19 +2,16 @@
 
 K12Beast is a personalized tutoring app for K12 students, designed to help them master concepts through tailored lessons, examples, and quizzes based on their test results. 
 
-At a high level the student experience flows like this: 
-  - Problem Input:
-    - Student inputs problem and optionally a proposed solution via text or images.
-  - Tutoring Lesson: 
-    - AI offers a personalized analysis of the problem, proposed solution (when present) and a  subject lesson.
-  - Example Problems with  Solutions:
-    - Upon student request AI presents similar problem examples with solutions for self study
-  - Quizzes:
-    - Upon student request AI presents optional Quizzes for self testing
-  - End Session: 
-    - Student ends session when they feel ready
-  - Share:
-    - Student can share session with their parents and teachers
+The student experience follows this flow: 
+  - **Student Registration/Login**: Students register or log in to access the app.
+  - **New Chat Session**: Students start a new chat session to begin their learning journey.
+  - **Problem Submission with Optional Student Solution**: Students input a problem and optionally a proposed solution via text or images.
+  - **AI Problem Evaluation and Solution Comments**: The AI evaluates the problem and the student’s proposed solution (if provided), offering comments on correctness and areas for improvement.
+  - **Personalized Tutoring Lesson**: The AI delivers a tailored lesson based on the problem and the student’s performance.
+  - **More Similar Problem Examples**: Upon request, the AI provides additional problem examples with solutions for self-study.
+  - **Quizzes**: Upon request, the AI offers quizzes for self-testing to reinforce learning.
+  - **End Session**: Students end the session when they feel ready.
+  - **Share Session with Parents**: Students can share the session with their parents or teachers for review.
 
 Built with Super Grok 3, Next.js, it leverages Supabase (or any PostgreSQL database) for data storage and the Grok/X xAI API for generating educational content. 
 This guide will walk you through setting up a local instance of the app from scratch.

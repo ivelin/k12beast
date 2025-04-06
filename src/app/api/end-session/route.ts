@@ -1,44 +1,33 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
+import supabase from "../../../supabase/serverClient";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export async function POST(request: Request) {
+  const { sessionId } = await request.json();
+  const sessionHeaderId = request.headers.get("x-session-id");
 
-export async function POST(request: NextRequest) {
-  const sessionId = request.headers.get("x-session-id");
-  const { sessionId: bodySessionId } = await request.json();
-
-  try {
-    if (!sessionId && !bodySessionId) {
-      throw new Error("Session ID is required");
-    }
-
-    const id = sessionId || bodySessionId;
-
-    const { error } = await supabase
-      .from("sessions")
-      .update({
-        completed: true,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (error) {
-      throw new Error(`Failed to end session: ${error.message}`);
-    }
-
-    // Construct a fully qualified shareable link
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-    const shareableLink = `${baseUrl}/session/${id}`;
-
-    return NextResponse.json({ shareableLink });
-  } catch (error) {
-    console.error("Error ending session:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to end session" },
-      { status: 500 }
-    );
+  if (!sessionId || sessionId !== sessionHeaderId) {
+    return NextResponse.json({ error: "Invalid or missing session ID" }, { status: 400 });
   }
+
+  const { data: session, error: sessionError } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .single();
+
+  if (sessionError || !session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+
+  const { error: updateError } = await supabase
+    .from("sessions")
+    .update({ completed: true, completed_at: new Date().toISOString() })
+    .eq("id", sessionId);
+
+  if (updateError) {
+    return NextResponse.json({ error: "Failed to end session" }, { status: 500 });
+  }
+
+  const shareableLink = `/session/${sessionId}`;
+  return NextResponse.json({ shareableLink });
 }

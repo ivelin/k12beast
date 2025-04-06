@@ -1,7 +1,8 @@
+// src/store/index.ts
 import { create } from 'zustand';
 
 interface AppState {
-  step: "problem" | "lesson" | "examples" | "quizzes" | "end"; // Added "examples"
+  step: "problem" | "lesson" | "examples" | "quizzes" | "end";
   sessionId: string | null;
   problem: string;
   submittedProblem: string | null;
@@ -19,6 +20,7 @@ interface AppState {
   quizFeedback: any;
   hasSubmittedProblem: boolean;
   sessionEnded: boolean;
+  messages: any[]; // Add messages to the store
   setStep: (step: string) => void;
   setSessionId: (sessionId: string | null) => void;
   setProblem: (problem: string) => void;
@@ -33,10 +35,13 @@ interface AppState {
   setLoading: (loading: boolean) => void;
   setHasSubmittedProblem: (hasSubmitted: boolean) => void;
   setSessionEnded: (ended: boolean) => void;
+  addMessage: (message: { role: string; content: string }) => void; // Action to add a message
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
   handleValidate: (answer: string, quiz: any) => Promise<void>;
   handleEndSession: () => Promise<void>;
+  handleSubmit: (problem: string, imageUrls: string[]) => Promise<void>; // New action for submission
+  append: (message: { role: string; content: string }, imageUrls: string[]) => Promise<void>; // New action for appending
   reset: () => void;
 }
 
@@ -59,6 +64,7 @@ const useAppStore = create<AppState>((set, get) => ({
   quizFeedback: null,
   hasSubmittedProblem: false,
   sessionEnded: false,
+  messages: [], // Initialize messages in the store
   setStep: (step) => set({ step }),
   setSessionId: (sessionId) => set({ sessionId }),
   setProblem: (problem) => set({ problem }),
@@ -73,8 +79,9 @@ const useAppStore = create<AppState>((set, get) => ({
   setLoading: (loading) => set({ loading }),
   setHasSubmittedProblem: (hasSubmitted) => set({ hasSubmittedProblem: hasSubmitted }),
   setSessionEnded: (ended) => set({ sessionEnded: ended }),
+  addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
   handleExamplesRequest: async () => {
-    const { problem, imageUrls, sessionId, setExamples, setError, setLoading } = get();
+    const { problem, imageUrls, sessionId, setExamples, setError, setLoading, addMessage } = get();
     try {
       if (!problem && imageUrls.length === 0) {
         throw new Error("Please enter a problem or upload an image.");
@@ -93,7 +100,13 @@ const useAppStore = create<AppState>((set, get) => ({
         throw new Error(data.error || "Failed to fetch examples");
       }
       setExamples(data);
-      set({ step: "examples" }); // Transition to examples step
+      addMessage({
+        role: "assistant",
+        content: `**New Example:**\n\n**Problem:** ${data.problem}\n\n${data.solution
+          .map((step: any) => `**${step.title}:** ${step.content}`)
+          .join("\n\n")}`,
+      });
+      set({ step: "examples" });
     } catch (err) {
       setError(err.message || "Failed to fetch examples. Please try again.");
     } finally {
@@ -101,10 +114,10 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
   handleQuizSubmit: async () => {
-    const { problem, imageUrls, sessionId, setQuiz, setError, setLoading } = get();
+    const { problem, imageUrls, sessionId, setQuiz, setError, setLoading, addMessage } = get();
     try {
       if (!problem && imageUrls.length === 0) {
-        throw new Error("Please enter a problem or upload an image before requesting a quiz.");
+        throw new Error("Please enter a problem or upload an image before requesting a quizz.");
       }
       setLoading(true);
       set({ step: "quizzes" });
@@ -121,6 +134,12 @@ const useAppStore = create<AppState>((set, get) => ({
         throw new Error(data.error || "Failed to fetch quiz");
       }
       setQuiz(data);
+      addMessage({
+        role: "assistant",
+        content: `**Quiz:**\n\n${data.problem}\n\n${data.options
+          .map((option: string) => `- [ ] ${option}`)
+          .join("\n")}`,
+      });
       set({ quizAnswer: '', quizIsCorrect: null, quizCommentary: '', quizFeedback: null });
     } catch (err) {
       setError(err.message || "Failed to fetch quiz. Please try again.");
@@ -129,7 +148,7 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
   handleValidate: async (answer: string, quiz: any) => {
-    const { sessionId, setError, setLoading } = get();
+    const { sessionId, setError, setLoading, addMessage } = get();
     try {
       if (!answer) {
         throw new Error("Please select an option before validating.");
@@ -167,6 +186,16 @@ const useAppStore = create<AppState>((set, get) => ({
           solution: data.solution || null,
         },
       });
+      addMessage({
+        role: "assistant",
+        content: `**Feedback:**\n\n${data.commentary}${
+          data.solution
+            ? `\n\n${data.solution
+                .map((step: any) => `**${step.title}:** ${step.content}`)
+                .join("\n\n")}`
+            : ""
+        }`,
+      });
     } catch (err) {
       console.error("Error in handleValidate:", err);
       setError(err.message || "Failed to validate quiz. Please try again.");
@@ -199,6 +228,86 @@ const useAppStore = create<AppState>((set, get) => ({
       setError("Failed to end session. Please try again.");
     }
   },
+  handleSubmit: async (problem: string, imageUrls: string[]) => {
+    const { sessionId, setLesson, setStep, setError, setLoading, setSubmittedProblem, addMessage } = get();
+    try {
+      if (!problem) {
+        throw new Error("Please enter a problem.");
+      }
+      setLoading(true);
+      setSubmittedProblem(problem);
+      addMessage({ role: "user", content: problem });
+      const response = await fetch("/api/tutor", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId || "",
+        },
+        body: JSON.stringify({ problem, images: imageUrls }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to fetch tutor lesson");
+      const newSessionId = response.headers.get("x-session-id");
+      if (newSessionId) set({ sessionId: newSessionId });
+      let lessonContent = data.lesson;
+      try {
+        const parsed = JSON.parse(data.lesson);
+        if (parsed.isK12 && parsed.lesson) {
+          lessonContent = parsed.lesson;
+        } else {
+          throw new Error("Invalid lesson format");
+        }
+      } catch (err) {
+        console.warn("Failed to parse lesson JSON, using raw content:", data.lesson);
+      }
+      setLesson(data.lesson);
+      addMessage({ role: "assistant", content: lessonContent });
+      setStep("examples");
+    } catch (err) {
+      setError(err.message || "Failed to fetch tutor lesson.");
+    } finally {
+      setLoading(false);
+    }
+  },
+  append: async (message: { role: string; content: string }, imageUrls: string[]) => {
+    const { setProblem, setSubmittedProblem, setLesson, setStep, setError, setLoading, addMessage } = get();
+    setProblem(message.content);
+    setSubmittedProblem(message.content);
+    addMessage(message);
+    setLoading(true);
+    try {
+      const response = await fetch("/api/tutor", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": get().sessionId || "",
+        },
+        body: JSON.stringify({ problem: message.content, images: imageUrls }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to fetch tutor lesson");
+      const newSessionId = response.headers.get("x-session-id");
+      if (newSessionId) set({ sessionId: newSessionId });
+      let lessonContent = data.lesson;
+      try {
+        const parsed = JSON.parse(data.lesson);
+        if (parsed.isK12 && parsed.lesson) {
+          lessonContent = parsed.lesson;
+        } else {
+          throw new Error("Invalid lesson format");
+        }
+      } catch (err) {
+        console.warn("Failed to parse lesson JSON, using raw content:", data.lesson);
+      }
+      setLesson(data.lesson);
+      addMessage({ role: "assistant", content: lessonContent });
+      setStep("examples");
+    } catch (err) {
+      setError(err.message || "Failed to fetch tutor lesson.");
+    } finally {
+      setLoading(false);
+    }
+  },
   reset: () =>
     set({
       step: 'problem',
@@ -219,6 +328,7 @@ const useAppStore = create<AppState>((set, get) => ({
       quizFeedback: null,
       hasSubmittedProblem: false,
       sessionEnded: false,
+      messages: [], // Reset messages
     }),
 }));
 

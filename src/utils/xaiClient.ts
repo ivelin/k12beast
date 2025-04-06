@@ -15,6 +15,7 @@ interface XAIResponse {
   answerFormat?: string;
   options?: string[];
   correctAnswer?: string;
+  readiness?: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
 }
 
 interface XAIRequestOptions {
@@ -23,8 +24,16 @@ interface XAIRequestOptions {
   responseFormat: string;
   defaultResponse: XAIResponse;
   maxTokens?: number;
-  sessionHistory?: any;
   validateK12?: boolean;
+  chatHistory?: { role: string; content: string }[];
+}
+
+function stripHtmlTags(text: string): string {
+  const htmlTagRegex = /<\/?[^>]+(>|$)/g;
+  if (htmlTagRegex.test(text)) {
+    console.warn("HTML tags detected in AI response, stripping them:", text);
+  }
+  return text.replace(htmlTagRegex, "");
 }
 
 export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
@@ -34,27 +43,41 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     responseFormat,
     defaultResponse,
     maxTokens = 1000,
-    sessionHistory = null,
     validateK12 = false,
+    chatHistory = [],
   } = options;
 
   validateRequestInputs(problem, images);
 
-  const sessionContext = sessionHistory
-    ? `Session History: ${JSON.stringify(sessionHistory, null, 2)}`
-    : "No session history available.";
+  const chatHistoryText = chatHistory.length > 0
+    ? `Chat History:\n${chatHistory.map(msg =>
+      `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`).join("\n")}`
+    : "No chat history available.";
 
-  const prompt = `You are a highly professional K12 tutor. Your role is to assist students with educational queries related to K12 subjects. Use the provided session history to understand the student's progress, including past lessons, examples, quiz results, and performance trends. Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the session context. Adapt your response based on this history—e.g., avoid repeating examples or quiz problems already given (check the 'examples' and 'quizzes' arrays in the session history), and adjust difficulty based on performance trends (simpler content for struggling students, more challenging for those excelling).
+  const prompt = `Original Input Problem (if provided): "${problem || 'No text provided'}"
 
-Original Input Problem (if provided): "${problem || 'No text provided'}"
-
-${sessionContext}
+${chatHistoryText}
 
 ${responseFormat}
 
-Ensure the response is valid JSON without any additional text, whitespace, or formatting outside the JSON object. Do not wrap the JSON in code blocks (e.g., do not use triple backticks with json). Return only the JSON object.`;
+Use the provided chat history to understand the student's progress, including past lessons, examples,
+quiz results, and interactions. Infer the student's approximate age, grade level, and skill level
+(beginner, intermediate, advanced) from the chat history. Adapt your response based on this history—e.g.,
+avoid repeating examples or quiz problems already given, and adjust difficulty based on performance trends.
+If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the
+student answered correctly, or simpler content if they answered incorrectly.`;
 
-  const systemMessage = "You are a K12 tutor. Validate inputs and respond only to valid K12 queries using the session history for context. Always return valid JSON without extra formatting or code blocks.";
+  const systemMessage = `You are a highly professional K12 tutor. Your role is to assist students with
+educational queries related to K12 subjects. Validate inputs and respond only to valid K12 queries using
+the chat history for context.
+
+Always return valid JSON with responses in pure Markdown format (e.g., use **bold**, *italic*, - for lists).
+Do not include any HTML tags (e.g., <p>, <strong>), JavaScript, extra formatting, or code blocks. Use
+Markdown syntax for all formatting (e.g., **bold** instead of <strong>bold</strong>). For paragraph breaks,
+use double newlines to separate paragraphs. Do not escape newlines (e.g., do not use \\n or \\n\\n; use
+actual newlines instead). Ensure the response contains only the JSON object with the Markdown content in the
+appropriate field (e.g., {"lesson": "Line 1\n\nLine 2"}), without additional text, whitespace, or formatting
+outside the JSON object. Do not wrap the JSON in code blocks (e.g., do not use triple backticks with json).`;
 
   const messages: any[] = [
     {
@@ -84,7 +107,6 @@ Ensure the response is valid JSON without any additional text, whitespace, or fo
   };
   console.log("Full xAI API request:", JSON.stringify(requestPayload, null, 2));
 
-  // Retry logic: up to 3 attempts with 1-second delay
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -107,9 +129,24 @@ Ensure the response is valid JSON without any additional text, whitespace, or fo
         console.warn("xAI API response is not valid JSON, treating as plain text:", rawContent);
         content = {
           ...defaultResponse,
-          lesson: `<p>${rawContent.replace(/\n/g, "<br>")}</p>`,
+          lesson: stripHtmlTags(rawContent),
         };
       }
+
+      if (content.lesson) content.lesson = stripHtmlTags(content.lesson);
+      if (content.error) content.error = stripHtmlTags(content.error);
+      if (content.problem) content.problem = stripHtmlTags(content.problem);
+      if (content.solution) {
+        content.solution = content.solution.map(step => ({
+          ...step,
+          title: stripHtmlTags(step.title),
+          content: stripHtmlTags(step.content),
+        }));
+      }
+      if (content.options) {
+        content.options = content.options.map(option => stripHtmlTags(option));
+      }
+      if (content.correctAnswer) content.correctAnswer = stripHtmlTags(content.correctAnswer);
 
       if (validateK12 && content.isK12 === false) {
         throw new Error(content.error || "Prompt must be related to K12 education");
@@ -119,7 +156,7 @@ Ensure the response is valid JSON without any additional text, whitespace, or fo
     } catch (error) {
       if (attempt === maxRetries) throw error;
       console.warn(`xAI request failed (attempt ${attempt}/${maxRetries}):`, error.message);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
 }

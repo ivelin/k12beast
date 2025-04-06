@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendXAIRequest, handleXAIError } from "../../../utils/xaiClient";
+import { sendXAIRequest, handleXAIError } from "@/utils/xaiClient";
 import supabase from "../../../supabase/serverClient";
 import { v4 as uuidv4 } from "uuid";
 
-const responseFormat = `Return a JSON object with a new quiz problem based on the provided session history. The quiz must be related to the same topic as the original input problem or image (e.g., if the input is about heat transfer, the quiz must also be about heat transfer). Do not repeat problems from the session history (check the 'examples' and 'quizzes' arrays). Do not reference images in the problem text. The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. Provide a brief context or scenario to make the problem engaging. Adjust the difficulty based on the student's performance history: if the student answered the last quiz correctly (check 'performanceHistory'), increase the difficulty slightly; if incorrectly, use a similar or easier difficulty. Include a step-by-step solution for the quiz problem, adapted to the student's inferred grade and skill level (beginner, intermediate, advanced) based on the session context, and provide more detailed explanations if the student answered the last quiz incorrectly. Structure: {"problem": "Quiz problem text", "answerFormat": "multiple-choice", "options": ["option1", "option2", "option3", "option4"], "correctAnswer": "correct option", "solution": [{"title": "Step 1", "content": "<p>Step content...</p>"}, ...], "difficulty": "easy|medium|hard", "encouragement": "Words of encouragement if the last quiz was answered correctly, otherwise null"}. Ensure all fields are present, especially the "solution" field with at least two steps.`;
+const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the
+original input problem (e.g., if the input is about heat transfer, the quiz must also be about heat
+transfer). The quiz must be a multiple-choice question with exactly four distinct and plausible options
+that test the student's understanding of the topic. Provide a brief context or scenario to make the
+problem engaging. Do not repeat problems from the session history. Do not reference images in the
+problem text. Additionally, assess the student's readiness for an end-of-semester test based on their
+overall performance in the chat history, considering quiz performance (correctness, consistency, and
+difficulty), engagement with lessons and examples (e.g., fewer example requests might indicate mastery),
+and inferred skill level and progress (e.g., improvement over time). Provide two confidence levels: one
+if the student answers this quiz correctly, and one if they answer incorrectly. Structure: {"problem":
+"Quiz problem text", "answerFormat": "multiple-choice", "options": ["option1", "option2", "option3",
+"option4"], "correctAnswer": "correct option", "solution": [{"title": "Step 1", "content": "Step
+content in Markdown"}, ...], "difficulty": "easy|medium|hard", "encouragement": "Words of encouragement
+if the last quiz was answered correctly, otherwise null", "readiness": {"confidenceIfCorrect": 0.92,
+"confidenceIfIncorrect": 0.75}}. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be
+numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 90%
+success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz
+correctly or incorrectly. Ensure all fields are present, especially the "solution" field with at least
+two steps.`;
 
 const defaultResponse = {
   problem: "",
@@ -11,16 +29,17 @@ const defaultResponse = {
   options: [],
   correctAnswer: "",
   solution: [
-    { title: "Step 1", content: "<p>No solution provided by the model.</p>" },
-    { title: "Step 2", content: "<p>Please try another quiz.</p>" },
+    { title: "Step 1", content: "No solution provided by the model." },
+    { title: "Step 2", content: "Please try another quiz." },
   ],
   difficulty: "medium",
   encouragement: null,
+  readiness: { confidenceIfCorrect: 0, confidenceIfIncorrect: 0 },
 };
 
 export async function POST(req: NextRequest) {
   try {
-    const { problem, images } = await req.json();
+    const { problem, images, chatHistory } = await req.json();
     let sessionId = req.headers.get("x-session-id");
 
     console.log("Quiz request body:", { problem, images });
@@ -63,7 +82,7 @@ export async function POST(req: NextRequest) {
       responseFormat,
       defaultResponse,
       maxTokens: 1000,
-      sessionHistory,
+      chatHistory,
     });
 
     console.log("Generated quiz:", content);
@@ -83,6 +102,7 @@ export async function POST(req: NextRequest) {
       solution: content.solution, // Store the solution server-side
       difficulty: content.difficulty,
       encouragement: content.encouragement,
+      readiness: content.readiness,
     };
 
     const updatedQuizzes = [...(sessionHistory.quizzes || []), quizToStore];
@@ -107,6 +127,7 @@ export async function POST(req: NextRequest) {
         correctAnswer: content.correctAnswer,
         difficulty: content.difficulty,
         encouragement: content.encouragement,
+        readiness: content.readiness,
       },
       {
         status: 200,
