@@ -18,6 +18,7 @@ interface AppState {
   quizFeedback: any;
   messages: Array<{ role: "user" | "assistant"; content: string; renderAs?: "markdown" | "html" }>;
   set: (updates: Partial<AppState>) => void;
+  setStep: (step: Step) => void;
   addMessage: (message: { role: string; content: string; renderAs?: "markdown" | "html" }) => void;
   handleSubmit: (problem: string, imageUrls: string[]) => Promise<void>;
   handleExamplesRequest: () => Promise<void>;
@@ -44,6 +45,7 @@ const useAppStore = create<AppState>((set, get) => ({
   quizFeedback: null,
   messages: [],
   set: (updates) => set(updates),
+  setStep: (step) => set({ step }),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
   handleSubmit: async (problem, imageUrls) => {
     const { sessionId, addMessage } = get();
@@ -111,7 +113,8 @@ const useAppStore = create<AppState>((set, get) => ({
       set({ quiz: data, quizAnswer: '', quizFeedback: null });
       addMessage({
         role: "assistant",
-        content: `**Quiz:**\n\n${data.problem}\n\n${data.options.map((o: string) => `- [ ] ${o}`).join("\n")}`,
+        content: `<strong>Quiz:</strong><br>${data.problem}<br><ul>${data.options.map((o: string) => `<li>${o}</li>`).join("")}</ul>`,
+        renderAs: "html",
       });
     } catch (err) {
       set({ error: err.message || "Failed to fetch quiz" });
@@ -131,9 +134,12 @@ const useAppStore = create<AppState>((set, get) => ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to validate quiz");
       set({ quizAnswer: answer, quizFeedback: data });
+      // Since QuizSection will add the feedback message via onQuizUpdate, we can skip adding it here
+      // But for consistency, we'll ensure any fallback message is rendered as HTML
       addMessage({
         role: "assistant",
-        content: `**Feedback:**\n\n${data.commentary}${data.solution ? `\n\n${data.solution.map((s: any) => `**${s.title}:** ${s.content}`).join("\n\n")}` : ""}`,
+        content: `<strong>Feedback:</strong><br>${data.commentary}${data.solution ? `<br><br>${data.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}` : ""}`,
+        renderAs: "html",
       });
     } catch (err) {
       set({ error: err.message || "Failed to validate quiz" });

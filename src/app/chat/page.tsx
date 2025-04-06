@@ -9,6 +9,7 @@ import { MessageInput } from "@/components/ui/message-input";
 import { PromptSuggestions } from "@/components/ui/prompt-suggestions";
 import useAppStore from "@/store";
 import SessionEnd from "./SessionEnd";
+import QuizSection from "./QuizSection";
 
 export default function ChatPage() {
   const {
@@ -31,6 +32,7 @@ export default function ChatPage() {
     handleEndSession,
     handleSubmit,
     append,
+    addMessage,
   } = useAppStore();
 
   useEffect(() => {
@@ -57,6 +59,16 @@ export default function ChatPage() {
         break;
       default:
         break;
+    }
+  };
+
+  const handleQuizUpdate = (update: { type: string; content: string }) => {
+    if (update.type === "result") {
+      addMessage({
+        role: "assistant",
+        content: update.content,
+        renderAs: "html",
+      });
     }
   };
 
@@ -115,15 +127,7 @@ export default function ChatPage() {
           )}
         </ChatContainer>
         {step === "quizzes" && quiz && !quizFeedback && (
-          <div className="flex gap-2 justify-center py-4">
-            <button
-              onClick={() => handleValidate(quizAnswer, quiz)}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-              disabled={loading || !quizAnswer}
-            >
-              Submit Quiz
-            </button>
-          </div>
+          <QuizSection onQuizUpdate={handleQuizUpdate} />
         )}
         {step === "share" && <SessionEnd />}
       </div>
