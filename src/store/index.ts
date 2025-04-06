@@ -77,7 +77,7 @@ const useAppStore = create<AppState>((set, get) => ({
     const { problem, imageUrls, sessionId, addMessage } = get();
     set({ loading: true });
     try {
-      addMessage({ role: "user", content: "Request Example" });
+      addMessage({ role: "user", content: "Another Example" });
       const res = await fetch("/api/examples", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-session-id": sessionId || "" },
