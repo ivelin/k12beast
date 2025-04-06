@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 
 interface AppState {
-  step: "problem" | "lesson" | "examples" | "quizzes" | "end";
+  step: "problem" | "lesson" | "examples" | "quizzes" | "end" | "share";
   sessionId: string | null;
   problem: string;
   submittedProblem: string | null;
@@ -20,7 +20,7 @@ interface AppState {
   quizFeedback: any;
   hasSubmittedProblem: boolean;
   sessionEnded: boolean;
-  messages: any[]; // Add messages to the store
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
   setStep: (step: string) => void;
   setSessionId: (sessionId: string | null) => void;
   setProblem: (problem: string) => void;
@@ -35,13 +35,14 @@ interface AppState {
   setLoading: (loading: boolean) => void;
   setHasSubmittedProblem: (hasSubmitted: boolean) => void;
   setSessionEnded: (ended: boolean) => void;
-  addMessage: (message: { role: string; content: string }) => void; // Action to add a message
+  addMessage: (message: { role: string; content: string }) => void;
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
   handleValidate: (answer: string, quiz: any) => Promise<void>;
   handleEndSession: () => Promise<void>;
-  handleSubmit: (problem: string, imageUrls: string[]) => Promise<void>; // New action for submission
-  append: (message: { role: string; content: string }, imageUrls: string[]) => Promise<void>; // New action for appending
+  handleSubmit: (problem: string, imageUrls: string[]) => Promise<void>;
+  append: (message: { role: string; content: string },
+    imageUrls: string[]) => Promise<void>;
   reset: () => void;
 }
 
@@ -64,7 +65,7 @@ const useAppStore = create<AppState>((set, get) => ({
   quizFeedback: null,
   hasSubmittedProblem: false,
   sessionEnded: false,
-  messages: [], // Initialize messages in the store
+  messages: [],
   setStep: (step) => set({ step }),
   setSessionId: (sessionId) => set({ sessionId }),
   setProblem: (problem) => set({ problem }),
@@ -81,7 +82,8 @@ const useAppStore = create<AppState>((set, get) => ({
   setSessionEnded: (ended) => set({ sessionEnded: ended }),
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
   handleExamplesRequest: async () => {
-    const { problem, imageUrls, sessionId, setExamples, setError, setLoading, addMessage } = get();
+    const { problem, imageUrls, sessionId, setExamples, setError,
+      setLoading, addMessage } = get();
     try {
       if (!problem && imageUrls.length === 0) {
         throw new Error("Please enter a problem or upload an image.");
@@ -114,7 +116,8 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
   handleQuizSubmit: async () => {
-    const { problem, imageUrls, sessionId, setQuiz, setError, setLoading, addMessage } = get();
+    const { problem, imageUrls, sessionId, messages, setQuiz, setError,
+      setLoading, addMessage } = get();
     try {
       if (!problem && imageUrls.length === 0) {
         throw new Error("Please enter a problem or upload an image before requesting a quizz.");
@@ -127,7 +130,7 @@ const useAppStore = create<AppState>((set, get) => ({
           "Content-Type": "application/json",
           "x-session-id": sessionId || "",
         },
-        body: JSON.stringify({ problem, images: imageUrls }),
+        body: JSON.stringify({ problem, images: imageUrls, chatHistory: messages }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -205,7 +208,8 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
   handleEndSession: async () => {
-    const { sessionId, setShareableLink, setError, setSessionEnded } = get();
+    const { sessionId, setShareableLink, setError, setSessionEnded,
+      setStep, addMessage } = get();
     try {
       if (!sessionId) {
         throw new Error("Session ID is missing.");
@@ -224,19 +228,24 @@ const useAppStore = create<AppState>((set, get) => ({
       }
       setShareableLink(data.shareableLink);
       setSessionEnded(true);
+      addMessage({ role: "assistant",
+        content: "**Session Ended:** Your session has been saved." });
+      setStep("share");
     } catch (err) {
       setError("Failed to end session. Please try again.");
     }
   },
   handleSubmit: async (problem: string, imageUrls: string[]) => {
-    const { sessionId, setLesson, setStep, setError, setLoading, setSubmittedProblem, addMessage } = get();
+    const { sessionId, setLesson, setStep, setError, setLoading,
+      setSubmittedProblem, addMessage } = get();
     try {
-      if (!problem) {
-        throw new Error("Please enter a problem.");
+      if (!problem && imageUrls.length === 0) {
+        throw new Error("Please enter a problem or upload an image.");
       }
       setLoading(true);
       setSubmittedProblem(problem);
       addMessage({ role: "user", content: problem });
+
       const response = await fetch("/api/tutor", {
         method: "POST",
         headers: {
@@ -249,7 +258,9 @@ const useAppStore = create<AppState>((set, get) => ({
       if (!response.ok) throw new Error(data.error || "Failed to fetch tutor lesson");
       const newSessionId = response.headers.get("x-session-id");
       if (newSessionId) set({ sessionId: newSessionId });
-      let lessonContent = data.lesson;
+
+      // Parse the JSON response to extract the lesson content
+      let lessonContent: string;
       try {
         const parsed = JSON.parse(data.lesson);
         if (parsed.isK12 && parsed.lesson) {
@@ -259,10 +270,12 @@ const useAppStore = create<AppState>((set, get) => ({
         }
       } catch (err) {
         console.warn("Failed to parse lesson JSON, using raw content:", data.lesson);
+        lessonContent = data.lesson; // Fallback to raw content if parsing fails
       }
-      setLesson(data.lesson);
+
+      setLesson(lessonContent);
       addMessage({ role: "assistant", content: lessonContent });
-      setStep("examples");
+      setStep("lesson");
     } catch (err) {
       setError(err.message || "Failed to fetch tutor lesson.");
     } finally {
@@ -270,7 +283,8 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
   append: async (message: { role: string; content: string }, imageUrls: string[]) => {
-    const { setProblem, setSubmittedProblem, setLesson, setStep, setError, setLoading, addMessage } = get();
+    const { setProblem, setSubmittedProblem, setLesson, setStep, setError,
+      setLoading, addMessage } = get();
     setProblem(message.content);
     setSubmittedProblem(message.content);
     addMessage(message);
@@ -288,7 +302,9 @@ const useAppStore = create<AppState>((set, get) => ({
       if (!response.ok) throw new Error(data.error || "Failed to fetch tutor lesson");
       const newSessionId = response.headers.get("x-session-id");
       if (newSessionId) set({ sessionId: newSessionId });
-      let lessonContent = data.lesson;
+
+      // Parse the JSON response to extract the lesson content
+      let lessonContent: string;
       try {
         const parsed = JSON.parse(data.lesson);
         if (parsed.isK12 && parsed.lesson) {
@@ -298,10 +314,12 @@ const useAppStore = create<AppState>((set, get) => ({
         }
       } catch (err) {
         console.warn("Failed to parse lesson JSON, using raw content:", data.lesson);
+        lessonContent = data.lesson; // Fallback to raw content if parsing fails
       }
-      setLesson(data.lesson);
+
+      setLesson(lessonContent);
       addMessage({ role: "assistant", content: lessonContent });
-      setStep("examples");
+      setStep("lesson");
     } catch (err) {
       setError(err.message || "Failed to fetch tutor lesson.");
     } finally {
@@ -328,7 +346,7 @@ const useAppStore = create<AppState>((set, get) => ({
       quizFeedback: null,
       hasSubmittedProblem: false,
       sessionEnded: false,
-      messages: [], // Reset messages
+      messages: [],
     }),
 }));
 

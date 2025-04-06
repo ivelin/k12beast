@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { toast } from "sonner";
 import useAppStore from "../../store";
 
 export default function SessionEnd() {
@@ -17,9 +18,9 @@ export default function SessionEnd() {
           url: shareableLink,
         });
         console.log("Successfully shared via Web Share API");
+        toast.success("Session shared successfully!");
       } catch (err) {
         console.error("Error sharing session via Web Share API:", err);
-        // Fallback to clipboard if sharing fails
         handleClipboardFallback();
       }
     } else {
@@ -31,12 +32,14 @@ export default function SessionEnd() {
   const handleClipboardFallback = () => {
     if (shareableLink) {
       navigator.clipboard.writeText(shareableLink).then(() => {
-        alert("Shareable link copied to clipboard!");
+        toast.success("Shareable link copied to clipboard!");
       }).catch((err) => {
         console.error("Error copying to clipboard:", err);
+        toast.error("Failed to copy link to clipboard.");
       });
     } else {
       console.error("No shareable link available to copy");
+      toast.error("No shareable link available.");
     }
   };
 

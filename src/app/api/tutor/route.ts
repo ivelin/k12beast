@@ -3,7 +3,14 @@ import { sendXAIRequest, handleXAIError } from "../../../utils/xaiClient";
 import supabase from "../../../supabase/serverClient";
 import { v4 as uuidv4 } from "uuid";
 
-const responseFormat = `Return a JSON object with the tutoring lesson based on the provided session history and original input problem or image. Structure: {"isK12": true, "lesson": "<p>Lesson content...</p>"}. If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}.`;
+const responseFormat = `Return a JSON object with the tutoring lesson based on the provided chat history
+and original input problem or image. The response must include an evaluation of the student's problem and
+proposed solution (if provided), followed by a personalized lesson. Structure: {"isK12": true, "lesson":
+"**Evaluation:** Evaluation comments...\n\n**Lesson:** Lesson content..."}. Use pure Markdown for formatting
+(e.g., **bold**, *italic*, - for lists). Do not include HTML tags (e.g., <p>, <strong>). Use double newlines
+for paragraph breaks. If no proposed solution is provided, the evaluation section should explain the
+problem's context and what the student needs to learn. If not K12-related, return {"isK12": false, "error":
+"Prompt must be related to K12 education"}.`;
 
 const defaultResponse = {
   isK12: true,
@@ -43,8 +50,8 @@ export async function POST(req: NextRequest) {
         .from("sessions")
         .insert({
           id: sessionId,
-          problem: problem || null, // Store the problem
-          images: images || null,   // Store the images
+          problem: problem || null,
+          images: images || null,
           created_at: new Date().toISOString(),
         })
         .select()
@@ -52,7 +59,10 @@ export async function POST(req: NextRequest) {
 
       if (error) {
         console.error("Error creating session:", error.message);
-        return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
+        return NextResponse.json(
+          { error: "Failed to create session" },
+          { status: 500 }
+        );
       }
       sessionHistory = data;
       console.log("Created new session:", sessionId, "Data:", sessionHistory);
@@ -65,15 +75,15 @@ export async function POST(req: NextRequest) {
       defaultResponse,
       validateK12: true,
       maxTokens: 1000,
-      sessionHistory,
+      chatHistory: sessionHistory?.messages || [],
     });
 
     if (content.isK12) {
       const { data, error } = await supabase
         .from("sessions")
         .update({
-          problem: problem || null, // Ensure problem is preserved
-          images: images || null,   // Ensure images are preserved
+          problem: problem || null,
+          images: images || null,
           lesson: content.lesson,
           updated_at: new Date().toISOString(),
         })
@@ -84,7 +94,8 @@ export async function POST(req: NextRequest) {
       if (error) {
         console.error("Error updating session with lesson:", error.message);
       } else {
-        console.log("Session updated with lesson for ID:", sessionId, "Updated data:", data);
+        console.log("Session updated with lesson for ID:", sessionId,
+          "Updated data:", data);
       }
     }
 
