@@ -58,16 +58,16 @@ const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify({ problem, images: imageUrls }),
       });
 
-      // Extract the content string from the nested structure
-      const contentString = await res.text();
+      // Extract the lesson content directly as a string
+      const lessonContent = await res.text();
 
       // Update the state with the lesson content and proceed to the lesson step
       set({
         sessionId: res.headers.get("x-session-id") || sessionId,
-        lesson: contentString,
+        lesson: lessonContent,
         step: "lesson",
       });
-      addMessage({ role: "assistant", content: contentString, renderAs: "html" });
+      addMessage({ role: "assistant", content: lessonContent, renderAs: "html" });
     } catch (err) {
       console.error("Error in handleSubmit:", err);
       set({ error: err.message || "Failed to fetch lesson" });

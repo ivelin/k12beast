@@ -8,7 +8,7 @@ const responseFormat = `Return a JSON object with the tutoring lesson based on t
 and original input problem or image. The response must include an evaluation of the student's problem and
 proposed solution (if provided), followed by a personalized lesson. Structure: {"isK12": true, "lesson":"..."}. 
 If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn.
-Encourage the student to requet more examples and quizzes when ready. Do not quiz them yet.
+Encourage the student to request more examples and quizzes when ready. Do not quiz them yet.
 If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}.`;
 
 export async function POST(request: Request) {
@@ -43,10 +43,15 @@ export async function POST(request: Request) {
       problem,
       images,
       responseFormat,
-      defaultResponse: { lesson: 'No lesson generated.' },
+      defaultResponse: { isK12: true, lesson: 'No lesson generated.' },
       validateK12: true,
       chatHistory: [], // Add chat history if needed
     });
+
+    // Check if the response is K12-related
+    if (!lessonResponse.isK12) {
+      throw new Error(lessonResponse.error || 'Prompt must be related to K12 education');
+    }
 
     if (!lessonResponse.lesson) {
       throw new Error('No lesson returned from xAI API');
@@ -62,8 +67,12 @@ export async function POST(request: Request) {
       throw new Error(`Failed to update session with lesson: ${updateError.message}`);
     }
 
-    return NextResponse.json(lessonResponse, {
-      headers: { 'x-session-id': sessionId },
+    // Return the lesson content directly as a string (not wrapped in JSON)
+    return new NextResponse(lessonResponse.lesson, {
+      headers: {
+        'Content-Type': 'text/plain', // Indicate that the response is plain text (HTML string)
+        'x-session-id': sessionId,
+      },
     });
   } catch (error) {
     return handleApiError(error, '/api/tutor');
