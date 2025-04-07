@@ -1,92 +1,71 @@
-// src/app/api/tutor/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import supabase from "../../../supabase/serverClient";
-import { sendXAIRequest } from "@/utils/xaiClient";
+import { v4 as uuidv4 } from 'uuid'; // Import uuid for generating session IDs
+import { NextResponse } from 'next/server';
+import supabase from '@/supabase/serverClient';
+import { sendXAIRequest } from '@/utils/xaiClient';
+import { handleApiError } from '@/utils/errorHandler';
 
-export async function POST(req: NextRequest) {
+const responseFormat = `Return a JSON object with the tutoring lesson based on the provided chat history
+and original input problem or image. The response must include an evaluation of the student's problem and
+proposed solution (if provided), followed by a personalized lesson. Structure: {"isK12": true, "lesson":"..."}. 
+If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn.
+Encourage the student to requet more examples and quizzes when ready. Do not quiz them yet.
+If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}.`;
+
+export async function POST(request: Request) {
   try {
-    const { problem, images } = await req.json();
-    const sessionId = req.headers.get("x-session-id");
+    const { problem, images } = await request.json();
+    const sessionId = request.headers.get('x-session-id') || uuidv4(); // Use provided sessionId or generate a new one
 
-    let session;
-    let chatHistory: { role: string; content: string; renderAs?: "markdown" | "html" }[] = [];
+    console.log('Creating new session with problem:', { problem, images });
 
-    if (sessionId) {
-      const { data, error } = await supabase
-        .from("sessions")
-        .select("*")
-        .eq("id", sessionId)
-        .single();
+    // Insert a new session with a generated ID
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert({
+        id: sessionId, // Provide the ID
+        lesson: null,
+        examples: null,
+        quizzes: null,
+        performanceHistory: null,
+      })
+      .select()
+      .single();
 
-      if (error || !data) {
-        console.error("Error fetching session:", error?.message || "No data returned");
-        return NextResponse.json({ error: "Session not found" }, { status: 404 });
-      }
-
-      session = data;
-      chatHistory = session.messages || [];
-      console.log("Tutor session ID from header:", sessionId);
-    } else {
-      console.log("Creating new session with problem:", problem, "images:", images);
-      const { data, error } = await supabase
-        .from("sessions")
-        .insert({
-          problem,
-          images: images || [],
-          messages: [{ role: "user", content: problem }],
-        })
-        .select()
-        .single();
-
-      if (error || !data) {
-        console.error("Error creating session:", error?.message || "No data returned");
-        throw new Error(`Failed to create session: ${error?.message || "Unknown error"}`);
-      }
-
-      session = data;
-      chatHistory = session.messages || [];
-      console.log("Created new session:", session.id, "Data:", session);
+    if (error || !data) {
+      console.error('Error creating session:', error?.message || 'No data returned');
+      throw new Error(`Failed to create session: ${error?.message || 'Unknown error'}`);
     }
 
-    // Optimized response format instructions
-    const responseFormat = `Return a JSON object with a tutoring lesson based on the chat history and original input problem. Structure: {"isK12": true, "lesson": "<p>Lesson content...</p>"}. The lesson should be a conversational explanation with minimal HTML formatting (e.g., <p>, <strong>, <ul>, <li>). Include an evaluation of the student's problem and proposed solution (if provided), or explain the problem's context and what the student needs to learn if no solution is provided. Encourage the student to request more examples and quizzes when ready, but do not quiz them yet. If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}. Ensure the lesson is concise and appropriate for the student's inferred skill level.`;
+    const session = data;
 
-    const xaiResponse = await sendXAIRequest({
+    // Send request to xAI API for a lesson
+    const lessonResponse = await sendXAIRequest({
       problem,
       images,
       responseFormat,
-      defaultResponse: { error: "Failed to create session" },
-      chatHistory,
+      defaultResponse: { lesson: 'No lesson generated.' },
+      validateK12: true,
+      chatHistory: [], // Add chat history if needed
     });
 
-    if (!xaiResponse.isK12) {
-      return NextResponse.json({ error: xaiResponse.error || "Invalid K12 query" }, { status: 400 });
+    if (!lessonResponse.lesson) {
+      throw new Error('No lesson returned from xAI API');
     }
 
-    const updatedMessages = [
-      ...chatHistory,
-      { role: "assistant", content: xaiResponse.lesson, renderAs: "html" },
-    ];
-
+    // Update the session with the lesson
     const { error: updateError } = await supabase
-      .from("sessions")
-      .update({
-        lesson: xaiResponse.lesson,
-        messages: updatedMessages,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", session.id);
+      .from('sessions')
+      .update({ lesson: lessonResponse.lesson })
+      .eq('id', sessionId);
 
     if (updateError) {
-      console.error("Error updating session:", updateError.message);
-      throw new Error(`Failed to update session: ${updateError.message}`);
+      throw new Error(`Failed to update session with lesson: ${updateError.message}`);
     }
 
-    console.log("Session updated with lesson for ID:", session.id, "Updated data:", { lesson: xaiResponse.lesson });
-
-    return NextResponse.json({ sessionId: session.id, messages: updatedMessages }, { status: 200 });
+    return NextResponse.json(lessonResponse, {
+      headers: { 'x-session-id': sessionId },
+    });
   } catch (error) {
-    console.error("Error in /api/tutor:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleApiError(error, '/api/tutor');
   }
 }
