@@ -83,6 +83,23 @@ button[type="submit"]:hover {
   color: hsl(var(--secondary-foreground)) !important;
 }
 
+/* Improve HTML rendering within assistant messages */
+.chat-message-assistant p {
+  margin-bottom: 1rem; /* Add spacing between paragraphs */
+  line-height: 1.5; /* Increase line spacing within paragraphs */
+}
+
+.chat-message-assistant ul {
+  list-style-type: disc; /* Ensure bullet points are visible */
+  margin-left: 1.5rem; /* Indent the list */
+  margin-bottom: 1rem; /* Add spacing below the list */
+}
+
+.chat-message-assistant li {
+  margin-bottom: 0.5rem; /* Add spacing between list items */
+  line-height: 1.5; /* Increase line spacing within list items */
+}
+
 /* Custom styles for input area */
 .message-input textarea {
   background-color: hsl(var(--input)) !important;
