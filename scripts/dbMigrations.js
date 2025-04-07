@@ -45,6 +45,8 @@ const migrationV5 = require("./migrations/migrationV5");
 const migrationV6 = require("./migrations/migrationV6");
 const migrationV7 = require("./migrations/migrationV7");
 const migrationV8 = require("./migrations/migrationV8");
+const migrationV9 = require("./migrations/migrationV9");
+const migrationV10 = require("./migrations/migrationV10");
 
 // Define the app version from package.json
 const APP_VERSION = packageJson.version;
@@ -59,6 +61,8 @@ const migrations = [
   migrationV6,
   migrationV7,
   migrationV8,
+  migrationV9,
+  migrationV10,
 ];
 
 // Mapping of database versions to the app version that introduced them
@@ -71,6 +75,8 @@ const dbVersionRequiredByAppVersion = [
   { dbVersion: 6, appVersion: "0.5.0" },
   { dbVersion: 7, appVersion: "0.6.2" },
   { dbVersion: 8, appVersion: "0.6.3" },
+  { dbVersion: 9, appVersion: "0.6.4" },
+  { dbVersion: 10, appVersion: "0.6.5" },
 ];
 
 // Run pending migrations

@@ -1,3 +1,4 @@
+// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -22,6 +23,8 @@ export async function middleware(request: NextRequest) {
       user = await res.json();
     }
     console.log("Middleware: User fetched from API -", user);
+  } else {
+    console.log("Middleware: No token found, user is not authenticated");
   }
 
   const pathname = request.nextUrl.pathname;
