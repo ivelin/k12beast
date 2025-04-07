@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
           id: sessionId,
           problem: problem || null,
           images: images || null,
+          messages: [{ role: "user", content: problem }], // Initialize messages
           created_at: new Date().toISOString(),
         })
         .select()
@@ -64,6 +65,24 @@ export async function POST(req: NextRequest) {
       }
       sessionHistory = data;
       console.log("Created new session:", sessionId, "Data:", sessionHistory);
+    } else {
+      // Update the session with the new user message
+      const updatedMessages = [
+        ...(sessionHistory.messages || []),
+        { role: "user", content: problem },
+      ];
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          messages: updatedMessages,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId);
+
+      if (error) {
+        console.error("Error updating session with messages:", error.message);
+      }
+      sessionHistory.messages = updatedMessages;
     }
 
     const content = await sendXAIRequest({
@@ -77,19 +96,25 @@ export async function POST(req: NextRequest) {
     });
 
     console.log("tutor/route xAI API response content object:", content);
-    console.log("tutor/route xAI API response content object content.isK12:", content.isK12);
-    console.log("tutor/route xAI API response content object content.isK12:", content["isK12"]);
+    console.log("tutor/route xAI API response content.isK12:", content.isK12);
+    console.log("tutor/route xAI API response content['isK12']:", content["isK12"]);
     console.log("Type of content:", typeof content);
     console.log("Content keys:", Object.keys(content));
 
     if (content.isK12) {
       const lessonContent = content.lesson;
+      // Update the session with the assistant's response
+      const updatedMessages = [
+        ...(sessionHistory.messages || []),
+        { role: "assistant", content: lessonContent, renderAs: "html" },
+      ];
       const { data, error } = await supabase
         .from("sessions")
         .update({
           problem: problem || null,
           images: images || null,
           lesson: lessonContent,
+          messages: updatedMessages,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sessionId)

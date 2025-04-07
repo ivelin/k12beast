@@ -1,5 +1,7 @@
+// src/app/api/quiz/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { sendXAIRequest, handleXAIError } from "@/utils/xaiClient";
+import { sendXAIRequest } from "@/utils/xaiClient";
+import { handleXAIError } from "@/utils/xaiUtils";
 import supabase from "../../../supabase/serverClient";
 import { v4 as uuidv4 } from "uuid";
 
@@ -29,8 +31,8 @@ const defaultResponse = {
   options: [],
   correctAnswer: "",
   solution: [
-    { title: "Step 1", content: "No solution provided by the model." },
-    { title: "Step 2", content: "Please try another quiz." },
+    { title: "Step 1", "content": "No solution provided by the model." },
+    { title: "Step 2", "content": "Please try another quiz." },
   ],
   difficulty: "medium",
   encouragement: null,
@@ -39,7 +41,7 @@ const defaultResponse = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { problem, images, chatHistory } = await req.json();
+    const { problem, images } = await req.json();
     let sessionId = req.headers.get("x-session-id");
 
     console.log("Quiz request body:", { problem, images });
@@ -66,14 +68,36 @@ export async function POST(req: NextRequest) {
       sessionId = uuidv4();
       const { error } = await supabase
         .from("sessions")
-        .insert({ id: sessionId, created_at: new Date().toISOString() });
+        .insert({
+          id: sessionId,
+          messages: [{ role: "user", content: "Take a Quiz" }],
+          created_at: new Date().toISOString(),
+        });
 
       if (error) {
         console.error("Error creating session:", error.message);
         return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
       }
-      sessionHistory = { id: sessionId, created_at: new Date().toISOString() };
+      sessionHistory = { id: sessionId, created_at: new Date().toISOString(), messages: [{ role: "user", content: "Take a Quiz" }] };
       console.log("Created new session for quiz:", sessionId);
+    } else {
+      // Update the session with the user's request for a quiz
+      const updatedMessages = [
+        ...(sessionHistory.messages || []),
+        { role: "user", content: "Take a Quiz" },
+      ];
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          messages: updatedMessages,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId);
+
+      if (error) {
+        console.error("Error updating session with messages:", error.message);
+      }
+      sessionHistory.messages = updatedMessages;
     }
 
     const content = await sendXAIRequest({
@@ -82,7 +106,7 @@ export async function POST(req: NextRequest) {
       responseFormat,
       defaultResponse,
       maxTokens: 1000,
-      chatHistory,
+      chatHistory: sessionHistory?.messages || [],
     });
 
     console.log("Generated quiz:", content);
@@ -106,10 +130,20 @@ export async function POST(req: NextRequest) {
     };
 
     const updatedQuizzes = [...(sessionHistory.quizzes || []), quizToStore];
+    // Append the assistant's response to the messages array
+    const updatedMessages = [
+      ...(sessionHistory?.messages || []),
+      {
+        role: "assistant",
+        content: `<strong>Quiz:</strong><br>${content.problem}<br><ul>${content.options.map((o: string) => `<li>${o}</li>`).join("")}</ul>`,
+        renderAs: "html",
+      },
+    ];
     const { error: updateError } = await supabase
       .from("sessions")
       .update({
         quizzes: updatedQuizzes,
+        messages: updatedMessages,
         updated_at: new Date().toISOString(),
       })
       .eq("id", sessionId);

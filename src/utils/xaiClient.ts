@@ -26,7 +26,7 @@ interface XAIRequestOptions {
   defaultResponse: XAIResponse;
   maxTokens?: number;
   validateK12?: boolean;
-  chatHistory?: { role: string; content: string }[];
+  chatHistory?: { role: string; content: string; renderAs?: "markdown" | "html" }[];
 }
 
 export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
@@ -56,9 +56,9 @@ ${responseFormat}
 Use the provided chat history to understand the student's progress, including past lessons, examples,
 quiz results, and interactions. Infer the student's approximate age, grade level, and skill level
 (beginner, intermediate, advanced) from the chat history. Adapt your response based on this history—e.g.,
-avoid repeating examples or quiz problems already given, and adjust difficulty based on performance trends.
-If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the
-student answered correctly, or simpler content if they answered incorrectly.`;
+avoid repeating examples or quiz problems already given (as specified in the chat history),
+and adjust difficulty based on performance trends. If the chat history includes quiz responses, adjust the difficulty:
+provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.`;
 
   const systemMessage = `You are a K12 tutor. Assist with educational queries related to K12 subjects.
 Respond only to valid K12 queries using the chat history for context. 
@@ -120,3 +120,5 @@ Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
   }
   throw new Error("Failed to get a response after maximum retries");
 }
+
+export { handleXAIError } from "./xaiUtils"; // Re-export for convenience

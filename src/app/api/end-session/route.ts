@@ -1,3 +1,4 @@
+// src/app/api/end-session/route.ts
 import { NextResponse } from "next/server";
 import supabase from "../../../supabase/serverClient";
 
@@ -19,9 +20,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
+  // Append the "End Session" message to the messages array
+  const updatedMessages = [
+    ...(session.messages || []),
+    { role: "user", content: "End Session" },
+    { role: "assistant", content: "**Session Ended:** Saved." },
+  ];
+
   const { error: updateError } = await supabase
     .from("sessions")
-    .update({ completed: true, completed_at: new Date().toISOString() })
+    .update({
+      completed: true,
+      completed_at: new Date().toISOString(),
+      messages: updatedMessages,
+    })
     .eq("id", sessionId);
 
   if (updateError) {

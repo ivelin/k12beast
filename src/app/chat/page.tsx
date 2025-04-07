@@ -48,7 +48,7 @@ export default function ChatPage() {
 
   const handleSuggestionAction = (action: string) => {
     switch (action) {
-      case "Another Example":
+      case "Request Example":
         handleExamplesRequest();
         break;
       case "Take a Quiz":
@@ -96,7 +96,7 @@ export default function ChatPage() {
               className="mb-8"
               label="What would you like to do next?"
               append={(message) => handleSuggestionAction(message.content)}
-              suggestions={["Another Example", "Take a Quiz", "End Session"]}
+              suggestions={["Request Example", "Take a Quiz", "End Session"]}
             />
           )}
           {(step === "problem" || step === "lesson") && (

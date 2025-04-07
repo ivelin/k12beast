@@ -1,3 +1,4 @@
+// src/app/api/validate/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -49,10 +50,21 @@ export async function POST(request: NextRequest) {
       { ...quiz, answer, isCorrect, commentary },
     ];
 
+    // Append the feedback to the messages array
+    const updatedMessages = [
+      ...(session.messages || []),
+      {
+        role: "assistant",
+        content: `<strong>Feedback:</strong><br>${commentary}${isCorrect ? "" : `<br><br>${quiz.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}`}`,
+        renderAs: "html",
+      },
+    ];
+
     const { error: updateError } = await supabase
       .from("sessions")
       .update({
         quizzes: updatedQuizzes,
+        messages: updatedMessages,
         performanceHistory: [
           ...(session.performanceHistory || []),
           { isCorrect },

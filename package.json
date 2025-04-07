@@ -1,6 +1,6 @@
 {
   "name": "k12beast",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "scripts": {
     "dev": "node scripts/migrate.js && next dev",
@@ -31,6 +31,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "remeda": "^2.21.2",
+    "semver": "^7.7.1",
     "shiki": "^1.29.2",
     "sonner": "^2.0.3",
     "tailwind-merge": "^2.5.2",

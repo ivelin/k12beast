@@ -79,7 +79,7 @@ const useAppStore = create<AppState>((set, get) => ({
     const { problem, imageUrls, sessionId, addMessage } = get();
     set({ loading: true });
     try {
-      addMessage({ role: "user", content: "Another Example" });
+      addMessage({ role: "user", content: "Request Example" });
       const res = await fetch("/api/examples", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-session-id": sessionId || "" },
@@ -106,7 +106,7 @@ const useAppStore = create<AppState>((set, get) => ({
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-session-id": sessionId || "" },
-        body: JSON.stringify({ problem, images: imageUrls, chatHistory: messages }),
+        body: JSON.stringify({ problem, images: imageUrls }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch quiz");
