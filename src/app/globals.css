@@ -100,6 +100,23 @@ button[type="submit"]:hover {
   line-height: 1.5; /* Increase line spacing within list items */
 }
 
+/* Style the readiness progress bar */
+.chat-message-assistant .readiness-container {
+  width: 100%;
+  max-width: 300px; /* Limit the width for better readability */
+  background-color: hsl(var(--muted)); /* Background for the progress bar */
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.chat-message-assistant .readiness-bar {
+  height: 10px; /* Height of the progress bar */
+  background-color: hsl(var(--primary)); /* Color of the filled portion */
+  transition: width 0.3s ease-in-out; /* Smooth transition for the bar */
+}
+
 /* Custom styles for input area */
 .message-input textarea {
   background-color: hsl(var(--input)) !important;

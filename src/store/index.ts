@@ -177,10 +177,30 @@ const useAppStore = create<AppState>((set, get) => ({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to validate quiz");
+
+      // Determine the readiness confidence based on whether the answer is correct
+      const isCorrect = answer === quiz.correctAnswer;
+      const readinessConfidence = isCorrect
+        ? quiz.readiness.confidenceIfCorrect
+        : quiz.readiness.confidenceIfIncorrect;
+      const readinessPercentage = Math.round(readinessConfidence * 100);
+
+      // Add a motivational message based on the readiness confidence
+      let motivationalMessage = "";
+      if (readinessPercentage >= 90) {
+        motivationalMessage = "You're doing amazing! You're very likely to ace your big test!";
+      } else if (readinessPercentage >= 70) {
+        motivationalMessage = "Great progress! You're on track to do well on your big test. Keep practicing!";
+      } else if (readinessPercentage >= 50) {
+        motivationalMessage = "You're making progress! Let's keep working to boost your confidence for the big test.";
+      } else {
+        motivationalMessage = "Let's keep practicing! More effort will help you succeed on your big test.";
+      }
+
       set({ quizAnswer: answer, quizFeedback: data });
       addMessage({
         role: "assistant",
-        content: `<strong>Feedback:</strong><br><strong>Your Answer:</strong> ${answer}<br>${data.commentary}${data.solution ? `<br><br>${data.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}` : ""}`,
+        content: `<strong>Feedback:</strong><br><strong>Your Answer:</strong> ${answer}<br>${data.commentary}${data.solution ? `<br><br>${data.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}` : ""}<br><br><strong>Options:</strong><br><ul>${quiz.options.map((o: string) => `<li>${o}${o === answer ? " (Your answer)" : ""}${o === quiz.correctAnswer ? " (Correct answer)" : ""}</li>`).join("")}</ul><br><br><strong>Test Readiness:</strong><br><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}% - ${motivationalMessage}</p>`,
         renderAs: "html",
       });
     } catch (err) {
