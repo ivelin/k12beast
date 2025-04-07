@@ -1,3 +1,4 @@
+// src/app/session/[sessionId]/page.tsx
 import { createClient } from "@supabase/supabase-js";
 import { MessageList } from "@/components/ui/message-list";
 import { AnimatePresence, motion } from "framer-motion";
@@ -22,18 +23,8 @@ async function fetchSession(sessionId: string) {
 export default async function SessionDetailPage({ params }: { params: { sessionId: string } }) {
   const session = await fetchSession(params.sessionId);
 
-  const messages = [
-    { role: "user", content: session.problem || "Image-based problem" },
-    ...(session.lesson ? [{ role: "assistant", content: session.lesson }] : []),
-    ...(session.examples || []).map((example: any) => ({
-      role: "assistant",
-      content: `<p><strong>Example:</strong></p><p><strong>Problem:</strong> ${example.problem}</p>${example.solution.map((step: any) => `<p><strong>${step.title}:</strong> ${step.content}</p>`).join("")}`,
-    })),
-    ...(session.quizzes || []).map((quiz: any) => ({
-      role: "assistant",
-      content: `<p><strong>Quiz:</strong></p><p>${quiz.problem}</p><ul>${quiz.options.map((option: string) => `<li>${option}${quiz.answer === option ? ` (Your answer: ${quiz.isCorrect ? "Correct" : "Incorrect"})` : ""}</li>`).join("")}</ul>${quiz.commentary ? `<p><strong>Feedback:</strong> ${quiz.commentary}</p>` : ""}${quiz.solution ? quiz.solution.map((step: any) => `<p><strong>${step.title}:</strong> ${step.content}</p>`).join("") : ""}`,
-    })),
-  ];
+  // Use the messages array directly from the session
+  const messages = session.messages || [];
 
   return (
     <div className="container flex flex-col h-screen">

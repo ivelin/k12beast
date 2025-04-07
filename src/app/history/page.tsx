@@ -1,3 +1,4 @@
+// src/app/history/page.tsx
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
@@ -25,23 +26,27 @@ export default async function HistoryPage() {
         <p className="text-muted-foreground">No sessions found. Start a new session in the <Link href="/chat" className="text-primary underline">Chat</Link> page.</p>
       ) : (
         <div className="space-y-4">
-          {sessions.map((session: any) => (
-            <Link
-              key={session.id}
-              href={`/session/${session.id}`}
-              className="block p-4 rounded-lg border bg-card hover:bg-muted transition"
-            >
-              <h2 className="text-lg font-semibold">
-                {session.problem || "Image-based Problem"}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {new Date(session.created_at).toLocaleString()}
-              </p>
-              <p className="text-sm mt-2">
-                {session.completed ? "Completed" : "In Progress"}
-              </p>
-            </Link>
-          ))}
+          {sessions.map((session: any) => {
+            // Find the first user message to use as a preview
+            const firstUserMessage = session.messages?.find((msg: any) => msg.role === "user")?.content || "Image-based Problem";
+            return (
+              <Link
+                key={session.id}
+                href={`/session/${session.id}`}
+                className="block p-4 rounded-lg border bg-card hover:bg-muted transition"
+              >
+                <h2 className="text-lg font-semibold">
+                  {firstUserMessage}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(session.created_at).toLocaleString()}
+                </p>
+                <p className="text-sm mt-2">
+                  {session.completed ? "Completed" : "In Progress"}
+                </p>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

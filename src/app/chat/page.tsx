@@ -62,22 +62,32 @@ export default function ChatPage() {
     }
   };
 
-  const handleQuizUpdate = (update: { type: string; content: string }) => {
-    if (update.type === "result") {
-      addMessage({
-        role: "assistant",
-        content: update.content,
-        renderAs: "html",
-      });
+  // Filter messages to hide quiz options while the user is answering
+  const filteredMessages = messages.map((message) => {
+    if (
+      message.role === "assistant" &&
+      message.content.startsWith("<strong>Quiz:</strong>") &&
+      step === "quizzes" &&
+      !quizFeedback
+    ) {
+      // Extract the problem part, excluding the options
+      const problemEndIndex = message.content.indexOf("<ul>");
+      if (problemEndIndex !== -1) {
+        return {
+          ...message,
+          content: message.content.substring(0, problemEndIndex),
+        };
+      }
     }
-  };
+    return message;
+  });
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 flex flex-col">
         <ChatContainer className="flex-1">
           <ChatMessages className="flex flex-col items-start">
-            <MessageList messages={messages} isTyping={loading} />
+            <MessageList messages={filteredMessages} isTyping={loading} />
           </ChatMessages>
           {(step === "problem" && !hasSubmittedProblem) && (
             <PromptSuggestions
@@ -127,7 +137,7 @@ export default function ChatPage() {
           )}
         </ChatContainer>
         {step === "quizzes" && quiz && !quizFeedback && (
-          <QuizSection onQuizUpdate={handleQuizUpdate} />
+          <QuizSection onQuizUpdate={() => {}} />
         )}
         {step === "share" && <SessionEnd />}
       </div>

@@ -17,6 +17,7 @@ interface AppState {
   quizAnswer: string;
   quizFeedback: any;
   messages: Array<{ role: "user" | "assistant"; content: string; renderAs?: "markdown" | "html" }>;
+  hasSubmittedProblem: boolean;
   set: (updates: Partial<AppState>) => void;
   setStep: (step: Step) => void;
   addMessage: (message: { role: string; content: string; renderAs?: "markdown" | "html" }) => void;
@@ -44,24 +45,34 @@ const useAppStore = create<AppState>((set, get) => ({
   quizAnswer: '',
   quizFeedback: null,
   messages: [],
+  hasSubmittedProblem: false,
   set: (updates) => set(updates),
   setStep: (step) => set({ step }),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
   handleSubmit: async (problem, imageUrls) => {
     const { sessionId, addMessage } = get();
-    set({ loading: true, problem, imageUrls });
+    set({ loading: true, problem, imageUrls, hasSubmittedProblem: true });
     try {
       addMessage({ role: "user", content: problem });
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "x-session-id": sessionId || "",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       const res = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-session-id": sessionId || "" },
+        headers,
         body: JSON.stringify({ problem, images: imageUrls }),
       });
 
-      // Extract the lesson content directly as a string
       const lessonContent = await res.text();
 
-      // Update the state with the lesson content and proceed to the lesson step
       set({
         sessionId: res.headers.get("x-session-id") || sessionId,
         lesson: lessonContent,
@@ -80,9 +91,20 @@ const useAppStore = create<AppState>((set, get) => ({
     set({ loading: true });
     try {
       addMessage({ role: "user", content: "Request Example" });
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "x-session-id": sessionId || "",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       const res = await fetch("/api/examples", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-session-id": sessionId || "" },
+        headers,
         body: JSON.stringify({ problem, images: imageUrls }),
       });
       const data = await res.json();
@@ -103,9 +125,20 @@ const useAppStore = create<AppState>((set, get) => ({
     set({ loading: true, step: "quizzes" });
     try {
       addMessage({ role: "user", content: "Take a Quiz" });
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "x-session-id": sessionId || "",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       const res = await fetch("/api/quiz", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-session-id": sessionId || "" },
+        headers,
         body: JSON.stringify({ problem, images: imageUrls }),
       });
       const data = await res.json();
@@ -126,19 +159,28 @@ const useAppStore = create<AppState>((set, get) => ({
     const { sessionId, addMessage } = get();
     set({ loading: true });
     try {
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "x-session-id": sessionId || "",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       const res = await fetch("/api/validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-session-id": sessionId || "" },
+        headers,
         body: JSON.stringify({ sessionId, problem: quiz.problem, answer }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to validate quiz");
       set({ quizAnswer: answer, quizFeedback: data });
-      // Since QuizSection will add the feedback message via onQuizUpdate, we can skip adding it here
-      // But for consistency, we'll ensure any fallback message is rendered as HTML
       addMessage({
         role: "assistant",
-        content: `<strong>Feedback:</strong><br>${data.commentary}${data.solution ? `<br><br>${data.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}` : ""}`,
+        content: `<strong>Feedback:</strong><br><strong>Your Answer:</strong> ${answer}<br>${data.commentary}${data.solution ? `<br><br>${data.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}` : ""}`,
         renderAs: "html",
       });
     } catch (err) {
@@ -152,9 +194,20 @@ const useAppStore = create<AppState>((set, get) => ({
     const { sessionId, addMessage } = get();
     try {
       addMessage({ role: "user", content: "End Session" });
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "x-session-id": sessionId || "",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       const res = await fetch("/api/end-session", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-session-id": sessionId || "" },
+        headers,
         body: JSON.stringify({ sessionId }),
       });
       const data = await res.json();
@@ -173,6 +226,7 @@ const useAppStore = create<AppState>((set, get) => ({
     step: 'problem', sessionId: null, problem: '', images: [], imageUrls: [],
     lesson: null, examples: null, quiz: null, shareableLink: null, error: null,
     loading: false, quizAnswer: '', quizFeedback: null, messages: [],
+    hasSubmittedProblem: false,
   }),
 }));
 

@@ -39,6 +39,7 @@ export default function QuizSection({ onQuizUpdate }) {
       await handleValidate(answer, quiz);
       const updatedFeedback = useAppStore.getState().quizFeedback;
       if (updatedFeedback) {
+        // Remove the onQuizUpdate call since the store already adds the message
         setStep("lesson"); // Return to lesson step after quiz submission
       } else {
         console.error("No feedback received after validation");

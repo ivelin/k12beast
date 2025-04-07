@@ -50,12 +50,12 @@ export async function POST(request: NextRequest) {
       { ...quiz, answer, isCorrect, commentary },
     ];
 
-    // Append the feedback to the messages array
+    // Append the feedback to the messages array, including the student's answer
     const updatedMessages = [
       ...(session.messages || []),
       {
         role: "assistant",
-        content: `<strong>Feedback:</strong><br>${commentary}${isCorrect ? "" : `<br><br>${quiz.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}`}`,
+        content: `<strong>Feedback:</strong><br><strong>Your Answer:</strong> ${answer}<br>${commentary}${isCorrect ? "" : `<br><br>${quiz.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}`}`,
         renderAs: "html",
       },
     ];
