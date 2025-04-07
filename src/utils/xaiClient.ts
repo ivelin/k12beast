@@ -42,42 +42,39 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
 
   validateRequestInputs(problem, images);
 
+  // Format the chat history
   const chatHistoryText = chatHistory.length > 0
     ? `Chat History:\n${chatHistory.map(msg =>
       `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`).join("\n")}`
     : "No chat history available.";
 
-  const prompt = `Original Input Problem (if provided): "${problem || 'No text provided'}"
-
-${chatHistoryText}
-
-${responseFormat}
-
-Use the provided chat history to understand the student's progress, including past lessons, examples,
-quiz results, and interactions. Infer the student's approximate age, grade level, and skill level
-(beginner, intermediate, advanced) from the chat history. Adapt your response based on this history—e.g.,
-avoid repeating examples or quiz problems already given (as specified in the chat history),
-and adjust difficulty based on performance trends. If the chat history includes quiz responses, adjust the difficulty:
-provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.`;
-
-  const systemMessage = `You are a K12 tutor. Assist with educational queries related to K12 subjects.
+  const messages: any[] = [
+    {
+      role: "system",
+      content: `You are a K12 tutor. Assist with educational queries related to K12 subjects.
 Respond only to valid K12 queries using the chat history for context. 
 Respond in a conversational style as if you are speaking directly with a K12 student.
 Return a raw JSON object
 (formatted for JSON.parse()) with response fields in 
 a string with plain text or minimal HTML formatting (use only <p>, <strong>, <ul>, <li> tags, no attributes or scripts). 
 Ensure all quotes are escaped (e.g., \") and no raw control characters are included.
-Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
-`;
-
-  const messages: any[] = [
-    {
-      role: "system",
-      content: systemMessage,
+Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).`,
     },
     {
       role: "user",
-      content: prompt,
+      content: `Instructions: Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions. Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history. Adapt your response based on this history—e.g., avoid repeating examples or quiz problems already given (as specified in the chat history), and adjust difficulty based on performance trends. If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.`,
+    },
+    {
+      role: "user",
+      content: `Original Input Problem (if provided): "${problem || 'No text provided'}"`,
+    },
+    {
+      role: "user",
+      content: chatHistoryText,
+    },
+    {
+      role: "user",
+      content: responseFormat,
     },
   ];
 

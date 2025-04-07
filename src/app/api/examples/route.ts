@@ -1,10 +1,10 @@
 // src/app/api/examples/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import supabase from "../../../supabase/serverClient";
 import { sendXAIRequest } from "../../../utils/xaiClient";
 import { handleXAIError } from "../../../utils/xaiUtils";
-import supabase from "../../../supabase/serverClient";
 
-const responseFormat = `Return a JSON object with a new example problem and its solution, related to the same topic as the original input problem or image (e.g., if the input is about heat transfer, the example must also be about heat transfer). Structure: {"problem": "Example problem text", "solution": [{"title": "Step 1", "content": "Step content..."}, ...]}. Do not repeat problems from the session history or the original input problem. Do not reference images in the response unless explicitly provided in the current request.`;
+const responseFormat = `Return a JSON object with a new example problem and its solution, related to the same topic as the original input problem. Structure: {"problem": "Example problem text", "solution": [{"title": "Step 1", "content": "Step content..."}, ...]}. Do not repeat problems from the session history or the original input problem. Do not reference images unless provided in the current request. Ensure the problem and solution steps are concise and appropriate for the student's inferred skill level.`;
 
 const defaultResponse = {
   problem: "",
@@ -68,6 +68,11 @@ export async function POST(req: NextRequest) {
       chatHistory: sessionHistory?.messages || [],
     });
 
+    // Validate the xAI response
+    if (!content.problem || !content.solution || !Array.isArray(content.solution)) {
+      throw new Error("Invalid xAI response format: Expected 'problem' and 'solution' fields with 'solution' as an array");
+    }
+
     if (sessionId) {
       const updatedExamples = [
         ...(sessionHistory?.examples || []),
@@ -78,7 +83,8 @@ export async function POST(req: NextRequest) {
         ...(sessionHistory?.messages || []),
         {
           role: "assistant",
-          content: `**Example:**\n\n${content.problem}\n\n${content.solution.map((s: any) => `**${s.title}:** ${s.content}`).join("\n\n")}`,
+          content: `<p><strong>Example:</strong> ${content.problem}</p><p><strong>Solution:</strong></p><ul>${content.solution.map((s: any) => `<li><strong>${s.title}:</strong> ${s.content}</li>`).join("")}</ul>`,
+          renderAs: "html",
         },
       ];
       const { error } = await supabase
