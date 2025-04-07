@@ -1,3 +1,4 @@
+// src/app/layout.tsx
 "use client";
 
 import { Geist, Geist_Mono } from "next/font/google";
@@ -7,6 +8,7 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
+import { Toaster } from "@/components/ui/sonner"; // Add import
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -107,6 +109,7 @@ export default function RootLayout({
             </div>
           </nav>
           <main className="p-4">{children}</main>
+          <Toaster /> {/* Add Toaster component */}
         </ThemeProvider>
       </body>
     </html>

@@ -1,7 +1,8 @@
 // src/store/index.ts
 import { create } from 'zustand';
+import { toast } from 'sonner';
 
-type Step = "problem" | "lesson" | "examples" | "quizzes" | "end" | "share";
+type Step = "problem" | "lesson" | "examples" | "quizzes" | "end";
 interface AppState {
   step: Step;
   sessionId: string | null;
@@ -11,7 +12,6 @@ interface AppState {
   lesson: string | null;
   examples: any;
   quiz: any;
-  shareableLink: string | null;
   error: string | null;
   loading: boolean;
   quizAnswer: string;
@@ -25,7 +25,6 @@ interface AppState {
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
   handleValidate: (answer: string, quiz: any) => Promise<void>;
-  handleEndSession: () => Promise<void>;
   append: (message: { role: string; content: string }, imageUrls: string[]) => Promise<void>;
   reset: () => void;
 }
@@ -39,7 +38,6 @@ const useAppStore = create<AppState>((set, get) => ({
   lesson: null,
   examples: null,
   quiz: null,
-  shareableLink: null,
   error: null,
   loading: false,
   quizAnswer: '',
@@ -81,7 +79,9 @@ const useAppStore = create<AppState>((set, get) => ({
       addMessage({ role: "assistant", content: lessonContent, renderAs: "html" });
     } catch (err) {
       console.error("Error in handleSubmit:", err);
-      set({ error: err.message || "Failed to fetch lesson" });
+      const errorMsg = err.message || "Failed to fetch lesson";
+      set({ error: errorMsg });
+      toast.error(errorMsg);
     } finally {
       set({ loading: false });
     }
@@ -121,7 +121,7 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
   handleQuizSubmit: async () => {
-    const { problem, imageUrls, sessionId, messages, addMessage } = get();
+    const { problem, imageUrls, sessionId, addMessage } = get();
     set({ loading: true, step: "quizzes" });
     try {
       addMessage({ role: "user", content: "Take a Quiz" });
@@ -178,14 +178,12 @@ const useAppStore = create<AppState>((set, get) => ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to validate quiz");
 
-      // Determine the readiness confidence based on whether the answer is correct
       const isCorrect = answer === quiz.correctAnswer;
       const readinessConfidence = isCorrect
         ? quiz.readiness.confidenceIfCorrect
         : quiz.readiness.confidenceIfIncorrect;
       const readinessPercentage = Math.round(readinessConfidence * 100);
 
-      // Add a motivational message based on the readiness confidence
       let motivationalMessage = "";
       if (readinessPercentage >= 90) {
         motivationalMessage = "You're doing amazing! You're very likely to ace your big test!";
@@ -210,41 +208,13 @@ const useAppStore = create<AppState>((set, get) => ({
       set({ loading: false });
     }
   },
-  handleEndSession: async () => {
-    const { sessionId, addMessage } = get();
-    try {
-      addMessage({ role: "user", content: "End Session" });
-      const token = document.cookie
-        .split("; ")
-        .find(row => row.startsWith("supabase-auth-token="))
-        ?.split("=")[1];
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-        "x-session-id": sessionId || "",
-      };
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      const res = await fetch("/api/end-session", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ sessionId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to end session");
-      set({ shareableLink: data.shareableLink, step: "share" });
-      addMessage({ role: "assistant", content: "**Session Ended:** Saved." });
-    } catch (err) {
-      set({ error: "Failed to end session" });
-    }
-  },
   append: async (msg, imageUrls) => {
     const { handleSubmit } = get();
     await handleSubmit(msg.content, imageUrls);
   },
   reset: () => set({
     step: 'problem', sessionId: null, problem: '', images: [], imageUrls: [],
-    lesson: null, examples: null, quiz: null, shareableLink: null, error: null,
+    lesson: null, examples: null, quiz: null, error: null,
     loading: false, quizAnswer: '', quizFeedback: null, messages: [],
     hasSubmittedProblem: false,
   }),

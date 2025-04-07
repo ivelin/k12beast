@@ -1,14 +1,17 @@
 // src/app/chat/page.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Share2 } from "lucide-react";
+import { toast } from "sonner";
 import { ChatContainer, ChatMessages, ChatForm } from "@/components/ui/chat";
 import { MessageList } from "@/components/ui/message-list";
 import { MessageInput } from "@/components/ui/message-input";
 import { PromptSuggestions } from "@/components/ui/prompt-suggestions";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import useAppStore from "@/store";
-import SessionEnd from "./SessionEnd";
 import QuizSection from "./QuizSection";
 
 export default function ChatPage() {
@@ -23,17 +26,20 @@ export default function ChatPage() {
     quizAnswer,
     quizFeedback,
     hasSubmittedProblem,
+    sessionId,
     setStep,
     setProblem,
     setImages,
     handleExamplesRequest,
     handleQuizSubmit,
     handleValidate,
-    handleEndSession,
     handleSubmit,
     append,
     addMessage,
   } = useAppStore();
+
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareableLink, setShareableLink] = useState<string | null>(null);
 
   useEffect(() => {
     if (step === "problem" && !hasSubmittedProblem) {
@@ -46,6 +52,15 @@ export default function ChatPage() {
     console.log("ChatPage loading:", loading);
   }, [messages, loading]);
 
+  useEffect(() => {
+    if (sessionId) {
+      const origin = window.location.origin;
+      setShareableLink(`${origin}/session/${sessionId}`);
+    } else {
+      setShareableLink(null);
+    }
+  }, [sessionId]);
+
   const handleSuggestionAction = (action: string) => {
     switch (action) {
       case "Request Example":
@@ -54,15 +69,48 @@ export default function ChatPage() {
       case "Take a Quiz":
         handleQuizSubmit();
         break;
-      case "End Session":
-        handleEndSession();
-        break;
       default:
         break;
     }
   };
 
-  // Filter messages to hide quiz options while the user is answering
+  const handleShare = async () => {
+    if (!shareableLink) {
+      alert("No active session to share.");
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "K12Beast Session",
+          text: "Check out my tutoring session on K12Beast!",
+          url: shareableLink,
+        });
+      } catch (err) {
+        console.error("Error sharing:", err);
+        setIsShareModalOpen(true);
+      }
+    } else {
+      setIsShareModalOpen(true);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (shareableLink) {
+      try {
+        await navigator.clipboard.writeText(shareableLink);
+        console.log("Triggering toast.success for copy link");
+        toast.success("Link copied to clipboard!");
+        setIsShareModalOpen(false); // Close the modal on success
+      } catch (err) {
+        console.error("Error copying link:", err);
+        console.log("Triggering toast.error for copy link failure");
+        toast.error("Failed to copy link to clipboard.");
+      }
+    }
+  };
+
   const filteredMessages = messages.map((message) => {
     if (
       message.role === "assistant" &&
@@ -70,7 +118,6 @@ export default function ChatPage() {
       step === "quizzes" &&
       !quizFeedback
     ) {
-      // Extract the problem part, excluding the options
       const problemEndIndex = message.content.indexOf("<ul>");
       if (problemEndIndex !== -1) {
         return {
@@ -83,7 +130,7 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col">
+    <div className="h-[calc(100vh-4rem)] flex flex-col relative">
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 flex flex-col">
         <ChatContainer className="flex-1">
           <ChatMessages className="flex flex-col items-start">
@@ -106,10 +153,10 @@ export default function ChatPage() {
               className="mb-8"
               label="What would you like to do next?"
               append={(message) => handleSuggestionAction(message.content)}
-              suggestions={["Request Example", "Take a Quiz", "End Session"]}
+              suggestions={["Request Example", "Take a Quiz"]}
             />
           )}
-          {(step === "problem" || step === "lesson") && (
+          {(step === "problem" && !hasSubmittedProblem) && (
             <ChatForm
               className="mt-auto"
               isPending={loading}
@@ -126,11 +173,7 @@ export default function ChatPage() {
                   files={images}
                   setFiles={(files) => setImages(files || [])}
                   isGenerating={loading}
-                  placeholder={
-                    step === "problem"
-                      ? "Ask k12beast AI..."
-                      : "Ask a follow-up question..."
-                  }
+                  placeholder="Ask k12beast AI..."
                 />
               )}
             </ChatForm>
@@ -139,8 +182,35 @@ export default function ChatPage() {
         {step === "quizzes" && quiz && !quizFeedback && (
           <QuizSection onQuizUpdate={() => {}} />
         )}
-        {step === "share" && <SessionEnd />}
       </div>
+
+      {hasSubmittedProblem && (
+        <Button
+          onClick={handleShare}
+          className="fixed top-16 right-4 bg-primary text-primary-foreground rounded-full p-3 shadow-lg hover:bg-primary/90 z-50"
+          aria-label="Share session"
+        >
+          <Share2 className="h-5 w-5" />
+        </Button>
+      )}
+
+      <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share Your Session</DialogTitle>
+          </DialogHeader>
+          <p>Copy this link to share your session:</p>
+          <input
+            type="text"
+            value={shareableLink || ""}
+            readOnly
+            className="w-full p-2 border rounded"
+          />
+          <Button onClick={handleCopyLink}>
+            Copy Link
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
