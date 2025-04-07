@@ -19,12 +19,6 @@ export default function QuizSection({ onQuizUpdate }) {
 
   const answer = useAppStore((state) => state.quizAnswer);
   const setAnswer = (value) => useAppStore.setState({ quizAnswer: value });
-  const isCorrect = useAppStore((state) => state.quizIsCorrect);
-  const setIsCorrect = (value) => useAppStore.setState({ quizIsCorrect: value });
-  const commentary = useAppStore((state) => state.quizCommentary);
-  const setCommentary = (value) => useAppStore.setState({ quizCommentary: value });
-  const feedback = useAppStore((state) => state.quizFeedback);
-  const setFeedback = (value) => useAppStore.setState({ quizFeedback: value });
   const loading = useAppStore((state) => state.loading);
 
   useEffect(() => {
@@ -45,26 +39,6 @@ export default function QuizSection({ onQuizUpdate }) {
       await handleValidate(answer, quiz);
       const updatedFeedback = useAppStore.getState().quizFeedback;
       if (updatedFeedback) {
-        const resultContent = `
-          <p><strong>Your Answer:</strong> ${answer}</p>
-          <p><strong>Result:</strong> ${updatedFeedback.isCorrect ? "Correct" : "Incorrect"}</p>
-          ${updatedFeedback.commentary}
-          ${quiz.encouragement && updatedFeedback.isCorrect ? `
-            <p class="text-green-500 italic mt-2">${quiz.encouragement}</p>
-          ` : ""}
-          ${updatedFeedback.solution && !updatedFeedback.isCorrect ? `
-            <div class="mt-2 p-2 bg-gray-50 rounded">
-              <h4 class="font-semibold">Solution</h4>
-              ${updatedFeedback.solution.map((step) => `
-                <div class="mt-1">
-                  <h5 class="font-medium">${step.title}</h5>
-                  ${step.content}
-                </div>
-              `).join("")}
-            </div>
-          ` : ""}
-        `;
-        onQuizUpdate({ type: "result", content: resultContent });
         setStep("lesson"); // Return to lesson step after quiz submission
       } else {
         console.error("No feedback received after validation");
@@ -98,7 +72,7 @@ export default function QuizSection({ onQuizUpdate }) {
                 checked={answer === option}
                 onChange={(e) => setAnswer(e.target.value)}
                 className="mr-2"
-                disabled={loading} // Only disable when loading
+                disabled={loading}
               />
               <label
                 htmlFor={`option-${index}`}
