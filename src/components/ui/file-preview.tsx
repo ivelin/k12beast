@@ -5,20 +5,25 @@ import { motion } from "framer-motion"
 import { FileIcon, X } from "lucide-react"
 
 interface FilePreviewProps {
-  file: File
+  file?: File
+  url?: string
+  name?: string
   onRemove?: () => void
 }
 
 export const FilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
   (props, ref) => {
-    if (props.file.type.startsWith("image/")) {
+    if (props.file && props.file.type.startsWith("image/")) {
+      return <ImageFilePreview {...props} ref={ref} />
+    } else if (props.url && props.url.match(/\.(jpeg|jpg|gif|png)$/i)) {
       return <ImageFilePreview {...props} ref={ref} />
     }
 
     if (
-      props.file.type.startsWith("text/") ||
-      props.file.name.endsWith(".txt") ||
-      props.file.name.endsWith(".md")
+      props.file &&
+      (props.file.type.startsWith("text/") ||
+        props.file.name.endsWith(".txt") ||
+        props.file.name.endsWith(".md"))
     ) {
       return <TextFilePreview {...props} ref={ref} />
     }
@@ -29,7 +34,9 @@ export const FilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
 FilePreview.displayName = "FilePreview"
 
 const ImageFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
-  ({ file, onRemove }, ref) => {
+  ({ file, url, name, onRemove }, ref) => {
+    const src = file ? URL.createObjectURL(file) : url;
+
     return (
       <motion.div
         ref={ref}
@@ -42,12 +49,12 @@ const ImageFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
         <div className="flex w-full items-center space-x-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            alt={`Attachment ${file.name}`}
+            alt={`Attachment ${name || "Image"}`}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-sm border bg-muted object-cover"
-            src={URL.createObjectURL(file)}
+            src={src}
           />
           <span className="w-full truncate text-muted-foreground">
-            {file.name}
+            {name || "Image"}
           </span>
         </div>
 
@@ -72,6 +79,7 @@ const TextFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
     const [preview, setPreview] = React.useState<string>("")
 
     useEffect(() => {
+      if (!file) return;
       const reader = new FileReader()
       reader.onload = (e) => {
         const text = e.target?.result as string
@@ -96,7 +104,7 @@ const TextFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
             </div>
           </div>
           <span className="w-full truncate text-muted-foreground">
-            {file.name}
+            {file?.name || "Text File"}
           </span>
         </div>
 
@@ -117,7 +125,7 @@ const TextFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
 TextFilePreview.displayName = "TextFilePreview"
 
 const GenericFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
-  ({ file, onRemove }, ref) => {
+  ({ file, name, onRemove }, ref) => {
     return (
       <motion.div
         ref={ref}
@@ -132,7 +140,7 @@ const GenericFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
             <FileIcon className="h-6 w-6 text-foreground" />
           </div>
           <span className="w-full truncate text-muted-foreground">
-            {file.name}
+            {name || file?.name || "File"}
           </span>
         </div>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { motion } from "framer-motion"
 import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react"
@@ -143,14 +143,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     })
   }, [])
 
-  const files = useMemo(() => {
-    return experimental_attachments?.map((attachment) => {
-      const dataArray = dataUrlToUint8Array(attachment.url)
-      const file = new File([dataArray], attachment.name ?? "Unknown")
-      return file
-    })
-  }, [experimental_attachments])
-
   const isUser = role === "user"
 
   const formattedTime = createdAt?.toLocaleTimeString("en-US", {
@@ -172,10 +164,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   if (isUser) {
     return (
       <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-        {files ? (
+        {experimental_attachments ? (
           <div className="mb-1 flex flex-wrap gap-2">
-            {files.map((file, index) => (
-              <FilePreview file={file} key={index} />
+            {experimental_attachments.map((attachment, index) => (
+              <FilePreview key={index} url={attachment.url} name={attachment.name} />
             ))}
           </div>
         ) : null}
@@ -279,12 +271,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       ) : null}
     </div>
   )
-}
-
-function dataUrlToUint8Array(data: string) {
-  const base64 = data.split(",")[1]
-  const buf = Buffer.from(base64, "base64")
-  return new Uint8Array(buf)
 }
 
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {

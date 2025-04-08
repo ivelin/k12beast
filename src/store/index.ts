@@ -29,20 +29,6 @@ interface AppState {
   reset: () => void;
 }
 
-// Utility function to convert a File to a base64 data URL
-const fileToDataUrl = (file: File): Promise<{ dataUrl: string; mimeType: string }> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const mimeType = dataUrl.split(',')[0].split(':')[1].split(';')[0]; // e.g., "image/jpeg"
-      resolve({ dataUrl, mimeType });
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
-
 const useAppStore = create<AppState>((set, get) => ({
   step: 'problem',
   sessionId: null,
@@ -66,16 +52,6 @@ const useAppStore = create<AppState>((set, get) => ({
     set({ loading: true, problem, imageUrls, hasSubmittedProblem: true });
 
     try {
-      // Convert images to data URLs for chat history rendering
-      let dataUrlResults: { dataUrl: string; mimeType: string }[] = [];
-      if (images && images.length > 0) {
-        dataUrlResults = await Promise.all(images.map(file => fileToDataUrl(file)));
-      }
-
-      // Extract data URLs and MIME types
-      const dataUrls = dataUrlResults.map(result => result.dataUrl);
-      const mimeTypes = dataUrlResults.map(result => result.mimeType);
-
       // Upload images to Supabase Storage if there are any
       let uploadedImageUrls: string[] = [];
       if (images && images.length > 0) {
@@ -109,14 +85,14 @@ const useAppStore = create<AppState>((set, get) => ({
         set({ imageUrls: uploadedImageUrls });
       }
 
-      // Add the user message with attached images (as data URLs) to the chat history
+      // Add the user message with attached images (using Supabase URLs) to the chat history
       addMessage({
         role: "user",
         content: problem,
-        experimental_attachments: dataUrls.map((url, index) => ({
+        renderAs: "markdown",
+        experimental_attachments: uploadedImageUrls.map((url, index) => ({
           name: images[index]?.name || `Image ${index + 1}`,
           url,
-          contentType: mimeTypes[index], // Include MIME type for reference
         })),
       });
 
@@ -159,7 +135,7 @@ const useAppStore = create<AppState>((set, get) => ({
     const { problem, imageUrls, sessionId, addMessage } = get();
     set({ loading: true });
     try {
-      addMessage({ role: "user", content: "Request Example" });
+      addMessage({ role: "user", content: "Request Example", renderAs: "markdown" });
       const token = document.cookie
         .split("; ")
         .find(row => row.startsWith("supabase-auth-token="))
@@ -181,7 +157,8 @@ const useAppStore = create<AppState>((set, get) => ({
       set({ examples: data, step: "examples" });
       addMessage({
         role: "assistant",
-        content: `**Example:**\n\n${data.problem}\n\n${data.solution.map((s: any) => `**${s.title}:** ${s.content}`).join("\n\n")}`,
+        content: `<p><strong>Example:</strong> ${data.problem}</p><p><strong>Solution:</strong></p><ul>${data.solution.map((s: any) => `<li><strong>${s.title}:</strong> ${s.content}</li>`).join("")}</ul>`,
+        renderAs: "html",
       });
     } catch (err) {
       set({ error: err.message || "Failed to fetch examples" });
@@ -193,7 +170,7 @@ const useAppStore = create<AppState>((set, get) => ({
     const { problem, imageUrls, sessionId, addMessage } = get();
     set({ loading: true, step: "quizzes" });
     try {
-      addMessage({ role: "user", content: "Take a Quiz" });
+      addMessage({ role: "user", content: "Take a Quiz", renderAs: "markdown" });
       const token = document.cookie
         .split("; ")
         .find(row => row.startsWith("supabase-auth-token="))
@@ -215,7 +192,7 @@ const useAppStore = create<AppState>((set, get) => ({
       set({ quiz: data, quizAnswer: '', quizFeedback: null });
       addMessage({
         role: "assistant",
-        content: `<strong>Quiz:</strong><br>${data.problem}<br><ul>${data.options.map((o: string) => `<li>${o}</li>`).join("")}</ul>`,
+        content: `<p><strong>Quiz:</strong></p><p>${data.problem}</p><ul>${data.options.map((o: string) => `<li>${o}</li>`).join("")}</ul>`,
         renderAs: "html",
       });
     } catch (err) {
@@ -267,7 +244,7 @@ const useAppStore = create<AppState>((set, get) => ({
       set({ quizAnswer: answer, quizFeedback: data });
       addMessage({
         role: "assistant",
-        content: `<strong>Feedback:</strong><br><strong>Your Answer:</strong> ${answer}<br>${data.commentary}${data.solution ? `<br><br>${data.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}` : ""}<br><br><strong>Options:</strong><br><ul>${quiz.options.map((o: string) => `<li>${o}${o === answer ? " (Your answer)" : ""}${o === quiz.correctAnswer ? " (Correct answer)" : ""}</li>`).join("")}</ul><br><br><strong>Test Readiness:</strong><br><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}% - ${motivationalMessage}</p>`,
+        content: `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${answer}</p><p>${data.commentary}</p>${data.solution ? `<p>${data.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("</p><p>")}</p>` : ""}<p><strong>Options:</strong></p><ul>${quiz.options.map((o: string) => `<li>${o}${o === answer ? " (Your answer)" : ""}${o === quiz.correctAnswer ? " (Correct answer)" : ""}</li>`).join("")}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}% - ${motivationalMessage}</p>`,
         renderAs: "html",
       });
     } catch (err) {
