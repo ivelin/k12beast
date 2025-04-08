@@ -16,18 +16,32 @@ interface AppState {
   loading: boolean;
   quizAnswer: string;
   quizFeedback: any;
-  messages: Array<{ role: "user" | "assistant"; content: string; renderAs?: "markdown" | "html" }>;
+  messages: Array<{ role: "user" | "assistant"; content: string; renderAs?: "markdown" | "html"; experimental_attachments?: { name: string; url: string }[] }>;
   hasSubmittedProblem: boolean;
   set: (updates: Partial<AppState>) => void;
   setStep: (step: Step) => void;
-  addMessage: (message: { role: string; content: string; renderAs?: "markdown" | "html" }) => void;
-  handleSubmit: (problem: string, imageUrls: string[]) => Promise<void>;
+  addMessage: (message: { role: string; content: string; renderAs?: "markdown" | "html"; experimental_attachments?: { name: string; url: string }[] }) => void;
+  handleSubmit: (problem: string, imageUrls: string[], images: File[]) => Promise<void>;
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
   handleValidate: (answer: string, quiz: any) => Promise<void>;
-  append: (message: { role: string; content: string }, imageUrls: string[]) => Promise<void>;
+  append: (message: { role: string; content: string }, imageUrls: string[], images: File[]) => Promise<void>;
   reset: () => void;
 }
+
+// Utility function to convert a File to a base64 data URL
+const fileToDataUrl = (file: File): Promise<{ dataUrl: string; mimeType: string }> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const mimeType = dataUrl.split(',')[0].split(':')[1].split(';')[0]; // e.g., "image/jpeg"
+      resolve({ dataUrl, mimeType });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
 
 const useAppStore = create<AppState>((set, get) => ({
   step: 'problem',
@@ -47,26 +61,81 @@ const useAppStore = create<AppState>((set, get) => ({
   set: (updates) => set(updates),
   setStep: (step) => set({ step }),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
-  handleSubmit: async (problem, imageUrls) => {
+  handleSubmit: async (problem, imageUrls, images) => {
     const { sessionId, addMessage } = get();
     set({ loading: true, problem, imageUrls, hasSubmittedProblem: true });
+
     try {
-      addMessage({ role: "user", content: problem });
-      const token = document.cookie
-        .split("; ")
-        .find(row => row.startsWith("supabase-auth-token="))
-        ?.split("=")[1];
+      // Convert images to data URLs for chat history rendering
+      let dataUrlResults: { dataUrl: string; mimeType: string }[] = [];
+      if (images && images.length > 0) {
+        dataUrlResults = await Promise.all(images.map(file => fileToDataUrl(file)));
+      }
+
+      // Extract data URLs and MIME types
+      const dataUrls = dataUrlResults.map(result => result.dataUrl);
+      const mimeTypes = dataUrlResults.map(result => result.mimeType);
+
+      // Upload images to Supabase Storage if there are any
+      let uploadedImageUrls: string[] = [];
+      if (images && images.length > 0) {
+        const formData = new FormData();
+        images.forEach((image) => {
+          formData.append("files", image);
+        });
+
+        const token = document.cookie
+          .split("; ")
+          .find(row => row.startsWith("supabase-auth-token="))
+          ?.split("=")[1];
+        const headers: HeadersInit = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const uploadResponse = await fetch("/api/upload-image", {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.error || "Failed to upload images");
+        }
+
+        const uploadResult = await uploadResponse.json();
+        uploadedImageUrls = uploadResult.files.map((file: { name: string; url: string }) => file.url);
+        set({ imageUrls: uploadedImageUrls });
+      }
+
+      // Add the user message with attached images (as data URLs) to the chat history
+      addMessage({
+        role: "user",
+        content: problem,
+        experimental_attachments: dataUrls.map((url, index) => ({
+          name: images[index]?.name || `Image ${index + 1}`,
+          url,
+          contentType: mimeTypes[index], // Include MIME type for reference
+        })),
+      });
+
       const headers: HeadersInit = {
         "Content-Type": "application/json",
         "x-session-id": sessionId || "",
       };
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
+
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers,
-        body: JSON.stringify({ problem, images: imageUrls }),
+        body: JSON.stringify({ problem, images: uploadedImageUrls }),
       });
 
       const lessonContent = await res.text();
@@ -208,9 +277,9 @@ const useAppStore = create<AppState>((set, get) => ({
       set({ loading: false });
     }
   },
-  append: async (msg, imageUrls) => {
+  append: async (msg, imageUrls, images) => {
     const { handleSubmit } = get();
-    await handleSubmit(msg.content, imageUrls);
+    await handleSubmit(msg.content, imageUrls, images);
   },
   reset: () => set({
     step: 'problem', sessionId: null, problem: '', images: [], imageUrls: [],

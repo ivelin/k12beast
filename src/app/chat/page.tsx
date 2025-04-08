@@ -15,11 +15,10 @@ import useAppStore from "@/store";
 import QuizSection from "./QuizSection";
 
 export default function ChatPage() {
+  const store = useAppStore();
   const {
     step,
-    problem,
     messages,
-    images,
     imageUrls,
     quiz,
     loading,
@@ -28,22 +27,25 @@ export default function ChatPage() {
     hasSubmittedProblem,
     sessionId,
     setStep,
-    setProblem,
-    setImages,
     handleExamplesRequest,
     handleQuizSubmit,
     handleValidate,
-    handleSubmit,
-    append,
+    handleSubmit: storeHandleSubmit,
+    append: storeAppend,
     addMessage,
-  } = useAppStore();
+  } = store;
 
+  // Local state for problem and images to work with MessageInput
+  const [localProblem, setLocalProblem] = useState<string>("");
+  const [localImages, setLocalImages] = useState<File[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareableLink, setShareableLink] = useState<string | null>(null);
 
   useEffect(() => {
     if (step === "problem" && !hasSubmittedProblem) {
       useAppStore.getState().reset();
+      setLocalProblem("");
+      setLocalImages([]);
     }
   }, [step, hasSubmittedProblem]);
 
@@ -100,15 +102,21 @@ export default function ChatPage() {
     if (shareableLink) {
       try {
         await navigator.clipboard.writeText(shareableLink);
-        console.log("Triggering toast.success for copy link");
         toast.success("Link copied to clipboard!");
-        setIsShareModalOpen(false); // Close the modal on success
+        setIsShareModalOpen(false);
       } catch (err) {
         console.error("Error copying link:", err);
-        console.log("Triggering toast.error for copy link failure");
         toast.error("Failed to copy link to clipboard.");
       }
     }
+  };
+
+  const handleSubmit = async (problem: string, imageUrls: string[]) => {
+    await storeHandleSubmit(problem, imageUrls, localImages);
+  };
+
+  const append = async (message: { role: string; content: string }, imageUrls: string[]) => {
+    await storeAppend(message, imageUrls, localImages);
   };
 
   const filteredMessages = messages.map((message) => {
@@ -136,7 +144,7 @@ export default function ChatPage() {
           <ChatMessages className="flex flex-col items-start">
             <MessageList messages={filteredMessages} isTyping={loading} />
           </ChatMessages>
-          {(step === "problem" && !hasSubmittedProblem) && (
+          {step === "problem" && !hasSubmittedProblem && (
             <PromptSuggestions
               className="mb-8"
               label="Try these prompts ✨"
@@ -156,22 +164,22 @@ export default function ChatPage() {
               suggestions={["Request Example", "Take a Quiz"]}
             />
           )}
-          {(step === "problem" && !hasSubmittedProblem) && (
+          {step === "problem" && !hasSubmittedProblem && (
             <ChatForm
               className="mt-auto"
               isPending={loading}
               handleSubmit={(e) => {
                 e.preventDefault();
-                handleSubmit(problem, imageUrls);
+                handleSubmit(localProblem, imageUrls);
               }}
             >
               {({ files, setFiles }) => (
                 <MessageInput
-                  value={problem}
-                  onChange={(e) => setProblem(e.target.value)}
+                  value={localProblem}
+                  onChange={(e) => setLocalProblem(e.target.value)}
                   allowAttachments={true}
-                  files={images}
-                  setFiles={(files) => setImages(files || [])}
+                  files={localImages}
+                  setFiles={setLocalImages}
                   isGenerating={loading}
                   placeholder="Ask k12beast AI..."
                 />
