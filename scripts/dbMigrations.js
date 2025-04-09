@@ -85,7 +85,7 @@ const dbVersionRequiredByAppVersion = [
   { dbVersion: 10, appVersion: "0.6.5" },
   { dbVersion: 11, appVersion: "0.6.6" },
   { dbVersion: 12, appVersion: "0.6.6" },
-  { dbVersion: 13, appVersion: "0.6.6" }, // Updated to require version 13
+  { dbVersion: 13, appVersion: "0.6.6" },
 ];
 
 // Run pending migrations
