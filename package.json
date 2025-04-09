@@ -1,6 +1,6 @@
 {
   "name": "k12beast",
-  "version": "0.6.6",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/migrate.js && next dev",
@@ -17,7 +17,6 @@
     "@supabase/supabase-js": "^2.49.4",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "dompurify": "^3.2.5",
     "dotenv": "^16.4.5",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.441.0",
@@ -31,11 +30,9 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "remeda": "^2.21.2",
-    "semver": "^7.7.1",
     "shiki": "^1.29.2",
     "sonner": "^2.0.3",
     "tailwind-merge": "^2.5.2",
-    "turndown": "^7.2.0",
     "uuid": "^11.1.0",
     "zustand": "^4.5.5"
   },
