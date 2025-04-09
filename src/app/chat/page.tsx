@@ -153,6 +153,7 @@ export default function ChatPage() {
                 "Explain step-by-step how to solve this math problem: if x * x + 9 = 25, what is x?",
                 "Problem: Room 1 is at 18'C. Room 2 is at 22'C. Which direction will heat flow?.",
                 "Problem: Simplify 3(4x + 6z). I think the answer is: 12x+19z",
+                "Help me prepare for 6th grade STAAR tests: math, science, ELR."
               ]}
             />
           )}
