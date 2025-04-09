@@ -2,19 +2,16 @@
 
 K12Beast is a personalized tutoring app for K12 students, designed to help them master concepts through tailored lessons, examples, and quizzes based on their test results. 
 
-At a high level the student experience flows like this: 
-  - Problem Input:
-    - Student inputs problem and optionally a proposed solution via text or images.
-  - Tutoring Lesson: 
-    - AI offers a personalized analysis of the problem, proposed solution (when present) and a  subject lesson.
-  - Example Problems with  Solutions:
-    - Upon student request AI presents similar problem examples with solutions for self study
-  - Quizzes:
-    - Upon student request AI presents optional Quizzes for self testing
-  - End Session: 
-    - Student ends session when they feel ready
-  - Share:
-    - Student can share session with their parents and teachers
+The student experience follows this flow: 
+  - **Student Registration/Login**: Students register or log in to access the app.
+  - **New Chat Session**: Students start a new chat session to begin their learning journey.
+  - **Problem Submission with Optional Student Solution**: Students input a problem and optionally a proposed solution via text or images.
+  - **AI Problem Evaluation and Solution Comments**: The AI evaluates the problem and the student’s proposed solution (if provided), offering comments on correctness and areas for improvement.
+  - **Personalized Tutoring Lesson**: The AI delivers a tailored lesson based on the problem and the student’s performance.
+  - **More Similar Problem Examples**: Upon request, the AI provides additional problem examples with solutions for self-study.
+  - **Quizzes**: Upon request, the AI offers quizzes for self-testing to reinforce learning.
+  - **End Session**: Students end the session when they feel ready.
+  - **Share Session with Parents**: Students can share the session with their parents or teachers for review.
 
 Built with Super Grok 3, Next.js, it leverages Supabase (or any PostgreSQL database) for data storage and the Grok/X xAI API for generating educational content. 
 This guide will walk you through setting up a local instance of the app from scratch.
@@ -78,11 +75,15 @@ K12Beast uses Node.js dependencies managed by npm. Install them with the followi
 1. After installation, you’ll see a message reminding you to set up your environment variables if you haven’t already. Ensure `.env.local` is configured as described in the previous section.
 1. The `node_modules` directory and `package-lock.json` will be created, containing all required packages.
 
+
+
+
+
 ## Setting Up Supabase/PostgreSQL
 
 K12Beast uses a PostgreSQL database, which can be hosted via Supabase or any PostgreSQL instance. Follow these steps:
 
-1. **Using Supabase**:
+1. **Using Supabase (Cloud)**:
    - Log in to your Supabase account and create a new project.
    - Note your project’s URL and anon key from the API settings.
    - In the Supabase dashboard, go to "Project Settings" > "API" to find your service role key.
@@ -90,16 +91,53 @@ K12Beast uses a PostgreSQL database, which can be hosted via Supabase or any Pos
      - Copy the code from `src/supabase/functions/execute-sql/index.ts`.
      - In the Supabase dashboard, go to "Edge Functions," create a new function named `execute-sql`, and paste the code.
      - Deploy the function.
+   - Apply the local SQL functions:
+     - Copy the code from `src/supabase/functions/local-sql.sql`.
+     - In the Supabase dashboard, go to the "SQL Editor," paste the code, and run it. This sets up necessary functions and permissions, such as `validate_user_id`, which are required for migrations that interact with the `auth` schema (e.g., linking sessions to users).
 
-2. **Using a Local PostgreSQL Instance**:
-   - Install PostgreSQL if not already installed.
-   - Create a new database:
-        ```
-        createdb k12beast
-        ```
-    - Update `.env.local` with your PostgreSQL connection details instead of Supabase keys (you may need to adjust the app’s Supabase client setup in `src/supabase/serverClient.ts` and `src/supabase/browserClient.ts` to use a direct PostgreSQL connection).
+2. **Using a Local Supabase Instance**:
+  - Ensure you have the Supabase CLI installed. Install it via npm if needed:
+    ```
+    npm install -g supabase
+    ```
+  - Start your local Supabase instance:    
+    ```
+    supabase start
+    ```
+  - Deploy the `execute-sql` Edge Function locally:
+    - The `execute-sql` function is located at `src/supabase/functions/execute-sql/index.ts`.
+    - Use the Supabase CLI to deploy it:
+      ```
+      supabase functions deploy execute-sql --project-ref local
+      ```
+  - Note: `project-ref local` assumes your local Supabase instance is running. If you encounter issues, ensure your Supabase CLI is logged in and linked to your project (use `supabase login` and `supabase link` if needed).
+  - Apply the local SQL functions:
+    - Run the following command to apply `local-sql.sql` to your local database:      
+      ```
+      psql -h localhost -p 54322 -U postgres -d k12beast -f src/supabase/functions/local-sql.sql
+      ```
 
-3. Ensure your database is running and accessible with the credentials provided in `.env.local`.
+Adjust the host, port, and user as needed based on your `src/supabase/config.toml` settings (default port for local Supabase is 54322).
+
+3. **Using a Local PostgreSQL Instance (Without Supabase)**:
+  - Install PostgreSQL if not already installed.
+  - Create a new database:
+    ```
+    createdb k12beast
+    ```
+  - Apply the local SQL functions:
+  - Run the following command to apply `local-sql.sql` to your database:
+    ```
+    psql -h localhost -p 5432 -U postgres -d k12beast -f src/supabase/functions/local-sql.sql
+    ```
+
+Adjust the host, port, and user as needed based on your PostgreSQL setup.
+- Update `.env.local` with your PostgreSQL connection details instead of Supabase keys (you may need to adjust the app’s Supabase client setup in `src/supabase/serverClient.ts` and `src/supabase/browserClient.ts` to use a direct PostgreSQL connection).
+- Note: If using a local PostgreSQL instance without Supabase, the `execute-sql` Edge Function is not applicable, and you’ll need to modify the migration scripts (`scripts/migrationUtils.js`) to execute SQL directly against your PostgreSQL database instead of using an Edge Function.
+
+4. Ensure your database is running and accessible with the credentials provided in `.env.local`.    
+
+
 
 ## Running Database Migrations
 

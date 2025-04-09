@@ -1,48 +1,116 @@
-import { createClient } from "@supabase/supabase-js";
-import Link from "next/link";
+// src/app/history/page.tsx
+"use client";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { useState, useEffect } from "react";
+import SessionItem from "./SessionItem";
+import { Button } from "@/components/ui/button";
 
-async function fetchSessions() {
-  const { data, error } = await supabase
-    .from("sessions")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return data;
+interface Session {
+  id: string;
+  problem?: string;
+  images?: string[] | null;
+  created_at?: string;
+  updated_at: string;
 }
 
-export default async function HistoryPage() {
-  const sessions = await fetchSessions();
+export default function HistoryPage() {
+  const PAGE_SIZE = 20;
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchSessions = async (pageToFetch: number, controller: AbortController) => {
+    try {
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`/api/history?page=${pageToFetch}&pageSize=${PAGE_SIZE}`, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch sessions");
+      }
+
+      const data = await res.json();
+      const newSessions: Session[] = data.sessions.map((session: Session) => ({
+        ...session,
+        updated_at: session.updated_at || session.created_at,
+      }));
+
+      return newSessions;
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("Error fetching sessions:", err);
+        setError(err.message || "Failed to fetch sessions");
+      }
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadInitialSessions = async () => {
+      setLoading(true);
+      const initialSessions = await fetchSessions(1, controller);
+      setSessions(initialSessions);
+      setHasMore(initialSessions.length === PAGE_SIZE);
+      setLoading(false);
+    };
+    loadInitialSessions();
+    return () => controller.abort();
+  }, []);
+
+  const loadMoreSessions = async () => {
+    const controller = new AbortController();
+    const nextPage = page + 1;
+    const newSessions = await fetchSessions(nextPage, controller);
+
+    const existingIds = new Set(sessions.map(s => s.id));
+    const uniqueNewSessions = newSessions.filter(s => !existingIds.has(s.id));
+
+    setSessions(prevSessions => [...prevSessions, ...uniqueNewSessions]);
+    setPage(nextPage);
+    setHasMore(uniqueNewSessions.length > 0 && newSessions.length === PAGE_SIZE);
+  };
+
+  if (loading) {
+    return <div className="container mx-auto p-4">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="container mx-auto p-4">Error: {error}</div>;
+  }
 
   return (
-    <div className="container">
-      <h1 className="text-2xl font-bold mb-6">Session History</h1>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Session History</h1>
       {sessions.length === 0 ? (
-        <p className="text-muted-foreground">No sessions found. Start a new session in the <Link href="/chat" className="text-primary underline">Chat</Link> page.</p>
+        <p>No sessions found.</p>
       ) : (
-        <div className="space-y-4">
-          {sessions.map((session: any) => (
-            <Link
-              key={session.id}
-              href={`/session/${session.id}`}
-              className="block p-4 rounded-lg border bg-card hover:bg-muted transition"
-            >
-              <h2 className="text-lg font-semibold">
-                {session.problem || "Image-based Problem"}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {new Date(session.created_at).toLocaleString()}
-              </p>
-              <p className="text-sm mt-2">
-                {session.completed ? "Completed" : "In Progress"}
-              </p>
-            </Link>
+        <ul className="space-y-2">
+          {sessions.map((session) => (
+            <SessionItem key={session.id} session={session} />
           ))}
-        </div>
+        </ul>
+      )}
+      {hasMore && (
+        <Button onClick={loadMoreSessions} className="mt-4">
+          Load More
+        </Button>
       )}
     </div>
   );

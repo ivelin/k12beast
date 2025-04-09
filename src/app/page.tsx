@@ -1,146 +1,75 @@
+// src/app/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import supabase from "../supabase/browserClient";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
 
 export default function Home() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    // Listen for auth state changes for debugging
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth state changed:", event, session);
-      if (event === "SIGNED_IN" && session) {
-        console.log("User signed in, session:", session);
-      }
-    });
+    const validateToken = async () => {
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
 
-    // Cleanup subscription on unmount
-    return () => {
-      subscription?.unsubscribe();
+      if (token) {
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (error || !user) {
+          console.log("Invalid or expired token found, clearing cookie:", error?.message);
+          document.cookie = "supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict";
+        } else {
+          console.log("Valid token found, redirecting to /chat");
+          router.push("/chat");
+        }
+      }
     };
-  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage("");
-
-    try {
-      if (isSignUp) {
-        console.log("Attempting sign-up with email:", email);
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (error) {
-          console.error("Sign-up error:", error.message);
-          throw error;
-        }
-        console.log("Sign-up successful");
-        setMessage("Sign-up successful! Check your email to confirm.");
-      } else {
-        console.log("Attempting login with email:", email);
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) {
-          console.error("Login error:", error.message);
-          throw error;
-        }
-        console.log("Login successful, session data:", data);
-        // Store the session token in a cookie
-        document.cookie = `supabase-auth-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Strict`;
-        // Force a full page redirect to ensure middleware re-evaluates the session
-        window.location.href = "/chat";
-      }
-    } catch (error) {
-      console.error("Authentication error:", error);
-      setMessage(error.message || "An error occurred. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    validateToken();
+  }, [router]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="bg-card shadow-sm">
-        <div className="container flex items-center justify-between py-4">
-          <h1 className="text-2xl font-bold text-foreground">K12Beast</h1>
-          <nav className="flex gap-4">
-            <Link href="/chat" className="text-primary hover:underline">
-              Chat
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <div className="text-center max-w-2xl">
+        <h1 className="text-5xl font-bold text-foreground mb-4">Welcome to K12Beast</h1>
+        <p className="text-lg text-muted-foreground mb-6">
+          Your ultimate study companion for K12 education. Chat with our AI, take quizzes, and track your progress to excel in your studies!
+        </p>
+        <div className="flex justify-center gap-4">
+          <Button asChild size="lg">
+            <Link href="/login" className="bg-primary text-primary-foreground hover:bg-primary/90">
+              Get Started
             </Link>
-            <Link href="/history" className="text-primary hover:underline">
-              History
-            </Link>
-          </nav>
-        </div>
-      </header>
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="bg-card p-6 rounded-lg shadow-sm w-full max-w-md">
-          <h1 className="text-2xl font-bold mb-4 text-foreground">
-            {isSignUp ? "Sign Up for K12Beast" : "Login to K12Beast"}
-          </h1>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="email" className="block text-sm font-medium text-foreground">
-                Email
-              </Label>
-              <Input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <Label htmlFor="password" className="block text-sm font-medium text-foreground">
-                Password
-              </Label>
-              <Input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1"
-                required
-                disabled={loading}
-              />
-            </div>
-            {message && <p className="text-destructive text-sm">{message}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isSignUp ? "Signing Up..." : "Logging In..."}
-                </>
-              ) : (
-                <>{isSignUp ? "Sign Up" : "Log In"}</>
-              )}
-            </Button>
-          </form>
-          <Button
-            variant="outline"
-            className="w-full mt-4"
-            onClick={() => setIsSignUp(!isSignUp)}
-            disabled={loading}
-          >
-            {isSignUp ? "Switch to Login" : "Switch to Sign Up"}
           </Button>
+          <Button asChild size="lg" variant="outline">
+            <Link href="/signup" className="text-foreground hover:bg-muted">
+              Sign Up
+            </Link>
+          </Button>
+        </div>
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-card p-6 rounded-lg shadow-sm">
+            <h3 className="text-xl font-semibold text-foreground mb-2">AI Tutor</h3>
+            <p className="text-muted-foreground">
+              Get instant help with your studies through AI chat.
+            </p>
+          </div>
+          <div className="bg-card p-6 rounded-lg shadow-sm">
+            <h3 className="text-xl font-semibold text-foreground mb-2">Personalized Quizzes</h3>
+            <p className="text-muted-foreground">
+              Test your knowledge with fun quizzes.
+            </p>
+          </div>
+          <div className="bg-card p-6 rounded-lg shadow-sm">
+            <h3 className="text-xl font-semibold text-foreground mb-2">Stay in Top Shape</h3>
+            <p className="text-muted-foreground">
+              Monitor your readiness for school tests.
+            </p>
+          </div>
         </div>
       </div>
     </div>

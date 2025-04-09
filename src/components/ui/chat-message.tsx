@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { motion } from "framer-motion"
 import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react"
@@ -98,7 +98,6 @@ interface TextPart {
   text: string
 }
 
-// For compatibility with AI SDK types, not used
 interface SourcePart {
   type: "source"
 }
@@ -113,6 +112,7 @@ export interface Message {
   experimental_attachments?: Attachment[]
   toolInvocations?: ToolInvocation[]
   parts?: MessagePart[]
+  renderAs?: "markdown" | "html"
 }
 
 export interface ChatMessageProps extends Message {
@@ -131,14 +131,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   experimental_attachments,
   toolInvocations,
   parts,
+  renderAs = "markdown",
 }) => {
-  const files = useMemo(() => {
-    return experimental_attachments?.map((attachment) => {
-      const dataArray = dataUrlToUint8Array(attachment.url)
-      const file = new File([dataArray], attachment.name ?? "Unknown")
-      return file
+  const [DOMPurify, setDOMPurify] = useState<any>(null)
+  const [isDOMPurifyLoaded, setIsDOMPurifyLoaded] = useState(false)
+
+  useEffect(() => {
+    import("dompurify").then((module) => {
+      setDOMPurify(() => module.default)
+      setIsDOMPurifyLoaded(true)
     })
-  }, [experimental_attachments])
+  }, [])
 
   const isUser = role === "user"
 
@@ -147,16 +150,25 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     minute: "2-digit",
   })
 
+  const sanitizeContent = (html: string) => {
+    if (!DOMPurify || typeof DOMPurify.sanitize !== "function") {
+      console.error("DOMPurify.sanitize is not available. Falling back to plain text.")
+      return html
+    }
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ["p", "strong", "ul", "li", "br"],
+      ALLOWED_ATTR: [],
+    })
+  }
+
   if (isUser) {
     return (
-      <div
-        className={cn("flex flex-col", isUser ? "items-end" : "items-start")}
-      >
-        {files ? (
+      <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+        {experimental_attachments ? (
           <div className="mb-1 flex flex-wrap gap-2">
-            {files.map((file, index) => {
-              return <FilePreview file={file} key={index} />
-            })}
+            {experimental_attachments.map((attachment, index) => (
+              <FilePreview key={index} url={attachment.url} name={attachment.name} />
+            ))}
           </div>
         ) : null}
 
@@ -184,10 +196,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       if (part.type === "text") {
         return (
           <div
-            className={cn(
-              "flex flex-col",
-              isUser ? "items-end" : "items-start"
-            )}
+            className={cn("flex flex-col", isUser ? "items-end" : "items-start")}
             key={`text-${index}`}
           >
             <div className={cn(chatBubbleVariants({ isUser, animation }))}>
@@ -233,7 +242,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-        <MarkdownRenderer>{content}</MarkdownRenderer>
+        {renderAs === "html" ? (
+          isDOMPurifyLoaded ? (
+            <div dangerouslySetInnerHTML={{ __html: sanitizeContent(content) }} />
+          ) : (
+            <div>Loading HTML content...</div>
+          )
+        ) : (
+          <MarkdownRenderer>{content}</MarkdownRenderer>
+        )}
         {actions ? (
           <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
             {actions}
@@ -254,12 +271,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       ) : null}
     </div>
   )
-}
-
-function dataUrlToUint8Array(data: string) {
-  const base64 = data.split(",")[1]
-  const buf = Buffer.from(base64, "base64")
-  return new Uint8Array(buf)
 }
 
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {

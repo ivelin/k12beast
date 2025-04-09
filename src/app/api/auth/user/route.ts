@@ -1,27 +1,31 @@
+// src/app/api/auth/user/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import supabase from "../../../../supabase/serverClient";
 
-// Initialize Supabase client with service role key (server-side only)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-export async function GET(request: NextRequest) {
-  const	token = request.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token) {
-    return NextResponse.json({ error: "No token provided" }, { status: 401 });
-  }
-
+export async function GET(req: NextRequest) {
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) {
-      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    // Extract the JWT token from the Authorization header
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.log("Missing or invalid Authorization header:", authHeader, "Request URL:", req.url);
+      return NextResponse.json({ error: "Missing or invalid Authorization header" }, { status: 401 });
     }
 
+    const token = authHeader.split(" ")[1];
+    console.log("Token received in /api/auth/user:", token);
+
+    // Use the token to authenticate the user
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      console.log("Error fetching user or user not found:", error?.message || "No user", "Token:", token);
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    console.log("User fetched successfully:", user.id);
     return NextResponse.json(user, { status: 200 });
-  } catch (err) {
-    console.error("Error fetching user:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    console.error("Error in /api/auth/user:", error.message, "Request URL:", req.url);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

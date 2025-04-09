@@ -1,3 +1,4 @@
+// src/app/chat/QuizSection.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -18,12 +19,7 @@ export default function QuizSection({ onQuizUpdate }) {
 
   const answer = useAppStore((state) => state.quizAnswer);
   const setAnswer = (value) => useAppStore.setState({ quizAnswer: value });
-  const isCorrect = useAppStore((state) => state.quizIsCorrect);
-  const setIsCorrect = (value) => useAppStore.setState({ quizIsCorrect: value });
-  const commentary = useAppStore((state) => state.quizCommentary);
-  const setCommentary = (value) => useAppStore.setState({ quizCommentary: value });
-  const feedback = useAppStore((state) => state.quizFeedback);
-  const setFeedback = (value) => useAppStore.setState({ quizFeedback: value });
+  const loading = useAppStore((state) => state.loading);
 
   useEffect(() => {
     if (step === "quizzes" && !quiz && !hasFetchedQuiz) {
@@ -41,30 +37,10 @@ export default function QuizSection({ onQuizUpdate }) {
   const handleSubmitAnswer = async () => {
     try {
       await handleValidate(answer, quiz);
-      // Directly call onQuizUpdate after handleValidate to ensure the result is displayed
       const updatedFeedback = useAppStore.getState().quizFeedback;
       if (updatedFeedback) {
-        const resultContent = `
-          <p><strong>Your Answer:</strong> ${answer}</p>
-          <p><strong>Result:</strong> ${updatedFeedback.isCorrect ? "Correct" : "Incorrect"}</p>
-          ${updatedFeedback.commentary}
-          ${quiz.encouragement && updatedFeedback.isCorrect ? `
-            <p class="text-green-500 italic mt-2">${quiz.encouragement}</p>
-          ` : ""}
-          ${updatedFeedback.solution && !updatedFeedback.isCorrect ? `
-            <div class="mt-2 p-2 bg-gray-50 rounded">
-              <h4 class="font-semibold">Solution</h4>
-              ${updatedFeedback.solution.map((step) => `
-                <div class="mt-1">
-                  <h5 class="font-medium">${step.title}</h5>
-                  ${step.content}
-                </div>
-              `).join("")}
-            </div>
-          ` : ""}
-        `;
-        onQuizUpdate({ type: "result", content: resultContent });
-        setStep("end");
+        // Remove the onQuizUpdate call since the store already adds the message
+        setStep("lesson"); // Return to lesson step after quiz submission
       } else {
         console.error("No feedback received after validation");
         setError("Failed to validate quiz answer. Please try again.");
@@ -78,17 +54,17 @@ export default function QuizSection({ onQuizUpdate }) {
   if (step !== "quizzes" || !quiz) return null;
 
   return (
-    <div className="mb-4">
-      {useAppStore.getState().loading && (
+    <div className="mb-4 flex flex-col items-center">
+      {loading && (
         <div className="text-blue-500">Loading... Please wait.</div>
       )}
       {useAppStore.getState().error && (
         <div className="text-red-500">{useAppStore.getState().error}</div>
       )}
       {quiz.answerFormat === "multiple-choice" && quiz.options && (
-        <div>
+        <div className="w-full max-w-md">
           {quiz.options.map((option, index) => (
-            <div key={index} className="my-2">
+            <div key={index} className="my-2 flex items-center">
               <input
                 type="radio"
                 id={`option-${index}`}
@@ -97,7 +73,7 @@ export default function QuizSection({ onQuizUpdate }) {
                 checked={answer === option}
                 onChange={(e) => setAnswer(e.target.value)}
                 className="mr-2"
-                disabled={useAppStore.getState().loading}
+                disabled={loading}
               />
               <label
                 htmlFor={`option-${index}`}
@@ -111,10 +87,10 @@ export default function QuizSection({ onQuizUpdate }) {
       )}
       <button
         onClick={handleSubmitAnswer}
-        disabled={!answer || useAppStore.getState().loading}
-        className="mt-2 p-2 bg-blue-500 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+        disabled={!answer || loading}
+        className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
       >
-        Submit Answer
+        Submit Quiz
       </button>
     </div>
   );

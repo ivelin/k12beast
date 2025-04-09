@@ -1,99 +1,83 @@
-import { NextRequest, NextResponse } from "next/server";
-import { sendXAIRequest, handleXAIError } from "../../../utils/xaiClient";
-import supabase from "../../../supabase/serverClient";
-import { v4 as uuidv4 } from "uuid";
+// src/app/api/tutor/route.ts
+import { v4 as uuidv4 } from 'uuid';
+import { NextResponse } from 'next/server';
+import supabase from '@/supabase/serverClient';
+import { sendXAIRequest } from '@/utils/xaiClient';
+import { handleApiError } from '@/utils/errorHandler';
 
-const responseFormat = `Return a JSON object with the tutoring lesson based on the provided session history and original input problem or image. Structure: {"isK12": true, "lesson": "<p>Lesson content...</p>"}. If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}.`;
+const responseFormat = `Return a JSON object with the tutoring lesson based on the provided chat history
+and original input problem or image. The response must include an evaluation of the student's problem and
+proposed solution (if provided), followed by a personalized lesson. Structure: {"isK12": true, "lesson":"..."}. 
+If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn.
+Encourage the student to request more examples and quizzes when ready. Do not quiz them yet.
+If not K12-related, return {"isK12": false, "error": "Prompt must be related to K12 education"}.`;
 
-const defaultResponse = {
-  isK12: true,
-  lesson: "",
-};
-
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const { problem, images } = await req.json();
-    let sessionId = req.headers.get("x-session-id");
+    const { problem, images } = await request.json();
+    const sessionId = request.headers.get('x-session-id') || uuidv4();
 
-    console.log("Tutor request body:", { problem, images });
-    console.log("Tutor session ID from header:", sessionId);
+    console.log('Creating new session with problem:', { problem, images });
 
-    // Fetch or create session
-    let sessionHistory = null;
-    if (sessionId) {
-      const { data, error } = await supabase
-        .from("sessions")
-        .select("*")
-        .eq("id", sessionId)
-        .single();
+    // Insert a new session with problem and images
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert({
+        id: sessionId,
+        problem, // Save the problem text
+        images,  // Save the image URLs
+        lesson: null,
+        examples: null,
+        quizzes: null,
+        performanceHistory: null,
+      })
+      .select()
+      .single();
 
-      if (error) {
-        console.error("Error fetching session from Supabase:", error.message);
-      } else if (data) {
-        sessionHistory = data;
-        console.log("Fetched session history:", sessionHistory);
-      } else {
-        console.warn("No session found for ID:", sessionId);
-      }
+    if (error || !data) {
+      console.error('Error creating session:', error?.message || 'No data returned');
+      throw new Error(`Failed to create session: ${error?.message || 'Unknown error'}`);
     }
 
-    if (!sessionId || !sessionHistory) {
-      sessionId = uuidv4();
-      const { data, error } = await supabase
-        .from("sessions")
-        .insert({
-          id: sessionId,
-          problem: problem || null, // Store the problem
-          images: images || null,   // Store the images
-          created_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+    const session = data;
 
-      if (error) {
-        console.error("Error creating session:", error.message);
-        return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
-      }
-      sessionHistory = data;
-      console.log("Created new session:", sessionId, "Data:", sessionHistory);
-    }
-
-    const content = await sendXAIRequest({
+    // Send request to xAI API for a lesson
+    const lessonResponse = await sendXAIRequest({
       problem,
       images,
       responseFormat,
-      defaultResponse,
+      defaultResponse: { isK12: true, lesson: 'No lesson generated.' },
       validateK12: true,
-      maxTokens: 1000,
-      sessionHistory,
+      chatHistory: [],
     });
 
-    if (content.isK12) {
-      const { data, error } = await supabase
-        .from("sessions")
-        .update({
-          problem: problem || null, // Ensure problem is preserved
-          images: images || null,   // Ensure images are preserved
-          lesson: content.lesson,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sessionId)
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Error updating session with lesson:", error.message);
-      } else {
-        console.log("Session updated with lesson for ID:", sessionId, "Updated data:", data);
-      }
+    // Check if the response is K12-related
+    if (!lessonResponse.isK12) {
+      throw new Error(lessonResponse.error || 'Prompt must be related to K12 education');
     }
 
-    return NextResponse.json(content, {
-      status: 200,
-      headers: { "x-session-id": sessionId },
+    if (!lessonResponse.lesson) {
+      throw new Error('No lesson returned from xAI API');
+    }
+
+    // Update the session with the lesson
+    const { error: updateError } = await supabase
+      .from('sessions')
+      .update({ lesson: lessonResponse.lesson })
+      .eq('id', sessionId);
+
+    if (updateError) {
+      throw new Error(`Failed to update session with lesson: ${updateError.message}`);
+    }
+
+    // Return the lesson content directly as a string
+    return new NextResponse(lessonResponse.lesson, {
+      headers: {
+        'Content-Type': 'text/plain',
+        'x-session-id': sessionId,
+      },
     });
-  } catch (err) {
-    console.error("Unexpected error in tutor route:", err);
-    return handleXAIError(err);
+  } catch (error) {
+    return handleApiError(error, '/api/tutor');
   }
 }

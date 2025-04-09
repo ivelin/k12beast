@@ -1,42 +1,31 @@
+// src/store/index.ts
 import { create } from 'zustand';
+import { toast } from 'sonner';
 
+type Step = "problem" | "lesson" | "examples" | "quizzes" | "end";
 interface AppState {
-  step: "problem" | "lesson" | "examples" | "quizzes" | "end"; // Added "examples"
+  step: Step;
   sessionId: string | null;
   problem: string;
-  submittedProblem: string | null;
   images: File[];
   imageUrls: string[];
   lesson: string | null;
   examples: any;
   quiz: any;
-  shareableLink: string | null;
   error: string | null;
   loading: boolean;
   quizAnswer: string;
-  quizIsCorrect: boolean | null;
-  quizCommentary: string;
   quizFeedback: any;
+  messages: Array<{ role: "user" | "assistant"; content: string; renderAs?: "markdown" | "html"; experimental_attachments?: { name: string; url: string }[] }>;
   hasSubmittedProblem: boolean;
-  sessionEnded: boolean;
-  setStep: (step: string) => void;
-  setSessionId: (sessionId: string | null) => void;
-  setProblem: (problem: string) => void;
-  setSubmittedProblem: (problem: string | null) => void;
-  setImages: (images: File[]) => void;
-  setImageUrls: (imageUrls: string[]) => void;
-  setLesson: (lesson: string | null) => void;
-  setExamples: (examples: any) => void;
-  setQuiz: (quiz: any) => void;
-  setShareableLink: (shareableLink: string | null) => void;
-  setError: (error: string | null) => void;
-  setLoading: (loading: boolean) => void;
-  setHasSubmittedProblem: (hasSubmitted: boolean) => void;
-  setSessionEnded: (ended: boolean) => void;
+  set: (updates: Partial<AppState>) => void;
+  setStep: (step: Step) => void;
+  addMessage: (message: { role: string; content: string; renderAs?: "markdown" | "html"; experimental_attachments?: { name: string; url: string }[] }) => void;
+  handleSubmit: (problem: string, imageUrls: string[], images: File[]) => Promise<void>;
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
   handleValidate: (answer: string, quiz: any) => Promise<void>;
-  handleEndSession: () => Promise<void>;
+  append: (message: { role: string; content: string }, imageUrls: string[], images: File[]) => Promise<void>;
   reset: () => void;
 }
 
@@ -44,182 +33,237 @@ const useAppStore = create<AppState>((set, get) => ({
   step: 'problem',
   sessionId: null,
   problem: '',
-  submittedProblem: null,
   images: [],
   imageUrls: [],
   lesson: null,
   examples: null,
   quiz: null,
-  shareableLink: null,
   error: null,
   loading: false,
   quizAnswer: '',
-  quizIsCorrect: null,
-  quizCommentary: '',
   quizFeedback: null,
+  messages: [],
   hasSubmittedProblem: false,
-  sessionEnded: false,
+  set: (updates) => set(updates),
   setStep: (step) => set({ step }),
-  setSessionId: (sessionId) => set({ sessionId }),
-  setProblem: (problem) => set({ problem }),
-  setSubmittedProblem: (problem) => set({ submittedProblem: problem }),
-  setImages: (images) => set({ images }),
-  setImageUrls: (imageUrls) => set({ imageUrls }),
-  setLesson: (lesson) => set({ lesson, hasSubmittedProblem: true }),
-  setExamples: (examples) => set({ examples }),
-  setQuiz: (quiz) => set({ quiz }),
-  setShareableLink: (shareableLink) => set({ shareableLink }),
-  setError: (error) => set({ error }),
-  setLoading: (loading) => set({ loading }),
-  setHasSubmittedProblem: (hasSubmitted) => set({ hasSubmittedProblem: hasSubmitted }),
-  setSessionEnded: (ended) => set({ sessionEnded: ended }),
-  handleExamplesRequest: async () => {
-    const { problem, imageUrls, sessionId, setExamples, setError, setLoading } = get();
+  addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
+  handleSubmit: async (problem, imageUrls, images) => {
+    const { sessionId, addMessage } = get();
+    set({ loading: true, problem, imageUrls, hasSubmittedProblem: true });
+
     try {
-      if (!problem && imageUrls.length === 0) {
-        throw new Error("Please enter a problem or upload an image.");
+      // Upload images to Supabase Storage if there are any
+      let uploadedImageUrls: string[] = [];
+      if (images && images.length > 0) {
+        const formData = new FormData();
+        images.forEach((image) => {
+          formData.append("files", image);
+        });
+
+        const token = document.cookie
+          .split("; ")
+          .find(row => row.startsWith("supabase-auth-token="))
+          ?.split("=")[1];
+        const headers: HeadersInit = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const uploadResponse = await fetch("/api/upload-image", {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.error || "Failed to upload images");
+        }
+
+        const uploadResult = await uploadResponse.json();
+        uploadedImageUrls = uploadResult.files.map((file: { name: string; url: string }) => file.url);
+        set({ imageUrls: uploadedImageUrls });
       }
-      setLoading(true);
-      const response = await fetch("/api/examples", {
+
+      // Add the user message with attached images (using Supabase URLs) to the chat history
+      addMessage({
+        role: "user",
+        content: problem,
+        renderAs: "markdown",
+        experimental_attachments: uploadedImageUrls.map((url, index) => ({
+          name: images[index]?.name || `Image ${index + 1}`,
+          url,
+        })),
+      });
+
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "x-session-id": sessionId || "",
+      };
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch("/api/tutor", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": sessionId || "",
-        },
+        headers,
+        body: JSON.stringify({ problem, images: uploadedImageUrls }),
+      });
+
+      const lessonContent = await res.text();
+
+      set({
+        sessionId: res.headers.get("x-session-id") || sessionId,
+        lesson: lessonContent,
+        step: "lesson",
+      });
+      addMessage({ role: "assistant", content: lessonContent, renderAs: "html" });
+    } catch (err) {
+      console.error("Error in handleSubmit:", err);
+      const errorMsg = err.message || "Failed to fetch lesson";
+      set({ error: errorMsg });
+      toast.error(errorMsg);
+    } finally {
+      set({ loading: false });
+    }
+  },
+  handleExamplesRequest: async () => {
+    const { problem, imageUrls, sessionId, addMessage } = get();
+    set({ loading: true });
+    try {
+      addMessage({ role: "user", content: "Request Example", renderAs: "markdown" });
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "x-session-id": sessionId || "",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch("/api/examples", {
+        method: "POST",
+        headers,
         body: JSON.stringify({ problem, images: imageUrls }),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch examples");
-      }
-      setExamples(data);
-      set({ step: "examples" }); // Transition to examples step
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch examples");
+      set({ examples: data, step: "examples" });
+      addMessage({
+        role: "assistant",
+        content: `<p><strong>Example:</strong> ${data.problem}</p><p><strong>Solution:</strong></p><ul>${data.solution.map((s: any) => `<li><strong>${s.title}:</strong> ${s.content}</li>`).join("")}</ul>`,
+        renderAs: "html",
+      });
     } catch (err) {
-      setError(err.message || "Failed to fetch examples. Please try again.");
+      set({ error: err.message || "Failed to fetch examples" });
     } finally {
-      setLoading(false);
+      set({ loading: false });
     }
   },
   handleQuizSubmit: async () => {
-    const { problem, imageUrls, sessionId, setQuiz, setError, setLoading } = get();
+    const { problem, imageUrls, sessionId, addMessage } = get();
+    set({ loading: true, step: "quizzes" });
     try {
-      if (!problem && imageUrls.length === 0) {
-        throw new Error("Please enter a problem or upload an image before requesting a quiz.");
+      addMessage({ role: "user", content: "Take a Quiz", renderAs: "markdown" });
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "x-session-id": sessionId || "",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
       }
-      setLoading(true);
-      set({ step: "quizzes" });
-      const response = await fetch("/api/quiz", {
+      const res = await fetch("/api/quiz", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": sessionId || "",
-        },
+        headers,
         body: JSON.stringify({ problem, images: imageUrls }),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch quiz");
-      }
-      setQuiz(data);
-      set({ quizAnswer: '', quizIsCorrect: null, quizCommentary: '', quizFeedback: null });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch quiz");
+      set({ quiz: data, quizAnswer: '', quizFeedback: null });
+      addMessage({
+        role: "assistant",
+        content: `<p><strong>Quiz:</strong></p><p>${data.problem}</p><ul>${data.options.map((o: string) => `<li>${o}</li>`).join("")}</ul>`,
+        renderAs: "html",
+      });
     } catch (err) {
-      setError(err.message || "Failed to fetch quiz. Please try again.");
+      set({ error: err.message || "Failed to fetch quiz" });
     } finally {
-      setLoading(false);
+      set({ loading: false });
     }
   },
-  handleValidate: async (answer: string, quiz: any) => {
-    const { sessionId, setError, setLoading } = get();
+  handleValidate: async (answer, quiz) => {
+    const { sessionId, addMessage } = get();
+    set({ loading: true });
     try {
-      if (!answer) {
-        throw new Error("Please select an option before validating.");
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        "x-session-id": sessionId || "",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
       }
-      if (!sessionId) {
-        throw new Error("Session ID is missing.");
-      }
-      if (!quiz || !quiz.problem) {
-        throw new Error("Quiz problem is missing.");
-      }
-      setLoading(true);
-      const response = await fetch("/api/validate", {
+      const res = await fetch("/api/validate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": sessionId,
-        },
-        body: JSON.stringify({
-          sessionId,
-          problem: quiz.problem,
-          answer,
-        }),
+        headers,
+        body: JSON.stringify({ sessionId, problem: quiz.problem, answer }),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        console.error("Validation failed with response:", data);
-        throw new Error(data.error || "Failed to validate quiz");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to validate quiz");
+
+      const isCorrect = answer === quiz.correctAnswer;
+      const readinessConfidence = isCorrect
+        ? quiz.readiness.confidenceIfCorrect
+        : quiz.readiness.confidenceIfIncorrect;
+      const readinessPercentage = Math.round(readinessConfidence * 100);
+
+      let motivationalMessage = "";
+      if (readinessPercentage >= 90) {
+        motivationalMessage = "You're doing amazing! You're very likely to ace your big test!";
+      } else if (readinessPercentage >= 70) {
+        motivationalMessage = "Great progress! You're on track to do well on your big test. Keep practicing!";
+      } else if (readinessPercentage >= 50) {
+        motivationalMessage = "You're making progress! Let's keep working to boost your confidence for the big test.";
+      } else {
+        motivationalMessage = "Let's keep practicing! More effort will help you succeed on your big test.";
       }
-      set({
-        quizIsCorrect: data.isCorrect,
-        quizCommentary: data.commentary,
-        quizFeedback: {
-          isCorrect: data.isCorrect,
-          commentary: data.commentary,
-          solution: data.solution || null,
-        },
+
+      set({ quizAnswer: answer, quizFeedback: data });
+      addMessage({
+        role: "assistant",
+        content: `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${answer}</p><p>${data.commentary}</p>${data.solution ? `<p>${data.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("</p><p>")}</p>` : ""}<p><strong>Options:</strong></p><ul>${quiz.options.map((o: string) => `<li>${o}${o === answer ? " (Your answer)" : ""}${o === quiz.correctAnswer ? " (Correct answer)" : ""}</li>`).join("")}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}% - ${motivationalMessage}</p>`,
+        renderAs: "html",
       });
     } catch (err) {
-      console.error("Error in handleValidate:", err);
-      setError(err.message || "Failed to validate quiz. Please try again.");
+      set({ error: err.message || "Failed to validate quiz" });
       throw err;
     } finally {
-      setLoading(false);
+      set({ loading: false });
     }
   },
-  handleEndSession: async () => {
-    const { sessionId, setShareableLink, setError, setSessionEnded } = get();
-    try {
-      if (!sessionId) {
-        throw new Error("Session ID is missing.");
-      }
-      const response = await fetch("/api/end-session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": sessionId,
-        },
-        body: JSON.stringify({ sessionId }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to end session");
-      }
-      setShareableLink(data.shareableLink);
-      setSessionEnded(true);
-    } catch (err) {
-      setError("Failed to end session. Please try again.");
-    }
+  append: async (msg, imageUrls, images) => {
+    const { handleSubmit } = get();
+    await handleSubmit(msg.content, imageUrls, images);
   },
-  reset: () =>
-    set({
-      step: 'problem',
-      sessionId: null,
-      problem: '',
-      submittedProblem: null,
-      images: [],
-      imageUrls: [],
-      lesson: null,
-      examples: null,
-      quiz: null,
-      shareableLink: null,
-      error: null,
-      loading: false,
-      quizAnswer: '',
-      quizIsCorrect: null,
-      quizCommentary: '',
-      quizFeedback: null,
-      hasSubmittedProblem: false,
-      sessionEnded: false,
-    }),
+  reset: () => set({
+    step: 'problem', sessionId: null, problem: '', images: [], imageUrls: [],
+    lesson: null, examples: null, quiz: null, error: null,
+    loading: false, quizAnswer: '', quizFeedback: null, messages: [],
+    hasSubmittedProblem: false,
+  }),
 }));
 
 export default useAppStore;
