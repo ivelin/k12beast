@@ -22,14 +22,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  async rewrites() {
-    return [
-      {
-        source: "/installHook.js.map",
-        destination: "/api/debug-install-hook",
-      },
-    ];
-  },
 };
 
 export default nextConfig;
