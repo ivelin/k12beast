@@ -1,4 +1,5 @@
-import { v4 as uuidv4 } from 'uuid'; // Import uuid for generating session IDs
+// src/app/api/tutor/route.ts
+import { v4 as uuidv4 } from 'uuid';
 import { NextResponse } from 'next/server';
 import supabase from '@/supabase/serverClient';
 import { sendXAIRequest } from '@/utils/xaiClient';
@@ -14,15 +15,17 @@ If not K12-related, return {"isK12": false, "error": "Prompt must be related to 
 export async function POST(request: Request) {
   try {
     const { problem, images } = await request.json();
-    const sessionId = request.headers.get('x-session-id') || uuidv4(); // Use provided sessionId or generate a new one
+    const sessionId = request.headers.get('x-session-id') || uuidv4();
 
     console.log('Creating new session with problem:', { problem, images });
 
-    // Insert a new session with a generated ID
+    // Insert a new session with problem and images
     const { data, error } = await supabase
       .from('sessions')
       .insert({
-        id: sessionId, // Provide the ID
+        id: sessionId,
+        problem, // Save the problem text
+        images,  // Save the image URLs
         lesson: null,
         examples: null,
         quizzes: null,
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
       responseFormat,
       defaultResponse: { isK12: true, lesson: 'No lesson generated.' },
       validateK12: true,
-      chatHistory: [], // Add chat history if needed
+      chatHistory: [],
     });
 
     // Check if the response is K12-related
@@ -67,10 +70,10 @@ export async function POST(request: Request) {
       throw new Error(`Failed to update session with lesson: ${updateError.message}`);
     }
 
-    // Return the lesson content directly as a string (not wrapped in JSON)
+    // Return the lesson content directly as a string
     return new NextResponse(lessonResponse.lesson, {
       headers: {
-        'Content-Type': 'text/plain', // Indicate that the response is plain text (HTML string)
+        'Content-Type': 'text/plain',
         'x-session-id': sessionId,
       },
     });

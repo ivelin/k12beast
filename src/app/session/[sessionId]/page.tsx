@@ -1,3 +1,4 @@
+// src/app/session/[sessionId]/page.tsx
 "use client"
 
 import { useEffect, useState } from "react"
@@ -13,9 +14,12 @@ interface Message {
   role: "user" | "assistant"
   content: string
   renderAs?: "markdown" | "html"
+  experimental_attachments?: { name: string; url: string }[]
 }
 
 interface Session {
+  problem: string | null
+  images: string[] | null
   lesson: string
   messages: Message[]
 }
@@ -25,7 +29,6 @@ export default function SessionDetailPage({
 }: {
   params: Promise<{ sessionId: string }>
 }) {
-  // Unwrap params using React.use()
   const params = use(paramsPromise)
   const { sessionId } = params
 
@@ -61,13 +64,33 @@ export default function SessionDetailPage({
         const data = await res.json()
         const session: Session = data.session
 
-        // Prepend the lesson as a message
-        const lessonMessage: Message = {
+        // Prepare messages array with problem and images at the top
+        const updatedMessages: Message[] = [];
+        
+        // Add the original problem and images as a user message if they exist
+        if (session.problem || (session.images && session.images.length > 0)) {
+          updatedMessages.push({
+            role: "user",
+            content: session.problem || "Image-based problem",
+            renderAs: "markdown",
+            experimental_attachments: session.images?.map((url, index) => ({
+              name: `Image ${index + 1}`,
+              url,
+            })),
+          });
+        }
+
+        // Add the lesson as an assistant message
+        updatedMessages.push({
           role: "assistant",
           content: session.lesson || "No lesson provided",
           renderAs: "html",
-        }
-        setMessages([lessonMessage, ...(session.messages || [])])
+        });
+
+        // Append the rest of the session messages
+        updatedMessages.push(...(session.messages || []));
+
+        setMessages(updatedMessages);
       } catch (err) {
         setError(err.message || "Error loading session")
       } finally {
