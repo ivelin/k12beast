@@ -26,6 +26,7 @@ interface Session {
   id: string;
   problem: string | null;
   images: string[] | null;
+  lesson?: string; // Add lesson field (might be present in older sessions)
   messages: Message[];
 }
 
@@ -116,6 +117,18 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         // Append the session messages
         updatedMessages.push(...(fetchedSession.messages || []));
 
+        // Check if the lesson content (assistant message) is present in messages
+        const hasLessonInMessages = updatedMessages.some(msg => msg.role === "assistant");
+
+        // If there's no assistant message but a lesson field exists (for older sessions), add it
+        if (!hasLessonInMessages && fetchedSession.lesson) {
+          updatedMessages.push({
+            role: "assistant",
+            content: fetchedSession.lesson,
+            renderAs: "html",
+          });
+        }
+
         // Update the store with the session data
         set({
           sessionId: fetchedSession.id,
@@ -123,11 +136,16 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           imageUrls: fetchedSession.images || [],
           messages: updatedMessages,
           hasSubmittedProblem: true,
-          step: "lesson", // Start at the lesson step since the problem is already submitted
+          step: updatedMessages.some(msg => msg.role === "assistant") ? "lesson" : "problem", // Set step based on whether the lesson exists
         });
 
         setLocalProblem(fetchedSession.problem || "");
         setLocalImages([]); // No new images to upload
+
+        // If the lesson is still missing, regenerate it
+        if (!updatedMessages.some(msg => msg.role === "assistant") && fetchedSession.problem) {
+          await storeHandleSubmit(fetchedSession.problem, fetchedSession.images || [], []);
+        }
       } catch (err) {
         setError(err.message || "Error loading session");
       } finally {
@@ -136,7 +154,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     }
 
     loadSession();
-  }, [sessionId, set, reset]);
+  }, [sessionId, set, reset, storeHandleSubmit]);
 
   useEffect(() => {
     if (storeSessionId) {
