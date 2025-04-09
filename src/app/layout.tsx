@@ -1,4 +1,3 @@
-// src/app/layout.tsx
 "use client";
 
 import { Geist, Geist_Mono } from "next/font/google";
@@ -43,7 +42,6 @@ export default function RootLayout({
       console.log("Initial auth check - user:", user);
       setIsLoggedIn(!!user);
       setIsAuthChecked(true);
-      // Redirect logged-in users away from /, /login, and /signup
       if (user && (pathname === "/" || pathname === "/login" || pathname === "/signup")) {
         router.push("/chat");
       }
@@ -66,6 +64,7 @@ export default function RootLayout({
     try {
       if (isLoggedIn) {
         await supabase.auth.signOut();
+        document.cookie = "supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
         setIsLoggedIn(false);
         router.push("/");
       } else {
@@ -86,15 +85,8 @@ export default function RootLayout({
   if (!isAuthChecked) {
     return (
       <html lang="en" suppressHydrationWarning>
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
-        >
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
+        <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <div className="flex items-center justify-center h-screen">
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
@@ -109,22 +101,16 @@ export default function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
-      >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <nav className="flex items-center justify-between p-4 bg-muted">
             <div className="text-lg font-bold">K12Beast</div>
             <div className="flex space-x-4">
-              <Link href="/" className="hover:underline">
-                Home
-              </Link>
-              {/* Only show Chat and History if logged in and not on /, /login, or /signup */}
+              {!isLoggedIn && (
+                <Link href="/" className="hover:underline">
+                  Home
+                </Link>
+              )}
               {isLoggedIn && pathname !== "/" && pathname !== "/login" && pathname !== "/signup" && (
                 <>
                   <Link href="/chat" className="hover:underline">
@@ -135,7 +121,6 @@ export default function RootLayout({
                   </Link>
                 </>
               )}
-              {/* Only show Login/Logout button if not on /, /login, or /signup */}
               {pathname !== "/" && pathname !== "/login" && pathname !== "/signup" && (
                 <button
                   onClick={handleAuth}

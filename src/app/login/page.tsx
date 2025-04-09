@@ -1,4 +1,3 @@
-// src/app/login/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -22,23 +21,14 @@ export default function Login() {
 
   useEffect(() => {
     const validateToken = async () => {
-      const token = document.cookie
-        .split("; ")
-        .find(row => row.startsWith("supabase-auth-token="))
-        ?.split("=")[1];
-
-      if (token) {
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-        if (error || !user) {
-          console.log("Invalid or expired token found, clearing cookie:", error?.message);
-          document.cookie = "supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict";
-        } else {
-          console.log("Valid token found, redirecting to /chat");
-          router.push("/chat");
-        }
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        console.log("No valid session found:", error?.message);
+      } else {
+        console.log("Valid session found, redirecting to /chat");
+        router.push("/chat");
       }
     };
-
     validateToken();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -102,7 +92,6 @@ export default function Login() {
           },          
         });
         if (error) {
-          // Removed console.error since the error is handled
           if (error.message.includes("already registered")) {
             setMessage("This email is already registered. Please log in or use a different email.");
           } else if (error.message.includes("For security purposes, you can only request this after")) {
@@ -123,7 +112,6 @@ export default function Login() {
           password: trimmedPassword,
         });
         if (error) {
-          // Removed console.error since the error is handled
           if (error.message === "Email not confirmed") {
             setMessage("Please confirm your email address. Check your inbox for a confirmation link.");
           } else if (error.message === "Invalid login credentials") {
@@ -135,8 +123,9 @@ export default function Login() {
           return;
         }
         console.log("Login successful, session data:", data);
-        document.cookie = `supabase-auth-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Strict`;
-        router.push("/chat");
+        document.cookie = `supabase-auth-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
+        setLoading(false);
+        window.location.href = "/chat"; // Removed setTimeout
       }
     } catch (error: any) {
       console.error("Authentication error:", error);
