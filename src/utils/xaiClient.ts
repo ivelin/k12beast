@@ -29,6 +29,14 @@ interface XAIRequestOptions {
   chatHistory?: { role: string; content: string; renderAs?: "markdown" | "html" }[];
 }
 
+function sanitizeResponse(rawContent: string): string {
+  // Remove control characters (except \n, \r, \t) that are not within quoted strings
+  const sanitized = rawContent
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F](?=(?:(?:[^"]*"){2})*[^"]*$)/g, "") // Remove control characters outside quotes
+    .trim();
+  return sanitized;
+}
+
 export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
   const {
     problem,
@@ -52,13 +60,12 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     {
       role: "system",
       content: `You are a K12 tutor. Assist with educational queries related to K12 subjects.
-Respond only to valid K12 queries using the chat history for context. 
+Respond only to valid K12 queries using the chat history for context.
 Respond in a conversational style as if you are speaking directly with a K12 student.
-Return a raw JSON object
-(formatted for JSON.parse()) with response fields in 
-a string with plain text or minimal HTML formatting (use only <p>, <strong>, <ul>, <li> tags, no attributes or scripts). 
-Ensure all quotes are escaped (e.g., \") and no raw control characters are included.
-Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).`,
+Return a raw JSON object (formatted for JSON.parse()) with response fields in a string with plain text or minimal HTML formatting (use only <p>, <strong>, <ul>, <li> tags, no attributes or scripts).
+Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
+Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
+Ensure the response is a single, valid JSON object with no trailing commas or syntax errors.`,
     },
     {
       role: "user",
@@ -103,6 +110,9 @@ Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).`,
 
       let rawContent = response.choices[0].message.content.trim();
 
+      // Sanitize the response to remove invalid control characters
+      rawContent = sanitizeResponse(rawContent);
+
       let content: XAIResponse;
       content = JSON.parse(rawContent);
 
@@ -110,12 +120,20 @@ Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).`,
 
       return content;
     } catch (error) {
-      if (attempt === maxRetries) throw error;
       console.warn(`xAI request failed (attempt ${attempt}/${maxRetries}):`, error.message);
+      if (attempt === maxRetries) {
+        console.error("Final attempt failed. Raw response:", rawContent);
+        console.error("Returning default response with error message.");
+        return {
+          ...defaultResponse,
+          lesson: defaultResponse.lesson ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON characters.`
+            : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON characters.`,
+        };
+      }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
-  throw new Error("Failed to get a response after maximum retries");
+  return defaultResponse;
 }
 
 export { handleXAIError } from "./xaiUtils"; // Re-export for convenience
