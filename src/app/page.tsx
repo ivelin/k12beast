@@ -53,21 +53,21 @@ export default function Home() {
         </div>
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-card p-6 rounded-lg shadow-sm">
-            <h3 className="text-xl font-semibold text-foreground mb-2">AI-Powered Chat</h3>
+            <h3 className="text-xl font-semibold text-foreground mb-2">AI Tutor</h3>
             <p className="text-muted-foreground">
-              Get instant help with your studies through our intelligent AI chat.
+              Get instant help with your studies through AI chat.
             </p>
           </div>
           <div className="bg-card p-6 rounded-lg shadow-sm">
-            <h3 className="text-xl font-semibold text-foreground mb-2">Interactive Quizzes</h3>
+            <h3 className="text-xl font-semibold text-foreground mb-2">Personalized Quizzes</h3>
             <p className="text-muted-foreground">
-              Test your knowledge with fun and engaging quizzes tailored for K12.
+              Test your knowledge with fun quizzes.
             </p>
           </div>
           <div className="bg-card p-6 rounded-lg shadow-sm">
-            <h3 className="text-xl font-semibold text-foreground mb-2">Track Progress</h3>
+            <h3 className="text-xl font-semibold text-foreground mb-2">Stay in Top Shape</h3>
             <p className="text-muted-foreground">
-              Monitor your learning journey and see your improvement over time.
+              Monitor your readiness for school tests.
             </p>
           </div>
         </div>
