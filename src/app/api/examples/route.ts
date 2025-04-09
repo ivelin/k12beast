@@ -68,22 +68,51 @@ export async function POST(req: NextRequest) {
       chatHistory: sessionHistory?.messages || [],
     });
 
-    // Validate the xAI response
-    if (!content.problem || !content.solution || !Array.isArray(content.solution)) {
+    // Handle unexpected response format
+    let formattedContent = content;
+    if (content.response && (!content.problem || !content.solution)) {
+      console.warn("xAI returned unexpected format with 'response' field:", content.response);
+      // Attempt to parse the response field into problem and solution
+      const responseText = content.response;
+      const problemMatch = responseText.match(/<p><strong>Problem:<\/strong>(.*?)(?=<p><strong>Solution:<\/strong>|$)/is);
+      const solutionMatch = responseText.match(/<p><strong>Solution:<\/strong><\/p>\s*<ul>(.*?)(?=<\/ul>|$)/is);
+
+      if (problemMatch && solutionMatch) {
+        const problemText = problemMatch[1].trim();
+        const solutionItems = solutionMatch[1].match(/<li><strong>(.*?):<\/strong>\s*(.*?)(?=<\/li>|$)/gi) || [];
+        const solution = solutionItems.map((item: string) => {
+          const match = item.match(/<li><strong>(.*?):<\/strong>\s*(.*?)(?=<\/li>|$)/i);
+          return match ? { title: match[1], content: match[2].trim() } : null;
+        }).filter(Boolean);
+
+        formattedContent = {
+          problem: problemText,
+          solution: solution.length > 0 ? solution : [{ title: "Step 1", content: "No solution steps provided." }],
+        };
+      } else {
+        console.error("Could not parse problem and solution from response:", responseText);
+        formattedContent = {
+          problem: "Unable to generate example due to API response format.",
+          solution: [{ title: "Error", content: "The AI response was not in the expected format. Please try again." }],
+        };
+      }
+    }
+
+    // Validate the formatted content
+    if (!formattedContent.problem || !formattedContent.solution || !Array.isArray(formattedContent.solution)) {
       throw new Error("Invalid xAI response format: Expected 'problem' and 'solution' fields with 'solution' as an array");
     }
 
     if (sessionId) {
       const updatedExamples = [
         ...(sessionHistory?.examples || []),
-        { problem: content.problem, solution: content.solution },
+        { problem: formattedContent.problem, solution: formattedContent.solution },
       ];
-      // Append the assistant's response to the messages array
       const updatedMessages = [
         ...(sessionHistory?.messages || []),
         {
           role: "assistant",
-          content: `<p><strong>Example:</strong> ${content.problem}</p><p><strong>Solution:</strong></p><ul>${content.solution.map((s: any) => `<li><strong>${s.title}:</strong> ${s.content}</li>`).join("")}</ul>`,
+          content: `<p><strong>Example:</strong> ${formattedContent.problem}</p><p><strong>Solution:</strong></p><ul>${formattedContent.solution.map((s: any) => `<li><strong>${s.title}:</strong> ${s.content}</li>`).join("")}</ul>`,
           renderAs: "html",
         },
       ];
@@ -99,11 +128,11 @@ export async function POST(req: NextRequest) {
       if (error) {
         console.error("Error updating session with examples:", error.message);
       } else {
-        console.log("Session updated with new example:", content.problem);
+        console.log("Session updated with new example:", formattedContent.problem);
       }
     }
 
-    return NextResponse.json(content, { status: 200 });
+    return NextResponse.json(formattedContent, { status: 200 });
   } catch (err) {
     return handleXAIError(err);
   }
