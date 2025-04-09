@@ -1,4 +1,3 @@
-// src/app/history/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -21,7 +20,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSessions = async (pageToFetch: number) => {
+  const fetchSessions = async (pageToFetch: number, controller: AbortController) => {
     try {
       const token = document.cookie
         .split("; ")
@@ -38,6 +37,7 @@ export default function HistoryPage() {
       const res = await fetch(`/api/history?page=${pageToFetch}&pageSize=${PAGE_SIZE}`, {
         method: "GET",
         headers,
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -52,27 +52,31 @@ export default function HistoryPage() {
 
       return newSessions;
     } catch (err) {
-      console.error("Error fetching sessions:", err);
-      setError(err.message || "Failed to fetch sessions");
+      if (err.name !== "AbortError") {
+        console.error("Error fetching sessions:", err);
+        setError(err.message || "Failed to fetch sessions");
+      }
       return [];
     }
   };
 
-  // Fetch initial sessions on mount
   useEffect(() => {
+    const controller = new AbortController();
     const loadInitialSessions = async () => {
       setLoading(true);
-      const initialSessions = await fetchSessions(1);
+      const initialSessions = await fetchSessions(1, controller);
       setSessions(initialSessions);
       setHasMore(initialSessions.length === PAGE_SIZE);
       setLoading(false);
     };
     loadInitialSessions();
+    return () => controller.abort();
   }, []);
 
   const loadMoreSessions = async () => {
+    const controller = new AbortController();
     const nextPage = page + 1;
-    const newSessions = await fetchSessions(nextPage);
+    const newSessions = await fetchSessions(nextPage, controller);
 
     const existingIds = new Set(sessions.map(s => s.id));
     const uniqueNewSessions = newSessions.filter(s => !existingIds.has(s.id));

@@ -1,4 +1,3 @@
-// src/app/chat/[sessionId]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -26,12 +25,12 @@ interface Session {
   id: string;
   problem: string | null;
   images: string[] | null;
-  lesson?: string; // Add lesson field (might be present in older sessions)
+  lesson?: string;
   messages: Message[];
 }
 
 export default function ChatPage({ params }: { params: Promise<{ sessionId: string }> }) {
-  const { sessionId } = React.use(params); // Unwrap params using React.use()
+  const { sessionId } = React.use(params);
   const store = useAppStore();
   const {
     step,
@@ -61,8 +60,8 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load session data if sessionId is not "new"
   useEffect(() => {
+    const controller = new AbortController();
     async function loadSession() {
       if (sessionId === "new") {
         reset();
@@ -88,6 +87,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         const res = await fetch(`/api/session/${sessionId}`, {
           method: "GET",
           headers,
+          signal: controller.signal,
         });
 
         if (!res.ok) {
@@ -98,10 +98,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         const data = await res.json();
         const fetchedSession: Session = data.session;
 
-        // Prepare messages array with problem and images at the top
         const updatedMessages: Message[] = [];
-
-        // Add the original problem and images as a user message if they exist
         if (fetchedSession.problem || (fetchedSession.images && fetchedSession.images.length > 0)) {
           updatedMessages.push({
             role: "user",
@@ -113,14 +110,8 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
             })),
           });
         }
-
-        // Append the session messages
         updatedMessages.push(...(fetchedSession.messages || []));
-
-        // Check if the lesson content (assistant message) is present in messages
         const hasLessonInMessages = updatedMessages.some(msg => msg.role === "assistant");
-
-        // If there's no assistant message but a lesson field exists (for older sessions), add it
         if (!hasLessonInMessages && fetchedSession.lesson) {
           updatedMessages.push({
             role: "assistant",
@@ -128,32 +119,31 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
             renderAs: "html",
           });
         }
-
-        // Update the store with the session data
         set({
           sessionId: fetchedSession.id,
           problem: fetchedSession.problem || "",
           imageUrls: fetchedSession.images || [],
           messages: updatedMessages,
           hasSubmittedProblem: true,
-          step: updatedMessages.some(msg => msg.role === "assistant") ? "lesson" : "problem", // Set step based on whether the lesson exists
+          step: updatedMessages.some(msg => msg.role === "assistant") ? "lesson" : "problem",
         });
-
         setLocalProblem(fetchedSession.problem || "");
-        setLocalImages([]); // No new images to upload
+        setLocalImages([]);
 
-        // If the lesson is still missing, regenerate it
         if (!updatedMessages.some(msg => msg.role === "assistant") && fetchedSession.problem) {
           await storeHandleSubmit(fetchedSession.problem, fetchedSession.images || [], []);
         }
       } catch (err) {
-        setError(err.message || "Error loading session");
+        if (err.name !== "AbortError") {
+          setError(err.message || "Error loading session");
+        }
       } finally {
         setIsLoadingSession(false);
       }
     }
 
     loadSession();
+    return () => controller.abort();
   }, [sessionId, set, reset, storeHandleSubmit]);
 
   useEffect(() => {
@@ -226,7 +216,6 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     setLocalProblem("");
     setLocalImages([]);
     setStep("problem");
-    // Redirect to /chat/new to start a new chat
     window.location.href = "/chat/new";
   };
 
@@ -249,7 +238,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   });
 
   if (isLoadingSession) {
-    return <div className="container mx-auto p-4">Loading...</div>;
+    return <div className="container mx-auto p-4">Loading session, please wait...</div>;
   }
 
   if (error) {

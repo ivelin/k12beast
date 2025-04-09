@@ -100,7 +100,6 @@ export default function RootLayout({
 
   console.log("Rendering nav - pathname:", pathname, "isLoggedIn:", isLoggedIn);
 
-  // Check if the user is on any chat-related page
   const isChatPage = pathname.startsWith("/chat");
 
   return (
@@ -119,6 +118,7 @@ export default function RootLayout({
                 <>
                   <Link
                     href="/chat/new"
+                    prefetch={false} // Disable prefetching
                     className={`hover:underline ${isChatPage ? "text-muted-foreground cursor-default" : ""}`}
                     onClick={(e) => isChatPage && e.preventDefault()}
                   >

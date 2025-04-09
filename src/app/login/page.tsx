@@ -14,6 +14,7 @@ export default function Login() {
   const [message, setMessage] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false); // New flag
   const router = useRouter();
 
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -24,7 +25,7 @@ export default function Login() {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error || !user) {
         console.log("No valid session found:", error?.message);
-      } else {
+      } else if (!isNavigating) { // Check navigation intent
         console.log("Valid session found, redirecting to /chat");
         router.push("/chat");
       }
@@ -41,7 +42,7 @@ export default function Login() {
     return () => {
       subscription?.unsubscribe();
     };
-  }, [router]);
+  }, [router, isNavigating]);
 
   useEffect(() => {
     const checkAutofill = () => {
@@ -75,7 +76,7 @@ export default function Login() {
     const trimmedPassword = password.trim();
 
     if (!trimmedEmail || !trimmedPassword) {
-      console.error("Validation failed: Email or password is empty after trimming", { email: trimmedEmail, password: trimmedPassword });
+      console.error("Validation failed: Email or password is empty", { email: trimmedEmail, password: trimmedPassword });
       setMessage("Please enter both email and password.");
       setLoading(false);
       return;
@@ -87,23 +88,21 @@ export default function Login() {
         const { error } = await supabase.auth.signUp({
           email: trimmedEmail,
           password: trimmedPassword,
-          options: {
-            emailRedirectTo: "http://localhost:3000/confirm-success",
-          },          
+          options: { emailRedirectTo: "http://localhost:3000/confirm-success" },
         });
         if (error) {
           if (error.message.includes("already registered")) {
             setMessage("This email is already registered. Please log in or use a different email.");
-          } else if (error.message.includes("For security purposes, you can only request this after")) {
-            setMessage("You’ve recently tried signing up with this email. Please wait a moment before trying again.");
+          } else if (error.message.includes("For security purposes")) {
+            setMessage("You’ve recently tried signing up. Please wait a moment.");
           } else {
-            setMessage(error.message || "An error occurred during sign-up. Please try again.");
+            setMessage(error.message || "Sign-up error. Please try again.");
           }
           setLoading(false);
           return;
         }
         console.log("Sign-up successful");
-        setMessage("Sign-up successful! Please check your email to confirm your account before logging in.");
+        setMessage("Sign-up successful! Check your email to confirm.");
         setLoading(false);
       } else {
         console.log("Attempting login with email:", trimmedEmail);
@@ -113,11 +112,11 @@ export default function Login() {
         });
         if (error) {
           if (error.message === "Email not confirmed") {
-            setMessage("Please confirm your email address. Check your inbox for a confirmation link.");
+            setMessage("Please confirm your email address.");
           } else if (error.message === "Invalid login credentials") {
-            setMessage("Invalid email or password. Please try again.");
+            setMessage("Invalid email or password.");
           } else {
-            setMessage(error.message || "An error occurred during login. Please try again.");
+            setMessage(error.message || "Login error. Please try again.");
           }
           setLoading(false);
           return;
@@ -125,13 +124,19 @@ export default function Login() {
         console.log("Login successful, session data:", data);
         document.cookie = `supabase-auth-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
         setLoading(false);
-        window.location.href = "/chat"; // Removed setTimeout
+        window.location.href = "/chat";
       }
     } catch (error: any) {
       console.error("Authentication error:", error);
       setMessage(error.message || "An error occurred. Please try again.");
       setLoading(false);
     }
+  };
+
+  // Set navigation intent when leaving the page
+  const handleNavigation = () => {
+    setIsNavigating(true);
+    setTimeout(() => setIsNavigating(false), 100); // Reset after navigation
   };
 
   const isFormValid = email.trim().length > 0 && password.trim().length > 0;
@@ -142,7 +147,7 @@ export default function Login() {
         <h1 className="text-2xl font-bold mb-4 text-foreground">
           {isSignUp ? "Sign Up for K12Beast" : "Login to K12Beast"}
         </h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} onClick={handleNavigation} className="space-y-4">
           <div>
             <Label htmlFor="email" className="block text-sm font-medium text-foreground">
               Email
@@ -194,7 +199,7 @@ export default function Login() {
         <Button
           variant="outline"
           className="w-full mt-4"
-          onClick={() => setIsSignUp(!isSignUp)}
+          onClick={() => { setIsSignUp(!isSignUp); handleNavigation(); }}
           disabled={loading}
         >
           {isSignUp ? "Switch to Login" : "Switch to Sign Up"}

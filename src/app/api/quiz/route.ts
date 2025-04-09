@@ -20,7 +20,7 @@ if the student answers this quiz correctly, and one if they answer incorrectly. 
 content in Markdown"}, ...], "difficulty": "easy|medium|hard", "encouragement": "Words of encouragement
 if the last quiz was answered correctly, otherwise null", "readiness": {"confidenceIfCorrect": 0.92,
 "confidenceIfIncorrect": 0.75}}. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be
-numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 90%
+numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 95%
 success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz
 correctly or incorrectly. Ensure all fields are present, especially the "solution" field with at least
 two steps.`;

@@ -1,6 +1,10 @@
+// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import supabase from "./supabase/serverClient";
+import { v4 as uuidv4 } from "uuid";
+
+const recentRequests = new Set<string>();
+const dedupeWindow = 100;
 
 const getCookie = (name: string, cookies: string): string | null => {
   const value = `; ${cookies}`;
@@ -10,38 +14,92 @@ const getCookie = (name: string, cookies: string): string | null => {
 };
 
 export async function middleware(request: NextRequest) {
-  let user = null;
-  const token = request.nextUrl.searchParams.get("token") ||
-                request.headers.get("Authorization")?.replace("Bearer ", "") ||
-                getCookie("supabase-auth-token", request.headers.get("cookie") || "");
-  console.log("Middleware: Token from request -", token || "null");
+  const requestId = uuidv4();
+  const now = Date.now();
 
-  if (token) {
-    const { data: { user: fetchedUser }, error } = await supabase.auth.getUser(token);
-    if (!error && fetchedUser) {
-      user = fetchedUser;
+  if (process.env.NODE_ENV === "development") {
+    for (const id of recentRequests) {
+      const [urlPart, timestamp] = id.split("|");
+      if (now - parseInt(timestamp) < dedupeWindow && request.url === urlPart) {
+        console.log(`Middleware [${requestId}]: Skipped duplicate log for ${request.url}`);
+        const response = NextResponse.next();
+        response.headers.set("x-request-id", requestId);
+        return response;
+      }
     }
-    console.log("Middleware: User from Supabase -", user || "null", "Error -", error?.message || "none");
+    recentRequests.add(`${request.url}|${now}`);
+    if (recentRequests.size > 100) recentRequests.clear();
+  }
+
+  const cookies = request.headers.get("cookie") || "";
+  let token = getCookie("supabase-auth-token", cookies);
+  console.log(`Middleware [${requestId}]: Token from cookie -`, token || "none");
+
+  if (!token) {
+    const authHeader = request.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.slice(7);
+      console.log(`Middleware [${requestId}]: Token from Authorization -`, token);
+    }
+  }
+
+  let user = null;
+  if (token) {
+    try {
+      const res = await fetch(`${request.nextUrl.origin}/api/auth/user`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log(`Middleware [${requestId}]: Auth API status -`, res.status);
+      if (res.ok) {
+        user = await res.json();
+        console.log(`Middleware [${requestId}]: User fetched -`, user.email || "no email");
+      } else {
+        console.log(`Middleware [${requestId}]: Auth API failed -`, res.statusText);
+      }
+    } catch (error) {
+      console.error(`Middleware [${requestId}]: Auth fetch error -`, error.message);
+    }
   } else {
-    console.log("Middleware: No token found in request");
+    console.log(`Middleware [${requestId}]: No token found in cookie or header`);
   }
 
   const pathname = request.nextUrl.pathname;
-  console.log(`Middleware: Pathname - ${pathname}, User -`, user || "null");
+  console.log(`Middleware [${requestId}]: Pathname - ${pathname}, User -`, !!user);
+  if (process.env.NODE_ENV === "development") {
+    console.log(`Middleware [${requestId}]: Note - Duplicate GET logs may appear in dev mode due to Next.js`);
+  }
 
+  let response: NextResponse;
   if (user && pathname === "/") {
-    console.log("Middleware: Authenticated user on /, redirecting to /chat");
-    return NextResponse.redirect(new URL("/chat", request.url));
+    console.log(`Middleware [${requestId}]: Auth user on /, redirect to /chat`);
+    response = NextResponse.redirect(new URL("/chat", request.url));
+  } else if (!user && (pathname.startsWith("/chat") || 
+                       pathname.startsWith("/history") || 
+                       pathname.startsWith("/session"))) {
+    console.log(`Middleware [${requestId}]: Unauth user on protected, redirect to /`);
+    response = NextResponse.redirect(new URL("/", request.url));
+  } else if (!user && pathname === "/login" && request.nextUrl.search.includes("reauth")) {
+    console.log(`Middleware [${requestId}]: Forcing reauth on /login`);
+    response = NextResponse.next();
+  } else if (!user && (pathname.startsWith("/chat") || 
+                       pathname.startsWith("/history") || 
+                       pathname.startsWith("/session"))) {
+    const referer = request.headers.get("referer") || "";
+    if (referer.includes("/login")) {
+      console.log(`Middleware [${requestId}]: Mismatch detected, redirect to /login?reauth=true`);
+      response = NextResponse.redirect(new URL("/login?reauth=true", request.url));
+    } else {
+      response = NextResponse.next();
+    }
+  } else {
+    console.log(`Middleware [${requestId}]: Allowing access to ${pathname}`);
+    response = NextResponse.next();
   }
 
-  if (!user && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session"))) {
-    console.log("Middleware: Unauthenticated user on protected route, redirecting to /");
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
-  return NextResponse.next();
+  response.headers.set("x-request-id", requestId);
+  return response;
 }
 
 export const config = {
-  matcher: ["/", "/chat", "/history", "/session/:path*"],
+  matcher: ["/", "/chat", "/history", "/session/:path*", "/login"],
 };
