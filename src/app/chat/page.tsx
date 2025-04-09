@@ -1,9 +1,8 @@
-// src/app/chat/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Share2 } from "lucide-react";
+import { Share2, PenSquare } from "lucide-react"; // Replaced Plus with PenSquare
 import { toast } from "sonner";
 import { ChatContainer, ChatMessages, ChatForm } from "@/components/ui/chat";
 import { MessageList } from "@/components/ui/message-list";
@@ -33,9 +32,9 @@ export default function ChatPage() {
     handleSubmit: storeHandleSubmit,
     append: storeAppend,
     addMessage,
+    reset,
   } = store;
 
-  // Local state for problem and images to work with MessageInput
   const [localProblem, setLocalProblem] = useState<string>("");
   const [localImages, setLocalImages] = useState<File[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -119,6 +118,13 @@ export default function ChatPage() {
     await storeAppend(message, imageUrls, localImages);
   };
 
+  const handleNewChat = () => {
+    reset();
+    setLocalProblem("");
+    setLocalImages([]);
+    setStep("problem");
+  };
+
   const filteredMessages = messages.map((message) => {
     if (
       message.role === "assistant" &&
@@ -140,6 +146,27 @@ export default function ChatPage() {
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col relative">
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 flex flex-col">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold">Chat</h1>
+          <div className="flex space-x-2">
+            <Button
+              onClick={handleNewChat}
+              className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
+              aria-label="New chat"
+            >
+              <PenSquare className="h-5 w-5" />
+            </Button>
+            {hasSubmittedProblem && (
+              <Button
+                onClick={handleShare}
+                className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
+                aria-label="Share session"
+              >
+                <Share2 className="h-5 w-5" />
+              </Button>
+            )}
+          </div>
+        </div>
         <ChatContainer className="flex-1">
           <ChatMessages className="flex flex-col items-start">
             <MessageList messages={filteredMessages} isTyping={loading} />
@@ -192,16 +219,6 @@ export default function ChatPage() {
           <QuizSection onQuizUpdate={() => {}} />
         )}
       </div>
-
-      {hasSubmittedProblem && (
-        <Button
-          onClick={handleShare}
-          className="fixed top-16 right-4 bg-primary text-primary-foreground rounded-full p-3 shadow-lg hover:bg-primary/90 z-50"
-          aria-label="Share session"
-        >
-          <Share2 className="h-5 w-5" />
-        </Button>
-      )}
 
       <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
         <DialogContent>

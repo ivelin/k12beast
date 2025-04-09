@@ -107,16 +107,24 @@ export default function RootLayout({
             <div className="text-lg font-bold">K12Beast</div>
             <div className="flex space-x-4">
               {!isLoggedIn && (
-                <Link href="/" className="hover:underline">
+                <Link href="/" className={`hover:underline ${pathname === "/" ? "text-muted-foreground cursor-default" : ""}`}>
                   Home
                 </Link>
               )}
               {isLoggedIn && pathname !== "/" && pathname !== "/login" && pathname !== "/signup" && (
                 <>
-                  <Link href="/chat" className="hover:underline">
+                  <Link
+                    href="/chat"
+                    className={`hover:underline ${pathname === "/chat" ? "text-muted-foreground cursor-default" : ""}`}
+                    onClick={(e) => pathname === "/chat" && e.preventDefault()}
+                  >
                     Chat
                   </Link>
-                  <Link href="/history" className="hover:underline">
+                  <Link
+                    href="/history"
+                    className={`hover:underline ${pathname === "/history" ? "text-muted-foreground cursor-default" : ""}`}
+                    onClick={(e) => pathname === "/history" && e.preventDefault()}
+                  >
                     History
                   </Link>
                 </>
