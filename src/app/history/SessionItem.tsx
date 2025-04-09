@@ -29,7 +29,7 @@ interface SessionItemProps {
 
 export default function SessionItem({ session }: SessionItemProps) {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const shareableLink = `${window.location.origin}/session/${session.id}`;
+  const shareableLink = `${window.location.origin}/public/session/${session.id}`;
 
   const handleShare = async () => {
     if (navigator.share) {

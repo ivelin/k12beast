@@ -1,4 +1,3 @@
-// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
@@ -29,6 +28,16 @@ export async function middleware(request: NextRequest) {
     }
     recentRequests.add(`${request.url}|${now}`);
     if (recentRequests.size > 100) recentRequests.clear();
+  }
+
+  const pathname = request.nextUrl.pathname;
+
+  // Allow all /public/* routes to bypass auth
+  if (pathname.startsWith("/public")) {
+    console.log(`Middleware [${requestId}]: Allowing public access to ${pathname}`);
+    const response = NextResponse.next();
+    response.headers.set("x-request-id", requestId);
+    return response;
   }
 
   const cookies = request.headers.get("cookie") || "";
@@ -63,7 +72,6 @@ export async function middleware(request: NextRequest) {
     console.log(`Middleware [${requestId}]: No token found in cookie or header`);
   }
 
-  const pathname = request.nextUrl.pathname;
   console.log(`Middleware [${requestId}]: Pathname - ${pathname}, User -`, !!user);
   if (process.env.NODE_ENV === "development") {
     console.log(`Middleware [${requestId}]: Note - Duplicate GET logs may appear in dev mode due to Next.js`);
@@ -73,17 +81,13 @@ export async function middleware(request: NextRequest) {
   if (user && pathname === "/") {
     console.log(`Middleware [${requestId}]: Auth user on /, redirect to /chat`);
     response = NextResponse.redirect(new URL("/chat", request.url));
-  } else if (!user && (pathname.startsWith("/chat") || 
-                       pathname.startsWith("/history") || 
-                       pathname.startsWith("/session"))) {
+  } else if (!user && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session"))) {
     console.log(`Middleware [${requestId}]: Unauth user on protected, redirect to /`);
     response = NextResponse.redirect(new URL("/", request.url));
   } else if (!user && pathname === "/login" && request.nextUrl.search.includes("reauth")) {
     console.log(`Middleware [${requestId}]: Forcing reauth on /login`);
     response = NextResponse.next();
-  } else if (!user && (pathname.startsWith("/chat") || 
-                       pathname.startsWith("/history") || 
-                       pathname.startsWith("/session"))) {
+  } else if (!user && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session"))) {
     const referer = request.headers.get("referer") || "";
     if (referer.includes("/login")) {
       console.log(`Middleware [${requestId}]: Mismatch detected, redirect to /login?reauth=true`);
@@ -101,5 +105,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/chat", "/history", "/session/:path*", "/login"],
+  matcher: ["/", "/chat", "/history", "/session/:path*", "/login"], // Kept /session/:path* for now, but it’s bypassed above
 };

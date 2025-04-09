@@ -149,7 +149,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   useEffect(() => {
     if (storeSessionId) {
       const origin = window.location.origin;
-      setShareableLink(`${origin}/session/${storeSessionId}`);
+      setShareableLink(`${origin}/public/session/${storeSessionId}`); // Updated to /public/session
     } else {
       setShareableLink(null);
     }
