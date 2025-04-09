@@ -45,10 +45,12 @@ export default function HistoryPage() {
       }
 
       const data = await res.json();
-      return data.sessions.map((session: Session) => ({
+      const newSessions: Session[] = data.sessions.map((session: Session) => ({
         ...session,
         updated_at: session.updated_at || session.created_at,
       }));
+
+      return newSessions;
     } catch (err) {
       console.error("Error fetching sessions:", err);
       setError(err.message || "Failed to fetch sessions");
@@ -56,6 +58,7 @@ export default function HistoryPage() {
     }
   };
 
+  // Fetch initial sessions on mount
   useEffect(() => {
     const loadInitialSessions = async () => {
       setLoading(true);

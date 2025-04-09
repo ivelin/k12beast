@@ -1,3 +1,4 @@
+// src/app/layout.tsx
 "use client";
 
 import { Geist, Geist_Mono } from "next/font/google";
@@ -99,6 +100,9 @@ export default function RootLayout({
 
   console.log("Rendering nav - pathname:", pathname, "isLoggedIn:", isLoggedIn);
 
+  // Check if the user is on any chat-related page
+  const isChatPage = pathname.startsWith("/chat");
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}>
@@ -114,9 +118,9 @@ export default function RootLayout({
               {isLoggedIn && pathname !== "/" && pathname !== "/login" && pathname !== "/signup" && (
                 <>
                   <Link
-                    href="/chat"
-                    className={`hover:underline ${pathname === "/chat" ? "text-muted-foreground cursor-default" : ""}`}
-                    onClick={(e) => pathname === "/chat" && e.preventDefault()}
+                    href="/chat/new"
+                    className={`hover:underline ${isChatPage ? "text-muted-foreground cursor-default" : ""}`}
+                    onClick={(e) => isChatPage && e.preventDefault()}
                   >
                     Chat
                   </Link>

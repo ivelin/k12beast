@@ -91,7 +91,7 @@ export default function SessionItem({ session }: SessionItemProps) {
   return (
     <>
       <div className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-muted transition">
-        <Link href={`/session/${session.id}`} className="flex-1">
+        <Link href={`/chat/${session.id}`} className="flex-1">
           <ChatMessages className="flex flex-col items-start">
             <MessageList messages={messages} showTimeStamps={false} />
             {session.images && session.images.length > 0 && messages[0]?.experimental_attachments?.length === 0 && (
