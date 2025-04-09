@@ -37,6 +37,9 @@ export default function SignUp() {
       const { error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password: trimmedPassword,
+        options: {
+          emailRedirectTo: "http://localhost:3000/confirm-success",
+        },        
       });
       if (error) {
         // Removed console.error since the error is handled
