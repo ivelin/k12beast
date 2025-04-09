@@ -21,7 +21,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSessions = async (pageToFetch: number, lastUpdatedAt?: string | null, lastId?: string | null) => {
+  const fetchSessions = async (pageToFetch: number) => {
     try {
       const token = document.cookie
         .split("; ")
@@ -35,15 +35,7 @@ export default function HistoryPage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      // Construct the URL with cursor parameters if provided
-      let url = `/api/history?page=${pageToFetch}&pageSize=${PAGE_SIZE}`;
-      if (lastUpdatedAt && lastId) {
-        url += `&lastUpdatedAt=${encodeURIComponent(lastUpdatedAt)}&lastId=${encodeURIComponent(lastId)}`;
-      }
-
-      console.log(`Fetching sessions with URL: ${url}`);
-
-      const res = await fetch(url, {
+      const res = await fetch(`/api/history?page=${pageToFetch}&pageSize=${PAGE_SIZE}`, {
         method: "GET",
         headers,
       });
@@ -53,16 +45,10 @@ export default function HistoryPage() {
       }
 
       const data = await res.json();
-      const newSessions: Session[] = data.sessions.map((session: Session) => ({
+      return data.sessions.map((session: Session) => ({
         ...session,
         updated_at: session.updated_at || session.created_at,
       }));
-
-      // Debug: Log the fetched sessions and their IDs
-      console.log(`Fetched sessions (page ${pageToFetch}):`, JSON.stringify(newSessions, null, 2));
-      console.log(`Fetched session IDs (page ${pageToFetch}):`, newSessions.map(s => s.id));
-
-      return newSessions;
     } catch (err) {
       console.error("Error fetching sessions:", err);
       setError(err.message || "Failed to fetch sessions");
@@ -70,7 +56,6 @@ export default function HistoryPage() {
     }
   };
 
-  // Fetch initial sessions on mount
   useEffect(() => {
     const loadInitialSessions = async () => {
       setLoading(true);
@@ -84,44 +69,15 @@ export default function HistoryPage() {
 
   const loadMoreSessions = async () => {
     const nextPage = page + 1;
+    const newSessions = await fetchSessions(nextPage);
 
-    // Get the last session's updated_at and id for cursor-based pagination
-    const lastSession = sessions[sessions.length - 1];
-    const lastUpdatedAt = lastSession ? lastSession.updated_at : null;
-    const lastId = lastSession ? lastSession.id : null;
-
-    console.log(`Loading more sessions for page ${nextPage}, lastUpdatedAt: ${lastUpdatedAt}, lastId: ${lastId}`);
-
-    const newSessions = await fetchSessions(nextPage, lastUpdatedAt, lastId);
-
-    // Debug: Log the current sessions and new sessions before merging
-    console.log("Current session IDs before merge:", sessions.map(s => s.id));
-    console.log("New session IDs to merge:", newSessions.map(s => s.id));
-
-    // Filter out duplicates
     const existingIds = new Set(sessions.map(s => s.id));
     const uniqueNewSessions = newSessions.filter(s => !existingIds.has(s.id));
 
-    // Debug: Log duplicates if any were filtered
-    const duplicates = newSessions.filter(s => existingIds.has(s.id));
-    if (duplicates.length > 0) {
-      console.warn("Filtered out duplicate sessions:", duplicates);
-    }
-
-    // Use functional update to ensure we merge with the latest state
-    setSessions(prevSessions => {
-      const updatedSessions = [...prevSessions, ...uniqueNewSessions];
-      // Debug: Log the updated sessions after merging
-      console.log("Updated session IDs after merge:", updatedSessions.map(s => s.id));
-      return updatedSessions;
-    });
-
+    setSessions(prevSessions => [...prevSessions, ...uniqueNewSessions]);
     setPage(nextPage);
     setHasMore(uniqueNewSessions.length > 0 && newSessions.length === PAGE_SIZE);
   };
-
-  // Debug: Log the render state
-  console.log("Rendering HistoryPage with sessions:", sessions);
 
   if (loading) {
     return <div className="container mx-auto p-4">Loading...</div>;
