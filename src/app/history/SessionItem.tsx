@@ -7,16 +7,23 @@ import { Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MessageList } from "@/components/ui/message-list";
+import { ChatMessages } from "@/components/ui/chat";
+
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  renderAs?: "markdown" | "html";
+  experimental_attachments?: { name: string; url: string }[];
+}
 
 interface SessionItemProps {
   session: {
     id: string;
-    lesson?: string;
-    examples?: any;
-    quizzes?: any;
-    performanceHistory?: any;
+    problem?: string;
+    images?: string[] | null;
     created_at?: string;
-    updated_at: string; // Now guaranteed to have a value
+    updated_at: string;
   };
 }
 
@@ -52,7 +59,26 @@ export default function SessionItem({ session }: SessionItemProps) {
     }
   };
 
-  const firstContent = session.lesson || "Image-based Problem";
+  // Create a message object for the problem and images
+  const messages: Message[] = [];
+  if (session.problem || (session.images && session.images.length > 0)) {
+    const attachments = session.images?.map((url, index) => ({
+      name: `Image ${index + 1}`,
+      url,
+    })) || [];
+    messages.push({
+      role: "user",
+      content: session.problem || "Image-based problem",
+      renderAs: "markdown",
+      experimental_attachments: attachments.length > 0 ? attachments : undefined,
+    });
+  } else {
+    messages.push({
+      role: "user",
+      content: "No problem or images available",
+      renderAs: "markdown",
+    });
+  }
 
   let lastUpdatedDisplay;
   try {
@@ -66,7 +92,14 @@ export default function SessionItem({ session }: SessionItemProps) {
     <>
       <div className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-muted transition">
         <Link href={`/session/${session.id}`} className="flex-1">
-          <h2 className="text-lg font-semibold">{firstContent}</h2>
+          <ChatMessages className="flex flex-col items-start">
+            <MessageList messages={messages} showTimeStamps={false} />
+            {session.images && session.images.length > 0 && messages[0]?.experimental_attachments?.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Images failed to load
+              </p>
+            )}
+          </ChatMessages>
           <p className="text-sm text-muted-foreground">
             {session.created_at
               ? new Date(session.created_at).toLocaleString()
