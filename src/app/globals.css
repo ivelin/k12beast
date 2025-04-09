@@ -75,36 +75,36 @@ button[type="submit"]:hover {
 
 /* Custom styles for message bubbles */
 .chat-message-user {
-  color: hsl(var(--foreground)) !important; /* White for user messages */
+  color: hsl(var(--foreground)) !important;
 }
 
 .chat-message-assistant {
-  background-color: hsl(var(--secondary)) !important; /* Light gray for assistant messages */
+  background-color: hsl(var(--secondary)) !important;
   color: hsl(var(--secondary-foreground)) !important;
 }
 
 /* Improve HTML rendering within assistant messages */
 .chat-message-assistant p {
-  margin-bottom: 1rem; /* Add spacing between paragraphs */
-  line-height: 1.5; /* Increase line spacing within paragraphs */
+  margin-bottom: 1rem;
+  line-height: 1.5;
 }
 
 .chat-message-assistant ul {
-  list-style-type: disc; /* Ensure bullet points are visible */
-  margin-left: 1.5rem; /* Indent the list */
-  margin-bottom: 1rem; /* Add spacing below the list */
+  list-style-type: disc;
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .chat-message-assistant li {
-  margin-bottom: 0.5rem; /* Add spacing between list items */
-  line-height: 1.5; /* Increase line spacing within list items */
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
 }
 
 /* Style the readiness progress bar */
 .chat-message-assistant .readiness-container {
   width: 100%;
-  max-width: 300px; /* Limit the width for better readability */
-  background-color: hsl(var(--muted)); /* Background for the progress bar */
+  max-width: 300px;
+  background-color: hsl(var(--muted));
   border-radius: var(--radius);
   overflow: hidden;
   margin-top: 0.5rem;
@@ -112,9 +112,9 @@ button[type="submit"]:hover {
 }
 
 .chat-message-assistant .readiness-bar {
-  height: 10px; /* Height of the progress bar */
-  background-color: hsl(var(--primary)); /* Color of the filled portion */
-  transition: width 0.3s ease-in-out; /* Smooth transition for the bar */
+  height: 10px;
+  background-color: hsl(var(--primary));
+  transition: width 0.3s ease-in-out;
 }
 
 /* Custom styles for input area */
@@ -167,4 +167,16 @@ button[type="submit"]:hover {
   }
   .animate-accordion-down { animation: accordion-down 0.2s ease-out; }
   .animate-accordion-up { animation: accordion-up 0.2s ease-out; }
+  /* Add screen-reader-only utility */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
 }
