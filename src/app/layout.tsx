@@ -8,7 +8,8 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
-import { Toaster } from "@/components/ui/sonner"; // Add import
+import { Toaster } from "@/components/ui/sonner";
+import { useRouter, usePathname } from "next/navigation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,14 +33,33 @@ export default function RootLayout({
 }>) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log("Initial auth check - user:", user);
       setIsLoggedIn(!!user);
+      setIsAuthChecked(true);
+      // Redirect logged-in users away from /, /login, and /signup
+      if (user && (pathname === "/" || pathname === "/login" || pathname === "/signup")) {
+        router.push("/chat");
+      }
     };
     checkUser();
-  }, []);
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state change - event:", event, "session:", session);
+      setIsLoggedIn(!!session?.user);
+      setIsAuthChecked(true);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [pathname, router]);
 
   const handleAuth = async () => {
     setIsLoggingIn(true);
@@ -47,6 +67,7 @@ export default function RootLayout({
       if (isLoggedIn) {
         await supabase.auth.signOut();
         setIsLoggedIn(false);
+        router.push("/");
       } else {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "email",
@@ -59,13 +80,32 @@ export default function RootLayout({
       alert(isLoggedIn ? "Failed to logout. Please try again." : "Failed to initiate login. Please try again.");
     } finally {
       setIsLoggingIn(false);
-      if (!isLoggedIn) {
-        // Re-check user after login attempt (OAuth redirect handles session)
-        const { data: { user } } = await supabase.auth.getUser();
-        setIsLoggedIn(!!user);
-      }
     }
   };
+
+  if (!isAuthChecked) {
+    return (
+      <html lang="en" suppressHydrationWarning>
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        >
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <div className="flex items-center justify-center h-screen">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+            <Toaster />
+          </ThemeProvider>
+        </body>
+      </html>
+    );
+  }
+
+  console.log("Rendering nav - pathname:", pathname, "isLoggedIn:", isLoggedIn);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -84,32 +124,40 @@ export default function RootLayout({
               <Link href="/" className="hover:underline">
                 Home
               </Link>
-              <Link href="/chat" className="hover:underline">
-                Chat
-              </Link>
-              <Link href="/history" className="hover:underline">
-                History
-              </Link>
-              <button
-                onClick={handleAuth}
-                disabled={isLoggingIn}
-                className="flex items-center px-3 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                {isLoggingIn ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    {isLoggedIn ? "Logging out..." : "Logging in..."}
-                  </>
-                ) : isLoggedIn ? (
-                  "Logout"
-                ) : (
-                  "Login"
-                )}
-              </button>
+              {/* Only show Chat and History if logged in and not on /, /login, or /signup */}
+              {isLoggedIn && pathname !== "/" && pathname !== "/login" && pathname !== "/signup" && (
+                <>
+                  <Link href="/chat" className="hover:underline">
+                    Chat
+                  </Link>
+                  <Link href="/history" className="hover:underline">
+                    History
+                  </Link>
+                </>
+              )}
+              {/* Only show Login/Logout button if not on /, /login, or /signup */}
+              {pathname !== "/" && pathname !== "/login" && pathname !== "/signup" && (
+                <button
+                  onClick={handleAuth}
+                  disabled={isLoggingIn}
+                  className="flex items-center px-3 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isLoggingIn ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      {isLoggedIn ? "Logging out..." : "Logging in..."}
+                    </>
+                  ) : isLoggedIn ? (
+                    "Logout"
+                  ) : (
+                    "Login"
+                  )}
+                </button>
+              )}
             </div>
           </nav>
           <main className="p-4">{children}</main>
-          <Toaster /> {/* Add Toaster component */}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
