@@ -121,6 +121,11 @@ async function ensureTablesExist(supabase) {
       );
     `, supabase);
 
+    // Grant privileges on the sessions table after creation
+    await executeSql(`
+      GRANT ALL PRIVILEGES ON TABLE sessions TO postgres;
+    `, supabase);
+
     const { data: sessionsCheck, error: sessionsCheckError } = await supabase
       .from("sessions")
       .select("*")
