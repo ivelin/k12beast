@@ -1,3 +1,4 @@
+// /src/middleware.js
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
@@ -82,8 +83,10 @@ export async function middleware(request: NextRequest) {
     console.log(`Middleware [${requestId}]: Auth user on /, redirect to /chat`);
     response = NextResponse.redirect(new URL("/chat", request.url));
   } else if (!user && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session"))) {
-    console.log(`Middleware [${requestId}]: Unauth user on protected, redirect to /`);
-    response = NextResponse.redirect(new URL("/", request.url));
+    console.log(`Middleware [${requestId}]: Unauth user on protected, redirect to /login`);
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    response = NextResponse.redirect(loginUrl);
   } else if (!user && pathname === "/login" && request.nextUrl.search.includes("reauth")) {
     console.log(`Middleware [${requestId}]: Forcing reauth on /login`);
     response = NextResponse.next();
@@ -105,5 +108,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/chat", "/history", "/session/:path*", "/login"], // Kept /session/:path* for now, but it’s bypassed above
+  matcher: ["/", "/chat", "/history", "/session/:path*", "/login"],
 };

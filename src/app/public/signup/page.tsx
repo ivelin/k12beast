@@ -1,25 +1,18 @@
-// src/app/signup/page.tsx
+// /app/public/signup/page.tsx
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
+import supabase from "../../../supabase/browserClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSignUp = async () => {
     setMessage("");
@@ -38,11 +31,10 @@ export default function SignUp() {
         email: trimmedEmail,
         password: trimmedPassword,
         options: {
-          emailRedirectTo: "http://localhost:3000/confirm-success",
-        },        
+          emailRedirectTo: `${window.location.origin}/chat`,
+        },
       });
       if (error) {
-        // Removed console.error since the error is handled
         if (error.message.includes("already registered")) {
           setMessage("This email is already registered. Please log in or use a different email.");
         } else if (error.message.includes("For security purposes, you can only request this after")) {
@@ -56,7 +48,7 @@ export default function SignUp() {
       setMessage("Sign-up successful! Please check your email to confirm your account before logging in.");
       setLoading(false);
     } catch (error: any) {
-      console.error("Authentication error:", error); // Keep this for unexpected errors
+      console.error("Authentication error:", error);
       setMessage(error.message || "An error occurred. Please try again.");
       setLoading(false);
     }
@@ -117,6 +109,14 @@ export default function SignUp() {
             ) : (
               "Sign Up"
             )}
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full mt-4"
+            onClick={() => window.location.href = "/public/login"}
+            disabled={loading}
+          >
+            Switch to Login
           </Button>
         </div>
       </div>

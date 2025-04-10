@@ -1,7 +1,7 @@
-// src/app/layout.tsx
+// /app/layout.tsx
 "use client";
 
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
@@ -44,7 +44,9 @@ export default function RootLayout({
       console.log("Initial auth check - user:", user);
       setIsLoggedIn(!!user);
       setIsAuthChecked(true);
-      if (user && (pathname === "/" || pathname === "/login" || pathname === "/signup")) {
+      // Only redirect authenticated users from "/" to "/chat"
+      if (user && pathname === "/") {
+        console.log("Authenticated user on /, redirecting to /chat");
         router.push("/chat");
       }
     };
@@ -54,6 +56,11 @@ export default function RootLayout({
       console.log("Auth state change - event:", event, "session:", session);
       setIsLoggedIn(!!session?.user);
       setIsAuthChecked(true);
+      // Only redirect authenticated users from "/" to "/chat"
+      if (session?.user && pathname === "/") {
+        console.log("Auth state changed to logged in, redirecting to /chat");
+        router.push("/chat");
+      }
     });
 
     return () => {
@@ -70,11 +77,7 @@ export default function RootLayout({
         setIsLoggedIn(false);
         router.push("/");
       } else {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "email",
-          options: { redirectTo: "http://localhost:3000/chat" },
-        });
-        if (error) throw error;
+        router.push("/public/login");
       }
     } catch (error) {
       console.error("Auth error:", error);
@@ -115,11 +118,11 @@ export default function RootLayout({
                   Home
                 </Link>
               )}
-              {isLoggedIn && pathname !== "/" && pathname !== "/login" && pathname !== "/signup" && (
+              {isLoggedIn && pathname !== "/" && !pathname.startsWith("/public") && (
                 <>
                   <Link
                     href="/chat/new"
-                    prefetch={false} // Disable prefetching
+                    prefetch={false}
                     className={`hover:underline ${isChatPage ? "text-muted-foreground cursor-default" : ""}`}
                     onClick={(e) => isChatPage && e.preventDefault()}
                   >
@@ -134,7 +137,7 @@ export default function RootLayout({
                   </Link>
                 </>
               )}
-              {pathname !== "/" && pathname !== "/login" && pathname !== "/signup" && (
+              {pathname !== "/" && !pathname.startsWith("/public") && (
                 <button
                   onClick={handleAuth}
                   disabled={isLoggingIn}
@@ -156,6 +159,7 @@ export default function RootLayout({
           </nav>
           <main className="p-4">{children}</main>
           <Toaster />
+          <SpeedInsights />
         </ThemeProvider>
       </body>
     </html>
