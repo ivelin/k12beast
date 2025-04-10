@@ -1,4 +1,3 @@
-// src/app/api/history/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import supabase from "@/supabase/serverClient";
 
@@ -13,7 +12,7 @@ export async function GET(request: NextRequest) {
   const { data: sessions, error } = await supabase
     .from("sessions")
     .select("id, problem, images, created_at, updated_at")
-    .order("updated_at", { ascending: false, nullsLast: true })
+    .order("updated_at", { ascending: false }) // Removed nullsLast
     .order("id", { ascending: false })
     .range(start, end);
 

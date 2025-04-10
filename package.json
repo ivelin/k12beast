@@ -1,6 +1,6 @@
 {
   "name": "k12beast",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "scripts": {
     "dev": "node scripts/migrate.js && next dev",
