@@ -252,7 +252,7 @@ async function releaseLock(lockKey, instanceId, supabase) {
 
     if (error) throw error;
 
-    console.log(`Lock ${lock_key} released by ${instanceId}`);
+    console.log(`Lock ${lockKey} released by ${instanceId}`);
   } catch (error) {
     console.error("Error releasing lock:", error);
     throw error;
