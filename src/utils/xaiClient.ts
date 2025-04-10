@@ -88,7 +88,7 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
       content: images.map((url) => ({
         type: "image_url" as const,
         image_url: { url },
-      })),
+      })) as OpenAI.ChatCompletionMessageParam["content"],
     });
   }
 
@@ -113,8 +113,8 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
       console.log("xAI API response content object:", content);
 
       return content;
-    } catch (error) {
-      console.warn(`xAI request failed (attempt ${attempt}/${maxRetries}):`, error.message);
+    } catch (error: unknown) {
+      console.warn(`xAI request failed (attempt ${attempt}/${maxRetries}):`, (error as Error).message);
       if (attempt === maxRetries) {
         console.error("Final attempt failed. Raw response:", rawContent ?? "No response");
         console.error("Returning default response with error message.");

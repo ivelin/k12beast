@@ -28,7 +28,10 @@ export function useCopyToClipboard({
       })
       .catch((error: unknown) => {
         toast.error("Failed to copy to clipboard.");
-        console.error("Copy error:", error instanceof Error ? error.message : error);
+        console.error(
+          "Copy error:",
+          error instanceof Error ? error.message : String(error)
+        );
       });
   }, [text, copyMessage]);
 

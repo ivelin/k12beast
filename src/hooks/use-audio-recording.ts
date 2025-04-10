@@ -39,12 +39,15 @@ export function useAudioRecording({
         onTranscriptionComplete?.(text);
       }
     } catch (error: unknown) {
-      console.error("Error transcribing audio:", error instanceof Error ? error.message : error);
+      console.error(
+        "Error transcribing audio:",
+        error instanceof Error ? error.message : String(error)
+      );
     } finally {
       setIsTranscribing(false);
       setIsListening(false);
       if (audioStream) {
-        audioStream.getTracks().forEach(track => track.stop());
+        audioStream.getTracks().forEach((track) => track.stop());
         setAudioStream(null);
       }
       activeRecordingRef.current = null;
@@ -60,11 +63,14 @@ export function useAudioRecording({
         setAudioStream(stream);
         activeRecordingRef.current = recordAudio(stream);
       } catch (error: unknown) {
-        console.error("Error recording audio:", error instanceof Error ? error.message : error);
+        console.error(
+          "Error recording audio:",
+          error instanceof Error ? error.message : String(error)
+        );
         setIsListening(false);
         setIsRecording(false);
         if (audioStream) {
-          audioStream.getTracks().forEach(track => track.stop());
+          audioStream.getTracks().forEach((track) => track.stop());
           setAudioStream(null);
         }
       }
