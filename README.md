@@ -205,6 +205,25 @@ For more information on the tools and technologies used in K12Beast, check out t
 - **xAI API**: Details on the xAI API for generating educational content are available at [x.ai](https://x.ai).
 - **React Documentation**: Understand React concepts at [react.dev](https://react.dev).
 
+## Testing
+
+### Local Setup
+- **Install Dependencies**: `npm install`
+- **E2E Tests (Playwright)**:
+  - Start Supabase: `supabase start`
+  - Run: `npm run test:e2e`
+  - Debug UI: `npm run test:e2e:ui`
+- **Server-Side Tests (Jest)**:
+  - Run: `npm run test:server`
+
+### CI Setup (GitHub Actions)
+- E2E tests run automatically on push/PR to `main` via `.github/workflows/e2e-tests.yml`.
+
+### Notes
+- Ensure `.env.local` has Supabase keys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) for local E2E tests.
+- Create a test user (`testuser@example.com`, `password123`) in Supabase for E2E tests.
+- No xAI keys are needed; tests mock AI calls.
+
 ## Contributions
 
 K12Beast welcomes contributions from the community! Follow these steps to contribute:

@@ -76,7 +76,7 @@ export default function Login() {
           return;
         }
         console.log("Sign-up successful");
-        setMessage("Sign-up successful! Check your email to confirm.");
+        setMessage("Sign-up successful!");
         setLoading(false);
       } else {
         console.log("Attempting login with email:", trimmedEmail);
