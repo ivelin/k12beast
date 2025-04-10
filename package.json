@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/migrate.js && next dev",
-    "build": "next build",
-    "start": "node scripts/migrate.js && next start",
+    "build": "node scripts/migrate.js && next build",
+    "start": "next start",
     "lint": "next lint",
     "postinstall": "echo 'Please set up your environment variables in .env.local. See README.md for instructions.'"
   },
@@ -15,6 +15,7 @@
     "@radix-ui/react-label": "^2.1.2",
     "@radix-ui/react-slot": "^1.1.2",
     "@supabase/supabase-js": "^2.49.4",
+    "@vercel/speed-insights": "^1.2.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "dompurify": "^3.2.5",
