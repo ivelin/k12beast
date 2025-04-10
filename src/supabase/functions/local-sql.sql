@@ -18,7 +18,6 @@ GRANT EXECUTE ON FUNCTION execute_sql TO postgres;
 
 -- Grant additional permissions to the postgres role
 GRANT ALL PRIVILEGES ON SCHEMA public TO postgres;
-GRANT ALL PRIVILEGES ON TABLE sessions TO postgres;
 GRANT USAGE ON SCHEMA auth TO postgres;
 GRANT SELECT ON TABLE auth.users TO postgres;
 
