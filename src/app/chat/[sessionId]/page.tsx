@@ -150,7 +150,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   useEffect(() => {
     if (storeSessionId) {
       const origin = window.location.origin;
-      setShareableLink(`${origin}/public/session/${storeSessionId}`); // Updated to /public/session
+      setShareableLink(`${origin}/public/session/${storeSessionId}`);
     } else {
       setShareableLink(null);
     }
@@ -260,21 +260,37 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 flex flex-col">
         <div className="flex justify-end items-center mb-4">
           <div className="flex space-x-2">
-            <Button
-              onClick={handleNewChat}
-              className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
-              aria-label="New chat"
-            >
-              <PenSquare className="h-5 w-5" />
-            </Button>
-            {hasSubmittedProblem && (
+            <div className="relative group">
               <Button
-                onClick={handleShare}
+                onClick={handleNewChat}
                 className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
-                aria-label="Share session"
+                aria-label="New chat"
               >
-                <Share2 className="h-5 w-5" />
+                <PenSquare className="h-5 w-5" />
               </Button>
+              <span className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity sm:hidden">
+                New Chat
+              </span>
+              <span className="hidden sm:block absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                New Chat
+              </span>
+            </div>
+            {hasSubmittedProblem && (
+              <div className="relative group">
+                <Button
+                  onClick={handleShare}
+                  className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
+                  aria-label="Share session"
+                >
+                  <Share2 className="h-5 w-5" />
+                </Button>
+                <span className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity sm:hidden">
+                  Share
+                </span>
+                <span className="hidden sm:block absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Share Session
+                </span>
+              </div>
             )}
           </div>
         </div>

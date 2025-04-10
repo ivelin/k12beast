@@ -1,4 +1,4 @@
-// /app/layout.tsx
+// src/app/layout.tsx
 "use client";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -44,7 +44,6 @@ export default function RootLayout({
       console.log("Initial auth check - user:", user);
       setIsLoggedIn(!!user);
       setIsAuthChecked(true);
-      // Only redirect authenticated users from "/" to "/chat"
       if (user && pathname === "/") {
         console.log("Authenticated user on /, redirecting to /chat");
         router.push("/chat");
@@ -56,7 +55,6 @@ export default function RootLayout({
       console.log("Auth state change - event:", event, "session:", session);
       setIsLoggedIn(!!session?.user);
       setIsAuthChecked(true);
-      // Only redirect authenticated users from "/" to "/chat"
       if (session?.user && pathname === "/") {
         console.log("Auth state changed to logged in, redirecting to /chat");
         router.push("/chat");
@@ -112,9 +110,9 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <nav className="flex items-center justify-between p-4 bg-muted">
             <div className="text-lg font-bold">K12Beast</div>
-            <div className="flex space-x-4">
+            <div className="flex space-x-2 sm:space-x-4">
               {!isLoggedIn && (
-                <Link href="/" className={`hover:underline ${pathname === "/" ? "text-muted-foreground cursor-default" : ""}`}>
+                <Link href="/" className={`hover:underline text-sm sm:text-base ${pathname === "/" ? "text-muted-foreground cursor-default" : ""}`}>
                   Home
                 </Link>
               )}
@@ -123,14 +121,14 @@ export default function RootLayout({
                   <Link
                     href="/chat/new"
                     prefetch={false}
-                    className={`hover:underline ${isChatPage ? "text-muted-foreground cursor-default" : ""}`}
+                    className={`hover:underline text-sm sm:text-base ${isChatPage ? "text-muted-foreground cursor-default" : ""}`}
                     onClick={(e) => isChatPage && e.preventDefault()}
                   >
                     Chat
                   </Link>
                   <Link
                     href="/history"
-                    className={`hover:underline ${pathname === "/history" ? "text-muted-foreground cursor-default" : ""}`}
+                    className={`hover:underline text-sm sm:text-base ${pathname === "/history" ? "text-muted-foreground cursor-default" : ""}`}
                     onClick={(e) => pathname === "/history" && e.preventDefault()}
                   >
                     History
@@ -141,7 +139,7 @@ export default function RootLayout({
                 <button
                   onClick={handleAuth}
                   disabled={isLoggingIn}
-                  className="flex items-center px-3 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  className="flex items-center px-2 py-1 sm:px-3 sm:py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 text-sm sm:text-base"
                 >
                   {isLoggingIn ? (
                     <>

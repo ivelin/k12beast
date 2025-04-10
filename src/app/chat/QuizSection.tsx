@@ -1,3 +1,4 @@
+// src/app/chat/QuizSection.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -63,9 +64,6 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
 
   return (
     <div className="mb-4 flex flex-col items-center">
-      {loading && (
-        <div className="text-blue-500">Loading... Please wait.</div>
-      )}
       {useAppStore.getState().error && (
         <div className="text-red-500">{useAppStore.getState().error}</div>
       )}
@@ -82,10 +80,13 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
                 onChange={(e) => setAnswer(e.target.value)}
                 className="mr-2"
                 disabled={loading}
+                aria-label={`Option ${index + 1}: ${option}`}
               />
               <label
                 htmlFor={`option-${index}`}
-                className={answer === option ? "text-blue-500 font-bold" : ""}
+                className={`flex-1 p-2 rounded-md transition-colors ${
+                  answer === option ? "bg-primary text-primary-foreground font-bold" : "bg-background"
+                }`}
               >
                 {option}
               </label>
