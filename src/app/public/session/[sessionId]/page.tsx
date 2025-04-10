@@ -1,3 +1,4 @@
+// src/app/public/[sessionId]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";

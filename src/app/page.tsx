@@ -1,37 +1,10 @@
-// src/app/page.tsx
+// /app/page.tsx
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import supabase from "../supabase/browserClient";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const validateToken = async () => {
-      const token = document.cookie
-        .split("; ")
-        .find(row => row.startsWith("supabase-auth-token="))
-        ?.split("=")[1];
-
-      if (token) {
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-        if (error || !user) {
-          console.log("Invalid or expired token found, clearing cookie:", error?.message);
-          document.cookie = "supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict";
-        } else {
-          console.log("Valid token found, redirecting to /chat");
-          router.push("/chat");
-        }
-      }
-    };
-
-    validateToken();
-  }, [router]);
-
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="text-center max-w-2xl">
@@ -41,12 +14,12 @@ export default function Home() {
         </p>
         <div className="flex justify-center gap-4">
           <Button asChild size="lg">
-            <Link href="/login" className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Link href="/public/login" className="bg-primary text-primary-foreground hover:bg-primary/90">
               Get Started
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="/signup" className="text-foreground hover:bg-muted">
+            <Link href="/public/signup" className="text-foreground hover:bg-muted">
               Sign Up
             </Link>
           </Button>

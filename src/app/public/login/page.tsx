@@ -1,8 +1,8 @@
+// /app/public/login/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import supabase from "../../supabase/browserClient";
+import supabase from "../../../supabase/browserClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,35 +14,9 @@ export default function Login() {
   const [message, setMessage] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false); // New flag
-  const router = useRouter();
 
   const emailInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const validateToken = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) {
-        console.log("No valid session found:", error?.message);
-      } else if (!isNavigating) { // Check navigation intent
-        console.log("Valid session found, redirecting to /chat");
-        router.push("/chat");
-      }
-    };
-    validateToken();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth state changed:", event, session);
-      if (event === "SIGNED_IN" && session) {
-        console.log("User signed in, session:", session);
-      }
-    });
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, [router, isNavigating]);
 
   useEffect(() => {
     const checkAutofill = () => {
@@ -88,7 +62,7 @@ export default function Login() {
         const { error } = await supabase.auth.signUp({
           email: trimmedEmail,
           password: trimmedPassword,
-          options: { emailRedirectTo: "http://localhost:3000/confirm-success" },
+          options: { emailRedirectTo: `${window.location.origin}/chat` },
         });
         if (error) {
           if (error.message.includes("already registered")) {
@@ -133,12 +107,6 @@ export default function Login() {
     }
   };
 
-  // Set navigation intent when leaving the page
-  const handleNavigation = () => {
-    setIsNavigating(true);
-    setTimeout(() => setIsNavigating(false), 100); // Reset after navigation
-  };
-
   const isFormValid = email.trim().length > 0 && password.trim().length > 0;
 
   return (
@@ -147,7 +115,7 @@ export default function Login() {
         <h1 className="text-2xl font-bold mb-4 text-foreground">
           {isSignUp ? "Sign Up for K12Beast" : "Login to K12Beast"}
         </h1>
-        <form onSubmit={handleSubmit} onClick={handleNavigation} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="email" className="block text-sm font-medium text-foreground">
               Email
@@ -199,7 +167,7 @@ export default function Login() {
         <Button
           variant="outline"
           className="w-full mt-4"
-          onClick={() => { setIsSignUp(!isSignUp); handleNavigation(); }}
+          onClick={() => setIsSignUp(!isSignUp)}
           disabled={loading}
         >
           {isSignUp ? "Switch to Login" : "Switch to Sign Up"}
