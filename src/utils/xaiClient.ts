@@ -74,6 +74,10 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
     },
     {
       role: "user",
+      content: `Respond in the natural language used in the Original Input Problem text and images`,
+    },
+    {
+      role: "user",
       content: chatHistoryText,
     },
     {
