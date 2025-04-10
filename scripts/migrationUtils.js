@@ -38,6 +38,10 @@ async function executeSql(sqlText, supabase, retries = 3, delay = 1000) {
     } catch (error) {
       if (attempt === retries) {
         console.error("Error executing SQL after all retries:", error);
+        if (error.context && error.context.body) {
+          const bodyText = await error.context.text();
+          console.error("Edge Function response body:", bodyText);
+        }
         throw error;
       }
       console.warn(
@@ -117,11 +121,11 @@ async function ensureTablesExist(supabase) {
         lesson TEXT,
         examples JSONB,
         quizzes JSONB,
-        "performanceHistory" JSONB
+        "performanceHistory" JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, supabase);
 
-    // Grant privileges on the sessions table after creation
     await executeSql(`
       GRANT ALL PRIVILEGES ON TABLE sessions TO postgres;
     `, supabase);
@@ -163,7 +167,6 @@ async function getCurrentVersion(supabase) {
 // Check if the app version is compatible with the database version
 async function isAppVersionCompatible(dbVersion, migrations, APP_VERSION, dbVersionRequiredByAppVersion) {
   try {
-    // Find the highest migration version
     const latestMigration = migrations
       .sort((a, b) => b.version - a.version)[0];
 
@@ -174,7 +177,6 @@ async function isAppVersionCompatible(dbVersion, migrations, APP_VERSION, dbVers
 
     const highestMigrationVersion = latestMigration.version;
 
-    // Find the required database version for the current app version
     const sortedMapping = [...dbVersionRequiredByAppVersion].sort((a, b) =>
       semver.compare(a.appVersion, b.appVersion)
     );
@@ -211,7 +213,6 @@ async function acquireLock(lockKey, instanceId, supabase) {
         { lock_key: lockKey, locked: false, locked_at: null, locked_by: null },
         { onConflict: "lock_key" }
       );
-
     if (insertError) throw insertError;
 
     const { data, error: updateError } = await supabase
@@ -219,18 +220,19 @@ async function acquireLock(lockKey, instanceId, supabase) {
       .update({ locked: true, locked_at: new Date().toISOString(), locked_by: instanceId })
       .eq("lock_key", lockKey)
       .eq("locked", false)
-      .select();
+      .select()
+      .single();
 
     if (updateError) throw updateError;
 
-    return data && data.length > 0;
+    return !!data;
   } catch (error) {
-    console.error("Error acquiring migration lock:", error);
-    throw error;
+    console.error("Error acquiring lock:", error);
+    return false;
   }
 }
 
-// Release the migration lock
+// Release a migration lock
 async function releaseLock(lockKey, instanceId, supabase) {
   try {
     const { error } = await supabase
@@ -240,8 +242,10 @@ async function releaseLock(lockKey, instanceId, supabase) {
       .eq("locked_by", instanceId);
 
     if (error) throw error;
+
+    console.log(`Lock ${lockKey} released by ${instanceId}`);
   } catch (error) {
-    console.error("Error releasing migration lock:", error);
+    console.error("Error releasing lock:", error);
     throw error;
   }
 }
