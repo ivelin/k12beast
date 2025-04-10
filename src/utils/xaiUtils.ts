@@ -1,3 +1,4 @@
+// src/utils/xaiUtils.ts
 import { NextResponse } from "next/server";
 
 export function validateRequestInputs(problem?: string, images?: string[]) {
@@ -6,10 +7,11 @@ export function validateRequestInputs(problem?: string, images?: string[]) {
   }
 }
 
-export function handleXAIError(error: any) {
-  console.error("Error in xAI request:", error.message);
+export function handleXAIError(error: unknown): NextResponse {
+  const message = error instanceof Error ? error.message : "Unexpected error in xAI request";
+  console.error("Error in xAI request:", message);
   return NextResponse.json(
-    { error: error.message || "Unexpected error in xAI request" },
-    { status: error.message === "Prompt must be related to K12 education" ? 400 : 500 }
+    { error: message },
+    { status: message === "Prompt must be related to K12 education" ? 400 : 500 }
   );
 }

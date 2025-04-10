@@ -1,4 +1,3 @@
-// src/app/api/validate/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -113,9 +112,11 @@ export async function POST(request: NextRequest) {
       solution: isCorrect ? null : quiz.solution, // Only send solution if the answer is incorrect
     });
   } catch (error) {
-    console.error("Error validating quiz:", error);
+    // Type assertion to handle unknown error type
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Error validating quiz:", err);
     return NextResponse.json(
-      { error: error.message || "Failed to validate quiz" },
+      { error: err.message || "Failed to validate quiz" },
       { status: 400 }
     );
   }

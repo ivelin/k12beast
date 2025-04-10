@@ -1,10 +1,17 @@
-// src/app/chat/QuizSection.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import useAppStore from "../../store";
 
-export default function QuizSection({ onQuizUpdate }) {
+// Define the type for the onQuizUpdate prop
+interface QuizUpdate {
+  type: string;
+  content: string;
+}
+
+import { Quiz } from "../../store";
+
+export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: QuizUpdate) => void }) {
   const {
     step,
     sessionId,
@@ -18,7 +25,7 @@ export default function QuizSection({ onQuizUpdate }) {
   const [hasFetchedQuiz, setHasFetchedQuiz] = useState(false);
 
   const answer = useAppStore((state) => state.quizAnswer);
-  const setAnswer = (value) => useAppStore.setState({ quizAnswer: value });
+  const setAnswer = (value: string) => useAppStore.setState({ quizAnswer: value });
   const loading = useAppStore((state) => state.loading);
 
   useEffect(() => {
@@ -35,19 +42,20 @@ export default function QuizSection({ onQuizUpdate }) {
   }, [quiz, onQuizUpdate]);
 
   const handleSubmitAnswer = async () => {
+    if (!quiz) return; // Additional runtime check for safety
     try {
       await handleValidate(answer, quiz);
       const updatedFeedback = useAppStore.getState().quizFeedback;
       if (updatedFeedback) {
-        // Remove the onQuizUpdate call since the store already adds the message
-        setStep("lesson"); // Return to lesson step after quiz submission
+        setStep("lesson");
       } else {
         console.error("No feedback received after validation");
         setError("Failed to validate quiz answer. Please try again.");
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to submit quiz answer";
       console.error("Error submitting quiz answer:", err);
-      setError(err.message || "Failed to submit quiz answer. Please try again.");
+      setError(errorMsg);
     }
   };
 
@@ -63,7 +71,7 @@ export default function QuizSection({ onQuizUpdate }) {
       )}
       {quiz.answerFormat === "multiple-choice" && quiz.options && (
         <div className="w-full max-w-md">
-          {quiz.options.map((option, index) => (
+          {quiz.options.map((option: string, index: number) => (
             <div key={index} className="my-2 flex items-center">
               <input
                 type="radio"

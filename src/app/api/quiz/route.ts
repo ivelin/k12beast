@@ -1,9 +1,20 @@
-// src/app/api/quiz/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { sendXAIRequest } from "@/utils/xaiClient";
 import { handleXAIError } from "@/utils/xaiUtils";
 import supabase from "../../../supabase/serverClient";
 import { v4 as uuidv4 } from "uuid";
+
+// Define the expected response structure
+interface QuizResponse {
+  problem: string;
+  answerFormat: string;
+  options: string[];
+  correctAnswer: string;
+  solution: { title: string; content: string }[];
+  difficulty: "easy" | "medium" | "hard";
+  encouragement: string | null;
+  readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
+}
 
 const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the
 original input problem (e.g., if the input is about heat transfer, the quiz must also be about heat
@@ -25,7 +36,7 @@ success rate on an end-of-semester test without AI assistance, depending on whet
 correctly or incorrectly. Ensure all fields are present, especially the "solution" field with at least
 two steps.`;
 
-const defaultResponse = {
+const defaultResponse: QuizResponse = {
   problem: "Unable to generate quiz due to API response format.",
   answerFormat: "multiple-choice",
   options: ["Option 1", "Option 2", "Option 3", "Option 4"],
@@ -100,86 +111,51 @@ export async function POST(req: NextRequest) {
       sessionHistory.messages = updatedMessages;
     }
 
-    const content = await sendXAIRequest({
+    let content = await sendXAIRequest({
       problem,
       images,
       responseFormat,
       defaultResponse,
       maxTokens: 1000,
       chatHistory: sessionHistory?.messages || [],
-    });
+    }) as QuizResponse;
 
     console.log("Generated quiz:", content);
 
-    // Handle unexpected response format
-    let formattedContent = content;
-    if (content.response && (!content.problem || !content.options || !content.correctAnswer)) {
-      console.warn("xAI returned unexpected format with 'response' field:", content.response);
-      // Attempt to parse the response field into quiz structure
-      const responseText = content.response;
-      const problemMatch = responseText.match(/<p><strong>Problem:<\/strong>(.*?)(?=<p><strong>Options:<\/strong>|$)/is);
-      const optionsMatch = responseText.match(/<p><strong>Options:<\/strong><\/p>\s*<ul>(.*?)(?=<\/ul>|$)/is);
-      const correctAnswerMatch = responseText.match(/<p><strong>Correct Answer:<\/strong>\s*(.*?)(?=<p|$)/is);
-
-      if (problemMatch && optionsMatch && correctAnswerMatch) {
-        const problemText = problemMatch[1].trim();
-        const optionsItems = optionsMatch[1].match(/<li>(.*?)(?=<\/li>|$)/gi) || [];
-        const options = optionsItems.map((item: string) => {
-          const match = item.match(/<li>(.*?)(?=<\/li>|$)/i);
-          return match ? match[1].trim() : null;
-        }).filter(Boolean);
-        const correctAnswer = correctAnswerMatch[1].trim();
-
-        formattedContent = {
-          problem: problemText,
-          answerFormat: "multiple-choice",
-          options: options.length === 4 ? options : defaultResponse.options,
-          correctAnswer: correctAnswer || defaultResponse.correctAnswer,
-          solution: defaultResponse.solution, // Use default since we can't parse solution
-          difficulty: "medium",
-          encouragement: null,
-          readiness: { confidenceIfCorrect: 0.5, confidenceIfIncorrect: 0.4 },
-        };
-      } else {
-        console.error("Could not parse quiz from response:", responseText);
-        formattedContent = defaultResponse;
-      }
-    }
-
     // Ensure the solution is present; if not, use the default
-    if (!formattedContent.solution || formattedContent.solution.length === 0) {
+    if (!content.solution || content.solution.length === 0) {
       console.warn("Model did not provide a solution; using default.");
-      formattedContent.solution = defaultResponse.solution;
+      content.solution = defaultResponse.solution;
     }
 
     // Validate the formatted content
     if (
-      !formattedContent.problem ||
-      !formattedContent.answerFormat ||
-      !formattedContent.options ||
-      formattedContent.options.length !== 4 ||
-      !formattedContent.correctAnswer ||
-      !formattedContent.solution ||
-      !Array.isArray(formattedContent.solution) ||
-      !formattedContent.difficulty ||
-      !formattedContent.readiness ||
-      typeof formattedContent.readiness.confidenceIfCorrect !== "number" ||
-      typeof formattedContent.readiness.confidenceIfIncorrect !== "number"
+      !content.problem ||
+      !content.answerFormat ||
+      !content.options ||
+      content.options.length !== 4 ||
+      !content.correctAnswer ||
+      !content.solution ||
+      !Array.isArray(content.solution) ||
+      !content.difficulty ||
+      !content.readiness ||
+      typeof content.readiness.confidenceIfCorrect !== "number" ||
+      typeof content.readiness.confidenceIfIncorrect !== "number"
     ) {
-      console.error("Invalid quiz format after parsing:", formattedContent);
-      formattedContent = defaultResponse;
+      console.error("Invalid quiz format:", content);
+      content = defaultResponse;
     }
 
     // Store the quiz in the session without the solution (to prevent client-side access)
     const quizToStore = {
-      problem: formattedContent.problem,
-      answerFormat: formattedContent.answerFormat,
-      options: formattedContent.options,
-      correctAnswer: formattedContent.correctAnswer,
-      solution: formattedContent.solution, // Store the solution server-side
-      difficulty: formattedContent.difficulty,
-      encouragement: formattedContent.encouragement,
-      readiness: formattedContent.readiness,
+      problem: content.problem,
+      answerFormat: content.answerFormat,
+      options: content.options,
+      correctAnswer: content.correctAnswer,
+      solution: content.solution, // Store the solution server-side
+      difficulty: content.difficulty,
+      encouragement: content.encouragement,
+      readiness: content.readiness,
     };
 
     const updatedQuizzes = [...(sessionHistory.quizzes || []), quizToStore];
@@ -187,7 +163,7 @@ export async function POST(req: NextRequest) {
       ...(sessionHistory?.messages || []),
       {
         role: "assistant",
-        content: `<strong>Quiz:</strong><br>${formattedContent.problem}<br><ul>${formattedContent.options.map((o: string) => `<li>${o}</li>`).join("")}</ul>`,
+        content: `<strong>Quiz:</strong><br>${content.problem}<br><ul>${content.options.map((o: string) => `<li>${o}</li>`).join("")}</ul>`,
         renderAs: "html",
       },
     ];
@@ -207,13 +183,13 @@ export async function POST(req: NextRequest) {
     // Return the quiz to the client without the solution
     return NextResponse.json(
       {
-        problem: formattedContent.problem,
-        answerFormat: formattedContent.answerFormat,
-        options: formattedContent.options,
-        correctAnswer: formattedContent.correctAnswer,
-        difficulty: formattedContent.difficulty,
-        encouragement: formattedContent.encouragement,
-        readiness: formattedContent.readiness,
+        problem: content.problem,
+        answerFormat: content.answerFormat,
+        options: content.options,
+        correctAnswer: content.correctAnswer,
+        difficulty: content.difficulty,
+        encouragement: content.encouragement,
+        readiness: content.readiness,
       },
       {
         status: 200,

@@ -52,7 +52,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, files: uploadedFiles }, { status: 200 });
   } catch (err) {
-    console.error("Error uploading images:", err.message); // Log only the error message, not the service role key
-    return NextResponse.json({ error: err.message || "Failed to upload images" }, { status: 500 });
+    // Type assertion to handle unknown error type
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error("Error uploading images:", error.message); // Log only the error message
+    return NextResponse.json({ error: error.message || "Failed to upload images" }, { status: 500 });
   }
 }

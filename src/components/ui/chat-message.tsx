@@ -1,18 +1,19 @@
-"use client"
+"use client";
 
-import React, { useEffect, useState } from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { motion } from "framer-motion"
-import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react"
+import React, { useEffect, useState } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { motion } from "framer-motion";
+import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react";
+import DOMPurify from "dompurify";
 
-import { cn } from "@/utils"
+import { cn } from "@/utils";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { FilePreview } from "@/components/ui/file-preview"
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
+} from "@/components/ui/collapsible";
+import { FilePreview } from "@/components/ui/file-preview";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
@@ -30,95 +31,76 @@ const chatBubbleVariants = cva(
       },
     },
     compoundVariants: [
-      {
-        isUser: true,
-        animation: "slide",
-        class: "slide-in-from-right",
-      },
-      {
-        isUser: false,
-        animation: "slide",
-        class: "slide-in-from-left",
-      },
-      {
-        isUser: true,
-        animation: "scale",
-        class: "origin-bottom-right",
-      },
-      {
-        isUser: false,
-        animation: "scale",
-        class: "origin-bottom-left",
-      },
+      { isUser: true, animation: "slide", class: "slide-in-from-right" },
+      { isUser: false, animation: "slide", class: "slide-in-from-left" },
+      { isUser: true, animation: "scale", class: "origin-bottom-right" },
+      { isUser: false, animation: "scale", class: "origin-bottom-left" },
     ],
   }
-)
+);
 
-type Animation = VariantProps<typeof chatBubbleVariants>["animation"]
+type Animation = VariantProps<typeof chatBubbleVariants>["animation"];
 
 interface Attachment {
-  name?: string
-  contentType?: string
-  url: string
+  name?: string;
+  contentType?: string;
+  url: string;
 }
 
 interface PartialToolCall {
-  state: "partial-call"
-  toolName: string
+  state: "partial-call";
+  toolName: string;
 }
 
 interface ToolCall {
-  state: "call"
-  toolName: string
+  state: "call";
+  toolName: string;
 }
 
 interface ToolResult {
-  state: "result"
-  toolName: string
-  result: {
-    __cancelled?: boolean
-    [key: string]: any
-  }
+  state: "result";
+  toolName: string;
+  result: { __cancelled?: boolean; [key: string]: unknown };
 }
 
-type ToolInvocation = PartialToolCall | ToolCall | ToolResult
+type ToolInvocation = PartialToolCall | ToolCall | ToolResult;
 
 interface ReasoningPart {
-  type: "reasoning"
-  reasoning: string
+  type: "reasoning";
+  reasoning: string;
 }
 
 interface ToolInvocationPart {
-  type: "tool-invocation"
-  toolInvocation: ToolInvocation
+  type: "tool-invocation";
+  toolInvocation: ToolInvocation;
 }
 
 interface TextPart {
-  type: "text"
-  text: string
+  type: "text";
+  text: string;
 }
 
 interface SourcePart {
-  type: "source"
+  type: "source";
 }
 
-type MessagePart = TextPart | ReasoningPart | ToolInvocationPart | SourcePart
+type MessagePart = TextPart | ReasoningPart | ToolInvocationPart | SourcePart;
 
 export interface Message {
-  id: string
-  role: "user" | "assistant" | (string & {})
-  content: string
-  createdAt?: Date
-  experimental_attachments?: Attachment[]
-  toolInvocations?: ToolInvocation[]
-  parts?: MessagePart[]
-  renderAs?: "markdown" | "html"
+  id: string;
+  role: "user" | "assistant" | (string & {});
+  content: string;
+  createdAt?: Date;
+  experimental_attachments?: Attachment[];
+  toolInvocations?: ToolInvocation[];
+  parts?: MessagePart[];
+  renderAs?: "markdown" | "html";
 }
 
 export interface ChatMessageProps extends Message {
-  showTimeStamp?: boolean
-  animation?: Animation
-  actions?: React.ReactNode
+  showTimeStamp?: boolean;
+  animation?: Animation;
+  actions?: React.ReactNode;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -133,50 +115,48 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   parts,
   renderAs = "markdown",
 }) => {
-  const [DOMPurify, setDOMPurify] = useState<any>(null)
-  const [isDOMPurifyLoaded, setIsDOMPurifyLoaded] = useState(false)
+  const [domPurify, setDomPurify] = useState<typeof DOMPurify | null>(null);
+  const [isDOMPurifyLoaded, setIsDOMPurifyLoaded] = useState(false);
 
   useEffect(() => {
     import("dompurify").then((module) => {
-      setDOMPurify(() => module.default)
-      setIsDOMPurifyLoaded(true)
-    })
-  }, [])
+      setDomPurify(() => module.default);
+      setIsDOMPurifyLoaded(true);
+    });
+  }, []);
 
-  const isUser = role === "user"
+  const isUser = role === "user";
 
   const formattedTime = createdAt?.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
-  })
+  });
 
   const sanitizeContent = (html: string) => {
-    if (!DOMPurify || typeof DOMPurify.sanitize !== "function") {
-      console.error("DOMPurify.sanitize is not available. Falling back to plain text.")
-      return html
+    if (!domPurify) {
+      console.error("DOMPurify not loaded. Falling back to plain text.");
+      return html;
     }
-    return DOMPurify.sanitize(html, {
+    return domPurify.sanitize(html, {
       ALLOWED_TAGS: ["p", "strong", "ul", "li", "br"],
       ALLOWED_ATTR: [],
-    })
-  }
+    });
+  };
 
   if (isUser) {
     return (
       <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-        {experimental_attachments ? (
+        {experimental_attachments && (
           <div className="mb-1 flex flex-wrap gap-2">
             {experimental_attachments.map((attachment, index) => (
               <FilePreview key={index} url={attachment.url} name={attachment.name} />
             ))}
           </div>
-        ) : null}
-
+        )}
         <div className={cn(chatBubbleVariants({ isUser, animation }))}>
           <MarkdownRenderer>{content}</MarkdownRenderer>
         </div>
-
-        {showTimeStamp && createdAt ? (
+        {showTimeStamp && createdAt && (
           <time
             dateTime={createdAt.toISOString()}
             className={cn(
@@ -186,57 +166,60 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           >
             {formattedTime}
           </time>
-        ) : null}
+        )}
       </div>
-    )
+    );
   }
 
   if (parts && parts.length > 0) {
-    return parts.map((part, index) => {
-      if (part.type === "text") {
-        return (
-          <div
-            className={cn("flex flex-col", isUser ? "items-end" : "items-start")}
-            key={`text-${index}`}
-          >
-            <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-              <MarkdownRenderer>{part.text}</MarkdownRenderer>
-              {actions ? (
-                <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-                  {actions}
-                </div>
-              ) : null}
-            </div>
-
-            {showTimeStamp && createdAt ? (
-              <time
-                dateTime={createdAt.toISOString()}
-                className={cn(
-                  "mt-1 block px-1 text-xs opacity-50",
-                  animation !== "none" && "duration-500 animate-in fade-in-0"
-                )}
+    return (
+      <>
+        {parts.map((part, index) => {
+          if (part.type === "text") {
+            return (
+              <div
+                className={cn("flex flex-col", isUser ? "items-end" : "items-start")}
+                key={`text-${index}`}
               >
-                {formattedTime}
-              </time>
-            ) : null}
-          </div>
-        )
-      } else if (part.type === "reasoning") {
-        return <ReasoningBlock key={`reasoning-${index}`} part={part} />
-      } else if (part.type === "tool-invocation") {
-        return (
-          <ToolCall
-            key={`tool-${index}`}
-            toolInvocations={[part.toolInvocation]}
-          />
-        )
-      }
-      return null
-    })
+                <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+                  <MarkdownRenderer>{part.text}</MarkdownRenderer>
+                  {actions && (
+                    <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+                      {actions}
+                    </div>
+                  )}
+                </div>
+                {showTimeStamp && createdAt && (
+                  <time
+                    dateTime={createdAt.toISOString()}
+                    className={cn(
+                      "mt-1 block px-1 text-xs opacity-50",
+                      animation !== "none" && "duration-500 animate-in fade-in-0"
+                    )}
+                  >
+                    {formattedTime}
+                  </time>
+                )}
+              </div>
+            );
+          } else if (part.type === "reasoning") {
+            return <ReasoningBlock key={`reasoning-${index}`} part={part} />;
+          } else if (part.type === "tool-invocation") {
+            return (
+              <ToolCall
+                key={`tool-${index}`}
+                toolInvocations={[part.toolInvocation]}
+              />
+            );
+          }
+          return null;
+        })}
+      </>
+    );
   }
 
   if (toolInvocations && toolInvocations.length > 0) {
-    return <ToolCall toolInvocations={toolInvocations} />
+    return <ToolCall toolInvocations={toolInvocations} />;
   }
 
   return (
@@ -251,14 +234,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         ) : (
           <MarkdownRenderer>{content}</MarkdownRenderer>
         )}
-        {actions ? (
+        {actions && (
           <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
             {actions}
           </div>
-        ) : null}
+        )}
       </div>
-
-      {showTimeStamp && createdAt ? (
+      {showTimeStamp && createdAt && (
         <time
           dateTime={createdAt.toISOString()}
           className={cn(
@@ -268,13 +250,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         >
           {formattedTime}
         </time>
-      ) : null}
+      )}
     </div>
-  )
-}
+  );
+};
 
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className="mb-2 flex flex-col items-start sm:max-w-[70%]">
@@ -303,28 +285,23 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
             className="border-t"
           >
             <div className="p-2">
-              <div className="whitespace-pre-wrap text-xs">
-                {part.reasoning}
-              </div>
+              <div className="whitespace-pre-wrap text-xs">{part.reasoning}</div>
             </div>
           </motion.div>
         </CollapsibleContent>
       </Collapsible>
     </div>
-  )
-}
+  );
+};
 
-function ToolCall({
-  toolInvocations,
-}: Pick<ChatMessageProps, "toolInvocations">) {
-  if (!toolInvocations?.length) return null
+function ToolCall({ toolInvocations }: Pick<ChatMessageProps, "toolInvocations">) {
+  if (!toolInvocations?.length) return null;
 
   return (
     <div className="flex flex-col items-start gap-2">
       {toolInvocations.map((invocation, index) => {
         const isCancelled =
-          invocation.state === "result" &&
-          invocation.result.__cancelled === true
+          invocation.state === "result" && invocation.result.__cancelled === true;
 
         if (isCancelled) {
           return (
@@ -335,14 +312,10 @@ function ToolCall({
               <Ban className="h-4 w-4" />
               <span>
                 Cancelled{" "}
-                <span className="font-mono">
-                  {"`"}
-                  {invocation.toolName}
-                  {"`"}
-                </span>
+                <span className="font-mono">{`\`${invocation.toolName}\``}</span>
               </span>
             </div>
-          )
+          );
         }
 
         switch (invocation.state) {
@@ -356,16 +329,11 @@ function ToolCall({
                 <Terminal className="h-4 w-4" />
                 <span>
                   Calling{" "}
-                  <span className="font-mono">
-                    {"`"}
-                    {invocation.toolName}
-                    {"`"}
-                  </span>
-                  ...
+                  <span className="font-mono">{`\`${invocation.toolName}\``}</span>...
                 </span>
                 <Loader2 className="h-3 w-3 animate-spin" />
               </div>
-            )
+            );
           case "result":
             return (
               <div
@@ -376,22 +344,18 @@ function ToolCall({
                   <Code2 className="h-4 w-4" />
                   <span>
                     Result from{" "}
-                    <span className="font-mono">
-                      {"`"}
-                      {invocation.toolName}
-                      {"`"}
-                    </span>
+                    <span className="font-mono">{`\`${invocation.toolName}\``}</span>
                   </span>
                 </div>
                 <pre className="overflow-x-auto whitespace-pre-wrap text-foreground">
                   {JSON.stringify(invocation.result, null, 2)}
                 </pre>
               </div>
-            )
+            );
           default:
-            return null
+            return null;
         }
       })}
     </div>
-  )
+  );
 }
