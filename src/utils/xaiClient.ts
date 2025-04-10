@@ -30,11 +30,9 @@ interface XAIRequestOptions {
 }
 
 function sanitizeResponse(rawContent: string): string {
-  // Remove control characters (except \n, \r, \t) that are not within quoted strings
-  const sanitized = rawContent
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F](?=(?:(?:[^"]*"){2})*[^"]*$)/g, "") // Remove control characters outside quotes
+  return rawContent
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F](?=(?:(?:[^"]*"){2})*[^"]*$)/g, "")
     .trim();
-  return sanitized;
 }
 
 export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
@@ -50,13 +48,12 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
 
   validateRequestInputs(problem, images);
 
-  // Format the chat history
   const chatHistoryText = chatHistory.length > 0
     ? `Chat History:\n${chatHistory.map(msg =>
-      `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`).join("\n")}`
+        `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`).join("\n")}`
     : "No chat history available.";
 
-  const messages: any[] = [
+  const messages: OpenAI.ChatCompletionMessageParam[] = [
     {
       role: "system",
       content: `You are a K12 tutor. Assist with educational queries related to K12 subjects.
@@ -88,8 +85,8 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
   if (images && images.length > 0) {
     messages.push({
       role: "user",
-      content: images.map((url: string) => ({
-        type: "image_url",
+      content: images.map((url) => ({
+        type: "image_url" as const,
         image_url: { url },
       })),
     });
@@ -103,30 +100,28 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
   console.log("Full xAI API request:", JSON.stringify(requestPayload, null, 2));
 
   const maxRetries = 3;
+  let rawContent: string | undefined;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const response = await openai.chat.completions.create(requestPayload);
       console.log("Full xAI API response:", JSON.stringify(response, null, 2));
 
-      let rawContent = response.choices[0].message.content.trim();
-
-      // Sanitize the response to remove invalid control characters
+      rawContent = response.choices[0].message.content.trim();
       rawContent = sanitizeResponse(rawContent);
 
-      let content: XAIResponse;
-      content = JSON.parse(rawContent);
-
+      const content: XAIResponse = JSON.parse(rawContent);
       console.log("xAI API response content object:", content);
 
       return content;
     } catch (error) {
       console.warn(`xAI request failed (attempt ${attempt}/${maxRetries}):`, error.message);
       if (attempt === maxRetries) {
-        console.error("Final attempt failed. Raw response:", rawContent);
+        console.error("Final attempt failed. Raw response:", rawContent ?? "No response");
         console.error("Returning default response with error message.");
         return {
           ...defaultResponse,
-          lesson: defaultResponse.lesson ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON characters.`
+          lesson: defaultResponse.lesson
+            ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON characters.`
             : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON characters.`,
         };
       }
@@ -136,4 +131,4 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
   return defaultResponse;
 }
 
-export { handleXAIError } from "./xaiUtils"; // Re-export for convenience
+export { handleXAIError } from "./xaiUtils";
