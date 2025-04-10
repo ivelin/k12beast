@@ -1,3 +1,4 @@
+// src/app/chat/[sessionId]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
