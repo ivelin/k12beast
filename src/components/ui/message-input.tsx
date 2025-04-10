@@ -1,3 +1,4 @@
+// src/components/ui/message-input.tsx
 "use client"
 
 import React, { useEffect, useRef, useState } from "react"
@@ -173,7 +174,7 @@ export function MessageInput({
 
   useAutosizeTextArea({
     ref: textAreaRef,
-    maxHeight: 240,
+    maxHeight: 120, // Reduced max height for mobile
     borderWidth: 1,
     dependencies: [props.value, showFileList],
   })
@@ -287,9 +288,11 @@ export function MessageInput({
           <Button
             type="submit"
             size="icon"
-            className="h-8 w-8 transition-opacity"
+            className={`h-8 w-8 transition-opacity ${
+              !props.value || isGenerating ? "bg-muted text-muted-foreground" : ""
+            }`}
             aria-label="Send message"
-            disabled={props.value === "" || isGenerating}
+            disabled={!props.value || isGenerating}
           >
             <ArrowUp className="h-5 w-5" />
           </Button>
@@ -407,7 +410,7 @@ function RecordingPrompt({ isVisible, onStopRecording }: RecordingPromptProps) {
           }}
           exit={{ top: 0, filter: "blur(5px)" }}
           className="absolute left-1/2 flex -translate-x-1/2 cursor-pointer overflow-hidden whitespace-nowrap rounded-full border bg-background py-1 text-center text-sm text-muted-foreground"
-          onClick={onStopRecording}
+          onClick={stopRecording}
         >
           <span className="mx-2.5 flex items-center">
             <Info className="mr-2 h-3 w-3" />
