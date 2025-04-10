@@ -3,6 +3,11 @@ module.exports = {
   version: 13,
   appVersion: "0.6.6",
   modifications: [
+    // Add created_at column if it doesn't exist (safety net for prior migration failures)
+    `
+      ALTER TABLE sessions
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    `,
     // Add updated_at column if it doesn't exist
     `
       ALTER TABLE sessions
@@ -11,7 +16,7 @@ module.exports = {
     // Backfill updated_at for existing sessions where it's null, using created_at
     `
       UPDATE sessions
-      SET updated_at = created_at
+      SET updated_at = COALESCE(created_at, NOW())
       WHERE updated_at IS NULL;
     `,
     // Create or update the trigger to set updated_at on update
