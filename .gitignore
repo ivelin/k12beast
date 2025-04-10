@@ -47,3 +47,8 @@ node_modules\n.env.local
 
 # dir for temp work files
 tmp/
+
+
+# ignore test artifacts
+playwright-report/
+test-results/
