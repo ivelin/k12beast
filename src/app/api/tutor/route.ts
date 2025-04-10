@@ -17,9 +17,21 @@ export async function POST(request: Request) {
     const { problem, images } = await request.json();
     const sessionId = request.headers.get('x-session-id') || uuidv4();
 
-    console.log('Creating new session with problem:', { problem, images });
+    // Get the Authorization token from the request headers
+    const token = request.headers.get("Authorization")?.replace("Bearer ", "");
+    if (!token) {
+      return NextResponse.json({ error: "No token provided" }, { status: 401 });
+    }
 
-    // Insert a new session with problem and images
+    // Verify the token and get the user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    console.log('Creating new session with problem:', { problem, images, userId: user.id });
+
+    // Insert a new session with problem, images, and user_id
     const { data, error } = await supabase
       .from('sessions')
       .insert({
@@ -30,6 +42,7 @@ export async function POST(request: Request) {
         examples: null,
         quizzes: null,
         performanceHistory: null,
+        user_id: user.id, // Associate the session with the authenticated user
       })
       .select()
       .single();
