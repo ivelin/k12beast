@@ -121,10 +121,19 @@ async function ensureTablesExist(supabase) {
         lesson TEXT,
         examples JSONB,
         quizzes JSONB,
-        "performanceHistory" JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        "performanceHistory" JSONB
       );
     `, supabase);
+
+    // Log sessions table schema for debugging
+    const { data: schemaCheck } = await supabase.rpc("execute_sql", {
+      sql_text: `
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'sessions';
+      `
+    });
+    console.log("Sessions table columns before migrations:", schemaCheck);
 
     await executeSql(`
       GRANT ALL PRIVILEGES ON TABLE sessions TO postgres;
@@ -243,7 +252,7 @@ async function releaseLock(lockKey, instanceId, supabase) {
 
     if (error) throw error;
 
-    console.log(`Lock ${lockKey} released by ${instanceId}`);
+    console.log(`Lock ${lock_key} released by ${instanceId}`);
   } catch (error) {
     console.error("Error releasing lock:", error);
     throw error;
