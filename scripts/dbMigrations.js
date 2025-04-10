@@ -11,7 +11,7 @@ const {
   releaseLock,
 } = require("./migrationUtils");
 
-// Validate environment variables before initializing Supabase client
+// Validate environment variables
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   console.error("NEXT_PUBLIC_SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL || "Empty");
   console.error(
@@ -26,7 +26,7 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_
   );
 }
 
-// Initialize Supabase client with the service role key
+// Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -49,12 +49,12 @@ const migrationV9 = require("./migrations/migrationV9");
 const migrationV10 = require("./migrations/migrationV10");
 const migrationV11 = require("./migrations/migrationV11");
 const migrationV12 = require("./migrations/migrationV12");
-const migrationV13 = require("./migrations/migrationV13"); // Added
+const migrationV13 = require("./migrations/migrationV13");
 
-// Define the app version from package.json
+// Define app version
 const APP_VERSION = packageJson.version;
 
-// Define the migrations with their required app versions
+// Define migrations in ascending order
 const migrations = [
   migrationV1,
   migrationV2,
@@ -68,10 +68,10 @@ const migrations = [
   migrationV10,
   migrationV11,
   migrationV12,
-  migrationV13, // Added
+  migrationV13,
 ];
 
-// Mapping of database versions to the app version that introduced them
+// Mapping of database versions to app versions
 const dbVersionRequiredByAppVersion = [
   { dbVersion: 1, appVersion: "0.0.1" },
   { dbVersion: 2, appVersion: "0.1.0" },
@@ -99,7 +99,6 @@ async function runMigrations(instanceId = "default-instance") {
     console.log(`Running app version: ${APP_VERSION}`);
     console.log(`Current database version: ${currentVersion}`);
 
-    // Check compatibility before migrations
     const { isCompatible: isCompatibleBefore, targetDbVersion } = await isAppVersionCompatible(
       currentVersion,
       migrations,
@@ -107,34 +106,39 @@ async function runMigrations(instanceId = "default-instance") {
       dbVersionRequiredByAppVersion
     );
 
-    let pendingMigrations = [];
-    if (!isCompatibleBefore) {
-      pendingMigrations = migrations.filter(m => m.version > currentVersion);
-      if (pendingMigrations.length === 0) {
-        console.log(
-          `No pending migrations to run, but app version ${APP_VERSION} requires database ` +
-          `version ${targetDbVersion}, while the current database version is ${currentVersion}.`
-        );
-        throw new Error(
-          `App version ${APP_VERSION} requires a database version newer than ${currentVersion}. ` +
-          "Please update the app or database schema."
-        );
-      }
-    } else {
+    if (isCompatibleBefore) {
       console.log(
         `App version ${APP_VERSION} is compatible with database version ${currentVersion}. ` +
-        "Checking for pending migrations..."
+        "No migrations needed."
       );
-      pendingMigrations = migrations.filter(m => m.version > currentVersion);
-      if (pendingMigrations.length === 0) {
-        console.log("No pending migrations to apply.");
-        return;
-      }
+      return;
     }
+
+    // Find migrations to apply: from currentVersion + 1 to targetDbVersion
+    const pendingMigrations = migrations
+      .filter(m => m.version > currentVersion && m.version <= targetDbVersion)
+      .sort((a, b) => a.version - b.version);
+
+    if (pendingMigrations.length === 0) {
+      console.log(
+        `No pending migrations to apply. Current version: ${currentVersion}, ` +
+        `Target version: ${targetDbVersion}.`
+      );
+      throw new Error(
+        `App version ${APP_VERSION} requires database version ${targetDbVersion}, ` +
+        `but no migrations are available to bridge the gap from ${currentVersion}.`
+      );
+    }
+
+    console.log(
+      `Pending migrations to apply (versions ${pendingMigrations[0].version} to ` +
+      `${pendingMigrations[pendingMigrations.length - 1].version}): ` +
+      pendingMigrations.map(m => m.version).join(", ")
+    );
 
     const lockAcquired = await acquireLock(lockKey, instanceId, supabase);
     if (!lockAcquired) {
-      console.log("Another instance is currently running migrations. Waiting...");
+      console.log("Another instance is running migrations. Waiting...");
       let retries = 10;
       while (retries > 0) {
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -150,55 +154,57 @@ async function runMigrations(instanceId = "default-instance") {
         }
         retries--;
       }
-
       if (retries === 0) {
-        throw new Error("Failed to acquire migration lock after multiple attempts.");
+        throw new Error("Failed to acquire migration lock after attempts.");
       }
     }
 
     try {
-      if (pendingMigrations.length > 0) {
-        console.log(
-          `Database upgrade required: Upgrading from version ${currentVersion} to version ` +
-          `${pendingMigrations[pendingMigrations.length - 1].version} for app version ${APP_VERSION}...`
-        );
+      for (const migration of pendingMigrations) {
+        // Double-check if migration was applied (in case of partial previous runs)
+        const { data: migrationExists } = await supabase
+          .from("migrations")
+          .select("version")
+          .eq("version", migration.version)
+          .single();
 
-        for (const migration of pendingMigrations) {
-          console.log(
-            `Applying migration version ${migration.version} for app version ${migration.appVersion}...`
-          );
-
-          if (migration.modifications) {
-            for (const sql of migration.modifications) {
-              await executeSql(sql, supabase);
-            }
-          }
-
-          if (migration.apply) {
-            await migration.apply(supabase);
-          }
-
-          const { error: insertMigrationError } = await supabase
-            .from("migrations")
-            .insert({ version: migration.version });
-          if (insertMigrationError) throw insertMigrationError;
-
-          const { error: insertCompatibilityError } = await supabase
-            .from("db_app_version_compatibility")
-            .insert({
-              db_version: migration.version,
-              app_version: migration.appVersion,
-              upgraded_at: new Date().toISOString(),
-            });
-          if (insertCompatibilityError) throw insertCompatibilityError;
-
-          console.log(`Migration version ${migration.version} applied successfully.`);
+        if (migrationExists) {
+          console.log(`Migration version ${migration.version} already applied, skipping.`);
+          continue;
         }
 
-        console.log("All migrations applied successfully.");
+        console.log(
+          `Applying migration version ${migration.version} for app version ${migration.appVersion}...`
+        );
+
+        if (migration.modifications) {
+          for (const sql of migration.modifications) {
+            console.log(`Executing SQL for migration ${migration.version}:`, sql);
+            await executeSql(sql, supabase);
+          }
+        }
+
+        if (migration.apply) {
+          await migration.apply(supabase);
+        }
+
+        const { error: insertMigrationError } = await supabase
+          .from("migrations")
+          .insert({ version: migration.version });
+        if (insertMigrationError) throw insertMigrationError;
+
+        const { error: insertCompatibilityError } = await supabase
+          .from("db_app_version_compatibility")
+          .insert({
+            db_version: migration.version,
+            app_version: migration.appVersion,
+            upgraded_at: new Date().toISOString(),
+          });
+        if (insertCompatibilityError) throw insertCompatibilityError;
+
+        console.log(`Migration version ${migration.version} applied successfully.`);
       }
 
-      // Recheck compatibility after migrations
       const newDbVersion = await getCurrentVersion(supabase);
       console.log(`Database version after migrations: ${newDbVersion}`);
       const { isCompatible: isCompatibleAfter } = await isAppVersionCompatible(
@@ -210,14 +216,13 @@ async function runMigrations(instanceId = "default-instance") {
 
       if (!isCompatibleAfter) {
         throw new Error(
-          `App version ${APP_VERSION} is not compatible with the database version ${newDbVersion} ` +
-          `after applying migrations. Required database version: ${targetDbVersion}. ` +
-          "Please update the app to a compatible version."
+          `App version ${APP_VERSION} not compatible with database version ${newDbVersion} ` +
+          `after migrations. Required: ${targetDbVersion}.`
         );
       }
 
       console.log(
-        `App version ${APP_VERSION} is compatible with the final database version ${newDbVersion}.`
+        `App version ${APP_VERSION} is compatible with final database version ${newDbVersion}.`
       );
     } catch (error) {
       console.error("Migration failed:", error);
