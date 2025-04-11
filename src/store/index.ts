@@ -79,19 +79,29 @@ const useAppStore = create<AppState>((set, get) => ({
   setError: (error) => set({ error }),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
   handleSubmit: async (problem, imageUrls, images) => {
-    const { sessionId, addMessage } = get();
+    const { sessionId, addMessage, loading } = get();
+    if (loading) {
+      return; // Silently ignore duplicate requests
+    }
+
     set({ loading: true, problem, imageUrls, hasSubmittedProblem: true });
 
     try {
       let uploadedImageUrls: string[] = [];
       if (images.length > 0) {
-        const formData = new FormData();
-        images.forEach((image) => formData.append("files", image));
         const token = document.cookie
           .split("; ")
           .find((row) => row.startsWith("supabase-auth-token="))
           ?.split("=")[1];
-        const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+        
+        if (!token) {
+          throw new Error("You must be logged in to upload images. Please log in and try again.");
+        }
+
+        const headers: HeadersInit = { Authorization: `Bearer ${token}` };
+
+        const formData = new FormData();
+        images.forEach((image) => formData.append("files", image));
 
         const uploadResponse = await fetch("/api/upload-image", {
           method: "POST",
@@ -125,11 +135,15 @@ const useAppStore = create<AppState>((set, get) => ({
         .split("; ")
         .find((row) => row.startsWith("supabase-auth-token="))
         ?.split("=")[1];
+      if (!token) {
+        throw new Error("You must be logged in to submit a problem. Please log in and try again.");
+      }
+
       const headers: HeadersInit = {
         "Content-Type": "application/json",
         "x-session-id": sessionId || "",
+        Authorization: `Bearer ${token}`,
       };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const res = await fetch("/api/tutor", {
         method: "POST",
@@ -141,7 +155,7 @@ const useAppStore = create<AppState>((set, get) => ({
       set({ sessionId: res.headers.get("x-session-id") || sessionId, lesson: lessonContent, step: "lesson" });
       addMessage({ role: "assistant", content: lessonContent, renderAs: "html" });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to fetch lesson";
+      const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while starting your lesson. Let's try again!";
       console.error("Error in handleSubmit:", err);
       set({ error: errorMsg });
       toast.error(errorMsg);
@@ -150,7 +164,11 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
   handleExamplesRequest: async () => {
-    const { problem, imageUrls, sessionId, addMessage } = get();
+    const { problem, imageUrls, sessionId, addMessage, loading } = get();
+    if (loading) {
+      return; // Silently ignore duplicate requests
+    }
+
     set({ loading: true });
     try {
       addMessage({ role: "user", content: "Request Example", renderAs: "markdown" });
@@ -158,37 +176,66 @@ const useAppStore = create<AppState>((set, get) => ({
         .split("; ")
         .find((row) => row.startsWith("supabase-auth-token="))
         ?.split("=")[1];
+      if (!token) {
+        throw new Error("You must be logged in to request examples. Please log in and try again.");
+      }
       const headers: HeadersInit = {
         "Content-Type": "application/json",
         "x-session-id": sessionId || "",
+        Authorization: `Bearer ${token}`,
       };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch("/api/examples", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ problem, images: imageUrls }),
-      });
-      const data = (await res.json()) as Example;
-      if (!res.ok) throw new Error((data as any).error || "Failed to fetch examples");
+      // Set up a timeout for the fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 30000); // 30 seconds timeout
 
-      set({ examples: data, step: "examples" });
-      addMessage({
-        role: "assistant",
-        content: `<p><strong>Example:</strong> ${data.problem}</p><p><strong>Solution:</strong></p><ul>${data.solution
-          .map((s) => `<li><strong>${s.title}:</strong> ${s.content}</li>`)
-          .join("")}</ul>`,
-        renderAs: "html",
-      });
+      try {
+        const res = await fetch("/api/examples", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ problem, images: imageUrls }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Oops! Something went wrong while fetching an example. Let's try again!");
+        }
+
+        const data = (await res.json()) as Example;
+
+        set({ examples: data, step: "examples" });
+        addMessage({
+          role: "assistant",
+          content: `<p><strong>Example:</strong> ${data.problem}</p><p><strong>Solution:</strong></p><ul>${data.solution
+            .map((s) => `<li><strong>${s.title}:</strong> ${s.content}</li>`)
+            .join("")}</ul>`,
+          renderAs: "html",
+        });
+      } catch (err: unknown) {
+        if (err.name === "AbortError") {
+          throw new Error("Oops! The AI had a little glitch and was snoozing. Let's try again in a moment!");
+        }
+        throw err;
+      }
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to fetch examples";
+      const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while fetching an example. Let's try again!";
       set({ error: errorMsg });
+      toast.error(errorMsg);
     } finally {
       set({ loading: false });
     }
   },
   handleQuizSubmit: async () => {
-    const { problem, imageUrls, sessionId, addMessage } = get();
+    const { problem, imageUrls, sessionId, addMessage, loading } = get();
+    if (loading) {
+      return; // Silently ignore duplicate requests
+    }
+
     set({ loading: true, step: "quizzes" });
     try {
       addMessage({ role: "user", content: "Take a Quiz", renderAs: "markdown" });
@@ -196,11 +243,14 @@ const useAppStore = create<AppState>((set, get) => ({
         .split("; ")
         .find((row) => row.startsWith("supabase-auth-token="))
         ?.split("=")[1];
+      if (!token) {
+        throw new Error("You must be logged in to take a quiz. Please log in and try again.");
+      }
       const headers: HeadersInit = {
         "Content-Type": "application/json",
         "x-session-id": sessionId || "",
+        Authorization: `Bearer ${token}`,
       };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const res = await fetch("/api/quiz", {
         method: "POST",
@@ -226,18 +276,25 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
   handleValidate: async (answer, quiz) => {
-    const { sessionId, addMessage } = get();
+    const { sessionId, addMessage, loading } = get();
+    if (loading) {
+      return; // Silently ignore duplicate requests
+    }
+
     set({ loading: true });
     try {
       const token = document.cookie
         .split("; ")
         .find((row) => row.startsWith("supabase-auth-token="))
         ?.split("=")[1];
+      if (!token) {
+        throw new Error("You must be logged in to validate a quiz. Please log in and try again.");
+      }
       const headers: HeadersInit = {
         "Content-Type": "application/json",
         "x-session-id": sessionId || "",
+        Authorization: `Bearer ${token}`,
       };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const res = await fetch("/api/validate", {
         method: "POST",
@@ -290,7 +347,10 @@ const useAppStore = create<AppState>((set, get) => ({
     }
   },
   append: async (msg, imageUrls, images) => {
-    const { handleSubmit } = get();
+    const { handleSubmit, loading } = get();
+    if (loading) {
+      return; // Silently ignore duplicate requests
+    }
     await handleSubmit(msg.content, imageUrls, images);
   },
   reset: () =>

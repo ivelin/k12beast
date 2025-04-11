@@ -8,10 +8,15 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0, // Retry failing tests in CI
   workers: process.env.CI ? 2 : undefined, // Limit workers in CI
   reporter: 'html', // Generate HTML report
+  outputDir: 'test-results', // Directory for test artifacts (screenshots, videos, traces)
   use: {
     baseURL: 'http://localhost:3000', // Default Next.js dev server
     trace: 'on-first-retry', // Record traces on first retry
+    screenshot: 'off', // Disable screenshots
+    video: 'off', // Disable video recording
+    viewport: { width: 1280, height: 720 },
   },
+  timeout: 60000, // 60 seconds
   projects: [
     {
       name: 'chromium',

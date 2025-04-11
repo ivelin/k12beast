@@ -14,6 +14,7 @@
     "test": "npm run test:e2e && npm run test:server"
   },
   "dependencies": {
+    "@applitools/eyes-playwright": "^1.37.1",
     "@radix-ui/react-collapsible": "^1.1.3",
     "@radix-ui/react-dialog": "^1.1.1",
     "@radix-ui/react-label": "^2.1.2",

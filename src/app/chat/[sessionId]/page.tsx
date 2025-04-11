@@ -60,6 +60,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   const [shareableLink, setShareableLink] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isStoreReady, setIsStoreReady] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -68,6 +69,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         reset();
         setLocalProblem("");
         setLocalImages([]);
+        setIsStoreReady(true);
         setIsLoadingSession(false);
         return;
       }
@@ -139,6 +141,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           setError(err.message || "Error loading session");
         }
       } finally {
+        setIsStoreReady(true);
         setIsLoadingSession(false);
       }
     }
@@ -238,7 +241,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     return message;
   });
 
-  if (isLoadingSession) {
+  if (isLoadingSession || !isStoreReady) {
     return <div className="container mx-auto p-4">Loading session, please wait...</div>;
   }
 
@@ -298,7 +301,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           <ChatMessages className="flex flex-col items-start">
             <MessageList messages={filteredMessages} isTyping={loading} />
           </ChatMessages>
-          {step === "problem" && !hasSubmittedProblem && (
+          {!loading && step === "problem" && !hasSubmittedProblem && (
             <PromptSuggestions
               className="mb-8"
               label="Try these prompts ✨"
@@ -311,7 +314,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
               ]}
             />
           )}
-          {(step === "lesson" || step === "examples") && (
+          {!loading && (step === "lesson" || step === "examples") && (
             <PromptSuggestions
               className="mb-8"
               label="What would you like to do next?"
