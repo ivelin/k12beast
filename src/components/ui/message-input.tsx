@@ -337,26 +337,45 @@ function FileUploadOverlay({ isDragging }: FileUploadOverlayProps) {
   )
 }
 
-function showFileUploadDialog() {
-  const input = document.createElement("input")
+async function showFileUploadDialog(): Promise<File[] | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
 
-  input.type = "file"
-  input.multiple = true
-  input.accept = "*/*"
-  input.click()
+    input.type = "file";
+    input.multiple = true;
+    input.accept = "*/*";
+    // Explicitly allow camera access for mobile devices
+    input.setAttribute("capture", "environment");
+    input.click();
 
-  return new Promise<File[] | null>((resolve) => {
-    input.onchange = (e) => {
-      const files = (e.currentTarget as HTMLInputElement).files
-
+    const handleChange = () => {
+      const files = input.files;
       if (files) {
-        resolve(Array.from(files))
-        return
+        resolve(Array.from(files));
+      } else {
+        resolve(null);
       }
+      // Clean up event listeners to prevent memory leaks
+      input.removeEventListener("change", handleChange);
+      input.removeEventListener("cancel", handleCancel);
+    };
 
-      resolve(null)
-    }
-  })
+    const handleCancel = () => {
+      resolve(null);
+      input.removeEventListener("change", handleChange);
+      input.removeEventListener("cancel", handleCancel);
+    };
+
+    input.addEventListener("change", handleChange);
+    input.addEventListener("cancel", handleCancel);
+
+    // Add a timeout to ensure iOS processes the camera input
+    setTimeout(() => {
+      if (!input.files || input.files.length === 0) {
+        handleCancel();
+      }
+    }, 60000); // 60 seconds timeout for user to take a photo
+  });
 }
 
 function TranscribingOverlay() {
@@ -410,7 +429,7 @@ function RecordingPrompt({ isVisible, onStopRecording }: RecordingPromptProps) {
           }}
           exit={{ top: 0, filter: "blur(5px)" }}
           className="absolute left-1/2 flex -translate-x-1/2 cursor-pointer overflow-hidden whitespace-nowrap rounded-full border bg-background py-1 text-center text-sm text-muted-foreground"
-          onClick={stopRecording}
+          onClick={onStopRecording}
         >
           <span className="mx-2.5 flex items-center">
             <Info className="mr-2 h-3 w-3" />
