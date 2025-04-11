@@ -1,4 +1,4 @@
-// /app/public/login/page.tsx
+// src/app/public/login/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -14,6 +15,9 @@ export default function Login() {
   const [message, setMessage] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
 
   const emailInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +66,7 @@ export default function Login() {
         const { error } = await supabase.auth.signUp({
           email: trimmedEmail,
           password: trimmedPassword,
-          options: { emailRedirectTo: `${window.location.origin}/chat` },
+          options: { emailRedirectTo: `${window.location.origin}/public/confirm-success` },
         });
         if (error) {
           if (error.message.includes("already registered")) {
@@ -107,7 +111,39 @@ export default function Login() {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setResetMessage("");
+
+    const trimmedResetEmail = resetEmail.trim();
+    if (!trimmedResetEmail) {
+      setResetMessage("Please enter your email.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedResetEmail, {
+        redirectTo: `${window.location.origin}/public/reset-password`,
+      });
+      if (error) {
+        setResetMessage(error.message || "Failed to send reset email. Please try again.");
+        setLoading(false);
+        return;
+      }
+      setResetMessage("Password reset email sent! Please check your inbox.");
+      setLoading(false);
+      setTimeout(() => setIsResetDialogOpen(false), 2000);
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      setResetMessage(error.message || "An error occurred. Please try again.");
+      setLoading(false);
+    }
+  };
+
   const isFormValid = email.trim().length > 0 && password.trim().length > 0;
+  const isResetFormValid = resetEmail.trim().length > 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -147,6 +183,16 @@ export default function Login() {
               required
               disabled={loading}
             />
+            {!isSignUp && (
+              <button
+                type="button"
+                onClick={() => setIsResetDialogOpen(true)}
+                className="text-sm text-primary hover:underline mt-2"
+                disabled={loading}
+              >
+                Forgot Password?
+              </button>
+            )}
           </div>
           {message && (
             <p className={`text-sm ${message.includes("successful") ? "text-green-500" : "text-destructive"}`}>
@@ -173,6 +219,45 @@ export default function Login() {
           {isSignUp ? "Switch to Login" : "Switch to Sign Up"}
         </Button>
       </div>
+
+      <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Your Password</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div>
+              <Label htmlFor="reset-email" className="block text-sm font-medium text-foreground">
+                Email
+              </Label>
+              <Input
+                type="email"
+                id="reset-email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                className="mt-1"
+                required
+                disabled={loading}
+              />
+            </div>
+            {resetMessage && (
+              <p className={`text-sm ${resetMessage.includes("sent") ? "text-green-500" : "text-destructive"}`}>
+                {resetMessage}
+              </p>
+            )}
+            <Button type="submit" className="w-full" disabled={loading || !isResetFormValid}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send Reset Email"
+              )}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -2,32 +2,34 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './tests/e2e', // Where tests will live
-  fullyParallel: true, // Run tests in parallel
-  forbidOnly: !!process.env.CI, // Fail CI if `test.only` is used
-  retries: process.env.CI ? 2 : 0, // Retry failing tests in CI
-  workers: process.env.CI ? 2 : undefined, // Limit workers in CI
-  reporter: 'html', // Generate HTML report
-  outputDir: 'test-results', // Directory for test artifacts (screenshots, videos, traces)
+  testDir: './tests/e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 2 : undefined,
+  reporter: 'html',
+  outputDir: 'test-results',
   use: {
-    baseURL: 'http://localhost:3000', // Default Next.js dev server
-    trace: 'on-first-retry', // Record traces on first retry
-    screenshot: 'off', // Disable screenshots
-    video: 'off', // Disable video recording
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+    screenshot: 'on', // Enable screenshots for all tests
+    video: 'on', // Enable video recording for all tests
     viewport: { width: 1280, height: 720 },
+    storageState: 'playwright/.auth/user.json',
   },
-  timeout: 60000, // 60 seconds
+  timeout: 10000,
+  expect: { timeout: 10000 },
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    // Add more browsers if needed (e.g., firefox, webkit)
   ],
   webServer: {
-    command: 'npm run dev', // Start Next.js dev server
+    command: 'npm run dev',
     url: 'http://localhost:3000',
-    timeout: 120 * 1000, // Give it time to start
-    reuseExistingServer: !process.env.CI, // Reuse server locally
+    timeout: 120 * 1000,
+    reuseExistingServer: !process.env.CI,
   },
+  globalSetup: require.resolve('./tests/e2e/global-setup'),
 });
