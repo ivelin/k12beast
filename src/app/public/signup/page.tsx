@@ -1,4 +1,4 @@
-// /app/public/signup/page.tsx
+// src/app/public/signup/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -31,7 +31,7 @@ export default function SignUp() {
         email: trimmedEmail,
         password: trimmedPassword,
         options: {
-          emailRedirectTo: `${window.location.origin}/chat`,
+          emailRedirectTo: `${window.location.origin}/public/confirm-success`,
         },
       });
       if (error) {

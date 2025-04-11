@@ -1,6 +1,10 @@
 // tests/server/mocks/xaiClient.ts
 export const sendXAIRequest = jest.fn().mockImplementation((options) => {
   if (options.responseFormat.includes('example problem')) {
+    // Check for a failure flag in options (for testing)
+    if (options.testFailure) {
+      return Promise.reject(new Error('xAI API failed'));
+    }
     return Promise.resolve({
       problem: 'Example problem',
       solution: [{ title: 'Step 1', content: 'Do this' }],

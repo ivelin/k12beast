@@ -1,4 +1,4 @@
-// /src/middleware.js
+// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
@@ -41,6 +41,14 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // Allow / and /confirm-success as public routes
+  if (pathname === "/" || pathname === "/confirm-success") {
+    console.log(`Middleware [${requestId}]: Allowing public access to ${pathname}`);
+    const response = NextResponse.next();
+    response.headers.set("x-request-id", requestId);
+    return response;
+  }
+
   const cookies = request.headers.get("cookie") || "";
   let token = getCookie("supabase-auth-token", cookies);
   console.log(`Middleware [${requestId}]: Token from cookie -`, token || "none");
@@ -65,9 +73,11 @@ export async function middleware(request: NextRequest) {
         console.log(`Middleware [${requestId}]: User fetched -`, user.email || "no email");
       } else {
         console.log(`Middleware [${requestId}]: Auth API failed -`, res.statusText);
+        user = null;
       }
     } catch (error) {
       console.error(`Middleware [${requestId}]: Auth fetch error -`, error.message);
+      user = null;
     }
   } else {
     console.log(`Middleware [${requestId}]: No token found in cookie or header`);
@@ -79,22 +89,19 @@ export async function middleware(request: NextRequest) {
   }
 
   let response: NextResponse;
-  if (user && pathname === "/") {
-    console.log(`Middleware [${requestId}]: Auth user on /, redirect to /chat`);
-    response = NextResponse.redirect(new URL("/chat", request.url));
-  } else if (!user && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session"))) {
-    console.log(`Middleware [${requestId}]: Unauth user on protected, redirect to /login`);
-    const loginUrl = new URL("/login", request.url);
+  if (!user && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session") || pathname.startsWith("/api/upload-image"))) {
+    console.log(`Middleware [${requestId}]: Unauth user on protected, redirect to /public/login`);
+    const loginUrl = new URL("/public/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     response = NextResponse.redirect(loginUrl);
-  } else if (!user && pathname === "/login" && request.nextUrl.search.includes("reauth")) {
-    console.log(`Middleware [${requestId}]: Forcing reauth on /login`);
+  } else if (!user && pathname === "/public/login" && request.nextUrl.search.includes("reauth")) {
+    console.log(`Middleware [${requestId}]: Forcing reauth on /public/login`);
     response = NextResponse.next();
   } else if (!user && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session"))) {
     const referer = request.headers.get("referer") || "";
-    if (referer.includes("/login")) {
-      console.log(`Middleware [${requestId}]: Mismatch detected, redirect to /login?reauth=true`);
-      response = NextResponse.redirect(new URL("/login?reauth=true", request.url));
+    if (referer.includes("/public/login")) {
+      console.log(`Middleware [${requestId}]: Mismatch detected, redirect to /public/login?reauth=true`);
+      response = NextResponse.redirect(new URL("/public/login?reauth=true", request.url));
     } else {
       response = NextResponse.next();
     }
@@ -108,5 +115,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/chat", "/history", "/session/:path*", "/login"],
+  matcher: ["/", "/chat/:path*", "/history", "/session/:path*", "/public/login", "/api/upload-image"],
 };
