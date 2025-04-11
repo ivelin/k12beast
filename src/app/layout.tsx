@@ -44,10 +44,6 @@ export default function RootLayout({
       console.log("Initial auth check - user:", user);
       setIsLoggedIn(!!user);
       setIsAuthChecked(true);
-      if (user && pathname === "/") {
-        console.log("Authenticated user on /, redirecting to /chat");
-        router.push("/chat");
-      }
     };
     checkUser();
 
@@ -55,14 +51,47 @@ export default function RootLayout({
       console.log("Auth state change - event:", event, "session:", session);
       setIsLoggedIn(!!session?.user);
       setIsAuthChecked(true);
-      if (session?.user && pathname === "/") {
-        console.log("Auth state changed to logged in, redirecting to /chat");
-        router.push("/chat");
+      if (!session?.user && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session"))) {
+        console.log("Auth state changed to logged out, redirecting to /public/login");
+        router.push("/public/login");
       }
     });
 
+    // Periodically check token validity for protected routes
+    const interval = setInterval(async () => {
+      if (pathname.startsWith("/public") || pathname === "/" || pathname === "/confirm-success") return; // Skip for public routes
+
+      const token = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
+
+      if (!token) {
+        console.log("No token found, redirecting to /public/login");
+        setIsLoggedIn(false);
+        router.push("/public/login");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/auth/user", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          console.log("Token validation failed, redirecting to /public/login");
+          setIsLoggedIn(false);
+          router.push("/public/login");
+        }
+      } catch (error) {
+        console.error("Error validating token:", error);
+        setIsLoggedIn(false);
+        router.push("/public/login");
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
     return () => {
       authListener.subscription.unsubscribe();
+      clearInterval(interval);
     };
   }, [pathname, router]);
 
