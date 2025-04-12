@@ -1,9 +1,17 @@
-// src/app/api/upload-image/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import supabase from "../../../supabase/serverClient";
 
 export async function POST(req: NextRequest) {
   try {
+    // Check for auth token
+    const token = req.cookies.get("supabase-auth-token")?.value;
+    if (!token) {
+      return NextResponse.json(
+        { error: "You must be logged in to upload images. Please log in and try again." },
+        { status: 401 }
+      );
+    }
+
     // Parse the multipart form data
     const formData = await req.formData();
     const files = formData.getAll("files") as File[];
