@@ -38,7 +38,10 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
 
   useEffect(() => {
     if (quiz) {
+      console.log("QuizSection: Quiz object loaded:", quiz);
       onQuizUpdate({ type: "quiz", content: quiz.problem });
+    } else {
+      console.warn("QuizSection: No quiz object available");
     }
   }, [quiz, onQuizUpdate]);
 
@@ -67,7 +70,7 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
       {useAppStore.getState().error && (
         <div className="text-red-500">{useAppStore.getState().error}</div>
       )}
-      {quiz.answerFormat === "multiple-choice" && quiz.options && (
+      {quiz.answerFormat === "multiple-choice" && quiz.options && quiz.options.length > 0 ? (
         <div className="w-full max-w-md">
           {quiz.options.map((option: string, index: number) => (
             <div key={index} className="my-2 flex items-center">
@@ -92,6 +95,10 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
               </label>
             </div>
           ))}
+        </div>
+      ) : (
+        <div className="text-red-500">
+          Error: Quiz options are missing. Please try requesting another quiz.
         </div>
       )}
       <button

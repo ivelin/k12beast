@@ -1,4 +1,3 @@
-// src/store/index.ts
 import { create } from "zustand";
 import { toast } from "sonner";
 
@@ -95,7 +94,7 @@ const useAppStore = create<AppState>((set, get) => ({
           ?.split("=")[1];
         
         if (!token) {
-          throw new Error("You must be logged in to upload images. Please log in and try again.");
+          throw new Error("Failed to upload images: Authentication required.");
         }
 
         const headers: HeadersInit = { Authorization: `Bearer ${token}` };
@@ -136,7 +135,7 @@ const useAppStore = create<AppState>((set, get) => ({
         .find((row) => row.startsWith("supabase-auth-token="))
         ?.split("=")[1];
       if (!token) {
-        throw new Error("You must be logged in to submit a problem. Please log in and try again.");
+        throw new Error("Failed to submit problem: Authentication required.");
       }
 
       const headers: HeadersInit = {
@@ -177,7 +176,7 @@ const useAppStore = create<AppState>((set, get) => ({
         .find((row) => row.startsWith("supabase-auth-token="))
         ?.split("=")[1];
       if (!token) {
-        throw new Error("You must be logged in to request examples. Please log in and try again.");
+        throw new Error("Failed to request examples: Authentication required.");
       }
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -224,6 +223,7 @@ const useAppStore = create<AppState>((set, get) => ({
       }
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while fetching an example. Let's try again!";
+      console.error("Error in handleExamplesRequest:", err);
       set({ error: errorMsg });
       toast.error(errorMsg);
     } finally {
@@ -244,7 +244,7 @@ const useAppStore = create<AppState>((set, get) => ({
         .find((row) => row.startsWith("supabase-auth-token="))
         ?.split("=")[1];
       if (!token) {
-        throw new Error("You must be logged in to take a quiz. Please log in and try again.");
+        throw new Error("Failed to fetch quiz: Authentication required.");
       }
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -263,13 +263,12 @@ const useAppStore = create<AppState>((set, get) => ({
       set({ quiz: data, quizAnswer: "", quizFeedback: null });
       addMessage({
         role: "assistant",
-        content: `<p><strong>Quiz:</strong></p><p>${data.problem}</p><ul>${data.options
-          .map((o) => `<li>${o}</li>`)
-          .join("")}</ul>`,
+        content: `<p><strong>Quiz:</strong></p><p>${data.problem}</p>`,
         renderAs: "html",
       });
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Failed to fetch quiz";
+      console.error("Error in handleQuizSubmit:", err);
       set({ error: errorMsg });
     } finally {
       set({ loading: false });
@@ -288,7 +287,7 @@ const useAppStore = create<AppState>((set, get) => ({
         .find((row) => row.startsWith("supabase-auth-token="))
         ?.split("=")[1];
       if (!token) {
-        throw new Error("You must be logged in to validate a quiz. Please log in and try again.");
+        throw new Error("Failed to validate quiz: Authentication required.");
       }
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -302,7 +301,10 @@ const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify({ sessionId, problem: quiz.problem, answer }),
       });
       const data = (await res.json()) as QuizFeedback;
-      if (!res.ok) throw new Error((data as any).error || "Failed to validate quiz");
+      if (!res.ok) {
+        const errorMsg = (data as any).error || "Failed to validate quiz";
+        throw new Error(errorMsg);
+      }
 
       const isCorrect = answer === quiz.correctAnswer;
       const readinessConfidence = isCorrect
@@ -340,7 +342,9 @@ const useAppStore = create<AppState>((set, get) => ({
       });
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Failed to validate quiz";
+      console.error("Error in handleValidate:", err);
       set({ error: errorMsg });
+      toast.error(errorMsg);
       throw err;
     } finally {
       set({ loading: false });
