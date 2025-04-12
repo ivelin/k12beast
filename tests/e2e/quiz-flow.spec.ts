@@ -1,4 +1,3 @@
-// tests/e2e/quiz-flow.spec.ts
 import { test, expect } from '@playwright/test';
 
 test.describe('Quiz Flow', () => {
@@ -64,7 +63,26 @@ test.describe('Quiz Flow', () => {
     // Act: Request a quiz
     const quizButton = page.locator('button', { hasText: 'Take a Quiz' });
     await quizButton.click();
+
+    // Wait for the quiz message to appear and validate content
+    await expect(page.locator('text=Quiz:')).toBeVisible();
     await expect(page.locator('text=What is 3 + 3?')).toBeVisible();
+
+    // Find the quiz message paragraph and ensure options are not listed there
+    const quizParagraph = page.locator('p:has-text("What is 3 + 3?")');
+    const quizParagraphText = await quizParagraph.innerText();
+    expect(quizParagraphText).not.toContain('4');
+    expect(quizParagraphText).not.toContain('5');
+    expect(quizParagraphText).not.toContain('6');
+    expect(quizParagraphText).not.toContain('7');
+
+    // Assert: Quiz options are rendered as radio buttons in QuizSection
+    const radioButtons = await page.$$("input[type='radio'][name='quiz-answer']");
+    expect(radioButtons.length).toBe(4); // Ensure exactly 4 options are rendered
+    const optionLabels = await page.$$eval("input[type='radio'][name='quiz-answer'] + label", (labels) =>
+      labels.map((label) => label.textContent?.trim())
+    );
+    expect(optionLabels).toEqual(['4', '5', '6', '7']); // Verify the options match the mocked data
 
     // Act: Submit correct answer
     await page.check('input[value="6"]');

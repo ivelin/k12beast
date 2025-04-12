@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
       ...(sessionHistory?.messages || []),
       {
         role: "assistant",
-        content: `<strong>Quiz:</strong><br>${content.problem}<br><ul>${content.options.map((o: string) => `<li>${o}</li>`).join("")}</ul>`,
+        content: `<strong>Quiz:</strong><br>${content.problem}`,
         renderAs: "html",
       },
     ];
