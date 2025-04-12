@@ -59,6 +59,9 @@ test.describe('Session Expiration', () => {
       window.dispatchEvent(event);
     });
 
+    // Add a short delay to ensure the UI updates
+    await page.waitForTimeout(500); // Wait 500ms for the modal to render
+
     // Assert: Session expiration modal appears
     await expect(page.locator('text=Your session has expired. Please log back in to continue.')).toBeVisible({ timeout: 10000 });
 
