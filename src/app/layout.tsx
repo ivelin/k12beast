@@ -76,11 +76,10 @@ export default function RootLayout({
       }
     };
 
-    // Listen for Supabase auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
-    // Listen for custom auth events (for testing)
     const customAuthListener = (event: Event) => {
+      if (process.env.NODE_ENV !== 'test') return; // Ignore in non-test environments
       const customEvent = event as CustomEvent;
       if (customEvent.detail && customEvent.detail.event) {
         handleAuthStateChange(customEvent.detail.event, customEvent.detail.session);
