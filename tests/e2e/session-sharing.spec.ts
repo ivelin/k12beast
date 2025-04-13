@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Session Sharing', () => {
   test('should share a session and allow an unauthenticated user to view it', async ({ page, context }) => {
-    test.setTimeout(30000);
+    test.setTimeout(5000);
 
     // Mock /api/tutor for the authenticated page
     await page.route('**/api/tutor', (route) => {

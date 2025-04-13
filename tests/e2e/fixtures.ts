@@ -23,7 +23,7 @@ export const test = base.extend<{
 
     const loginFn = async () => {
       // Navigate to the login page
-      await page.goto("http://localhost:3000/public/login", { timeout: 30000 });
+      await page.goto("http://localhost:3000/public/login", { timeout: 5000 });
 
       // Check if already logged in (redirected to /chat/new)
       const currentUrl = page.url();
@@ -38,21 +38,31 @@ export const test = base.extend<{
       // Wait for the email input to be visible
       const emailInput = page.locator('#email');
       try {
-        await emailInput.waitFor({ state: "visible", timeout: 30000 });
+        await emailInput.waitFor({ state: "visible", timeout: 5000 });
       } catch (error) {
         console.log("Email input not found. Current URL:", page.url());
         console.log("Page content:", await page.content());
         throw new Error("Email input not found on login page");
       }
 
+      // Wait for the password input to be visible
+      const passwordInput = page.locator('#password');
+      try {
+        await passwordInput.waitFor({ state: "visible", timeout: 5000 });
+      } catch (error) {
+        console.log("Password input not found. Current URL:", page.url());
+        console.log("Page content:", await page.content());
+        throw new Error("Password input not found on login page");
+      }
+
       // Fill in the login form
       await emailInput.fill(testUserEmail);
-      await page.fill('input[name="password"]', testUserPassword);
+      await passwordInput.fill(testUserPassword);
       await page.click('button[type="submit"]');
 
       // Wait for redirect to /chat/new/
       try {
-        await page.waitForURL("http://localhost:3000/chat/new", { timeout: 30000 });
+        await page.waitForURL("http://localhost:3000/chat/new", { timeout: 5000 });
       } catch (error) {
         // Check for login error message
         const errorMessage = await page.locator('text=Invalid email or password').textContent({ timeout: 5000 }).catch(() => null);
@@ -75,14 +85,18 @@ export const test = base.extend<{
 
   logout: async ({ page }, use) => {
     const logoutFn = async () => {
-      await page.goto("http://localhost:3000/logout", { timeout: 30000 });
+      await page.goto("http://localhost:3000/logout", { timeout: 5000 });
       try {
-        await page.waitForURL("http://localhost:3000/public/login", { timeout: 30000 });
+        await page.waitForURL("http://localhost:3000/public/login", { timeout: 5000 });
       } catch (error) {
         console.log("Logout redirect failed. Current URL:", page.url());
-        console.log("Page content:", await page.content());
+        try {
+          console.log("Page content:", await page.content());
+        } catch (contentError) {
+          console.log("Failed to access page content (context may be closed):", contentError.message);
+        }
         // Fallback: Navigate to /public/login manually if redirect fails
-        await page.goto("http://localhost:3000/public/login", { timeout: 30000 });
+        await page.goto("http://localhost:3000/public/login", { timeout: 5000 });
       }
       // Ensure the page has fully loaded
       await page.waitForLoadState("load");

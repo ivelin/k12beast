@@ -22,11 +22,11 @@ async function globalSetup(config: FullConfig) {
 
   try {
     // Navigate to the login page
-    await page.goto('http://localhost:3000/public/login', { timeout: 30000 });
+    await page.goto('http://localhost:3000/public/login', { timeout: 5000 });
 
     // Wait for the loading spinner to disappear and the form to appear
-    await page.waitForSelector('svg.lucide-loader-circle', { state: 'hidden', timeout: 30000 });
-    await page.waitForSelector('#email', { state: 'visible', timeout: 30000 });
+    await page.waitForSelector('svg.lucide-loader-circle', { state: 'hidden', timeout: 5000 });
+    await page.waitForSelector('#email', { state: 'visible', timeout: 5000 });
 
     // Find login form elements
     const emailInput = page.locator('#email');
@@ -45,7 +45,7 @@ async function globalSetup(config: FullConfig) {
 
     // Wait for redirect to /chat/new/
     try {
-      await page.waitForURL(/\/chat\/new/, { timeout: 30000 });
+      await page.waitForURL(/\/chat\/new/, { timeout: 5000 });
     } catch (error) {
       // Check for login error message
       const errorMessage = await page.locator('text=Invalid email or password').textContent({ timeout: 5000 }).catch(() => null);

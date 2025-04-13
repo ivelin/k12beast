@@ -2,7 +2,7 @@
 import { NextRequest } from 'next/server';
 
 // Mock xaiClient using the abstracted mock
-jest.mock('../../src/utils/xaiClient', () => jest.requireActual('../../tests/server/mocks/xaiClient'));
+jest.mock('../../src/utils/xaiClient', () => jest.requireActual('./mocks/xaiClient'));
 
 // Mock Supabase
 jest.mock('../../src/supabase/serverClient', () => ({
@@ -63,22 +63,31 @@ describe('POST /api/quiz', () => {
       problem: 'What is 3 + 3?',
       answerFormat: 'multiple-choice',
       options: ['4', '5', '6', '7'],
-      correctAnswer: '6',
       difficulty: 'easy',
-      encouragement: null,
-      readiness: { confidenceIfCorrect: 0.5, confidenceIfIncorrect: 0.4 },
     });
     expect(response.headers.get('x-session-id')).toBe('mock-session-id');
-    expect(jest.requireMock('../../src/supabase/serverClient').from).toHaveBeenCalledWith('sessions');
-    expect(jest.requireMock('../../src/supabase/serverClient').update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        quizzes: expect.arrayContaining([
-          expect.objectContaining({
-            problem: 'What is 3 + 3?',
-            correctAnswer: '6',
-          }),
-        ]),
-      })
-    );
+    expect(jest.requireMock('../../src/supabase/serverClient').from)
+      .toHaveBeenCalledWith('sessions');
+    expect(jest.requireMock('../../src/supabase/serverClient').update)
+      .toHaveBeenCalledWith(
+        expect.objectContaining({
+          quizzes: expect.arrayContaining([
+            expect.objectContaining({
+              problem: 'What is 3 + 3?',
+              correctAnswer: '6',
+            }),
+          ]),
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              role: 'user',
+              content: 'Take a Quiz',
+            }),
+            expect.objectContaining({
+              role: 'assistant',
+              content: expect.stringContaining('What is 3 + 3?'),
+            }),
+          ]),
+        })
+      );
   });
 });

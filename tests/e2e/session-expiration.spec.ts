@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Session Expiration', () => {
   test('should show session expired modal when session expires', async ({ page }) => {
-    test.setTimeout(30000);
+    test.setTimeout(5000);
 
     // Mock /api/tutor
     await page.route('**/api/tutor', (route) => {
