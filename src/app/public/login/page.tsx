@@ -102,7 +102,7 @@ export default function Login() {
         console.log("Login successful, session data:", data);
         document.cookie = `supabase-auth-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
         setLoading(false);
-        window.location.href = "/chat";
+        window.location.href = "/chat/new"; // Redirect to /chat/new
       }
     } catch (error: any) {
       console.error("Authentication error:", error);

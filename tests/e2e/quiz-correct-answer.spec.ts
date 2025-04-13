@@ -1,9 +1,9 @@
 // tests/e2e/quiz-correct-answer.spec.ts
 import { test, expect } from "@playwright/test";
 
-test.describe("Quiz Correct Answer Feedback V3", () => {
+test.describe("Quiz Correct Answer Feedback", () => {
   test("should show encouragement and readiness for correct answer", async ({ page }) => {
-    // Mock APIs with increased timeouts and logging
+    // Mock APIs
     await page.route("**/api/tutor", (route) => {
       console.log("Mocking /api/tutor");
       route.fulfill({
@@ -46,25 +46,25 @@ test.describe("Quiz Correct Answer Feedback V3", () => {
 
     // Start chat
     await page.goto("/chat/new");
-    await page.waitForURL(/\/chat\/new/, { timeout: 15000 });
-    await page.waitForSelector('textarea[placeholder="Ask k12beast AI..."]', { timeout: 15000 });
+    await page.waitForURL(/\/chat\/new/, { timeout: 5000 });
+    await page.waitForSelector('textarea[placeholder="Ask k12beast AI..."]', { timeout: 5000 });
 
     // Submit problem
     await page.fill('textarea[placeholder="Ask k12beast AI..."]', "Help me with 2+3");
     await page.click('button[aria-label="Send message"]');
-    await expect(page.locator("text=Lesson: Adding numbers.")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("text=Lesson: Adding numbers.")).toBeVisible({ timeout: 5000 });
 
     // Request quiz
     await page.click('button:has-text("Take a Quiz")');
-    await expect(page.locator("text=What is 2 + 3?")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("text=What is 2 + 3?")).toBeVisible({ timeout: 5000 });
 
     // Submit correct answer
     await page.click('label:has-text("5")');
     await page.click('button:has-text("Submit Quiz")');
 
     // Verify critical feedback
-    await expect(page.locator("text=Well done! You nailed it!")).toBeVisible({ timeout: 15000 });
-    await expect(page.locator("text=Test Readiness:")).toBeVisible({ timeout: 15000 });
-    await expect(page.locator("text=92%")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("text=Well done! You nailed it!")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("text=Test Readiness:")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("text=92%")).toBeVisible({ timeout: 5000 });
   });
 });

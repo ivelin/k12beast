@@ -227,7 +227,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
 
   const handleClosePopup = () => {
     set({ showErrorPopup: false, error: null });
-    handleNewChat();
+    window.location.href = "/public/login"; // Redirect to /public/login
   };
 
   if (isLoadingSession) {
