@@ -10,7 +10,7 @@ interface QuizUpdate {
   content: string;
 }
 
-import { Quiz } from "../../store";
+import { Quiz } from "@/store/types";
 
 export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: QuizUpdate) => void }) {
   const {

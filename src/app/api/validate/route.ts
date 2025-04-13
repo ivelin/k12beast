@@ -4,9 +4,9 @@ import supabase from "@/supabase/serverClient";
 
 interface QuizFeedback {
   isCorrect: boolean;
-  commentary: string;
+  encouragement: string;
   solution: { title: string; content: string }[] | null;
-  readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
+  readiness: number; // Single readiness value based on answer correctness
 }
 
 interface Quiz {
@@ -16,7 +16,9 @@ interface Quiz {
   correctAnswer: string;
   solution: { title: string; content: string }[];
   difficulty: "easy" | "medium" | "hard";
-  encouragement: string | null;
+  encouragementIfCorrect?: string;
+  encouragementIfIncorrect?: string;
+  encouragement?: string | null;
   readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
 }
 
@@ -67,25 +69,19 @@ export async function POST(req: NextRequest) {
     }
 
     const isCorrect = answer === quiz.correctAnswer;
-    const commentary = isCorrect
-      ? "Great job! You got it right!"
-      : "Nice try! Let's go over the correct answer.";
 
-    const readinessConfidence = isCorrect
+    // Use AI-provided encouragement messages, with fallbacks for backward compatibility
+    const encouragement = isCorrect
+      ? quiz.encouragementIfCorrect || quiz.encouragement || "Great job! You got it right!"
+      : quiz.encouragementIfIncorrect || quiz.encouragement || "Nice try! Let's review the correct answer.";
+
+    // Select the single readiness value based on correctness
+    const readiness = isCorrect
       ? quiz.readiness.confidenceIfCorrect
       : quiz.readiness.confidenceIfIncorrect;
-    const readinessPercentage = Math.round(readinessConfidence * 100);
+    const readinessPercentage = Math.round(readiness * 100);
 
-    const motivationalMessage =
-      readinessPercentage >= 90
-        ? "You're doing amazing! You're very likely to ace your big test!"
-        : readinessPercentage >= 70
-        ? "Great progress! You're on track to do well on your big test. Keep practicing!"
-        : readinessPercentage >= 50
-        ? "You're making progress! Let's keep working to boost your confidence for the big test."
-        : "Let's keep practicing! More effort will help you succeed on your big test.";
-
-    const feedbackMessage = `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${answer}</p><p>${commentary}</p>${
+    const feedbackMessage = `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${answer}</p><p>${encouragement}</p>${
       quiz.solution
         ? `<p>${quiz.solution.map((s) => `<strong>${s.title}:</strong> ${s.content}`).join("</p><p>")}</p>`
         : ""
@@ -96,13 +92,13 @@ export async function POST(req: NextRequest) {
             o === quiz.correctAnswer ? " (Correct answer)" : ""
           }</li>`
       )
-      .join("")}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}% - ${motivationalMessage}</p>`;
+      .join("")}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}%</p>`;
 
     const feedback: QuizFeedback = {
       isCorrect,
-      commentary,
+      encouragement,
       solution: quiz.solution,
-      readiness: quiz.readiness,
+      readiness, // Return only the selected readiness value
     };
 
     // Fetch the current messages and append the new ones

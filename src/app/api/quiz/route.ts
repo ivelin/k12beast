@@ -12,11 +12,12 @@ interface QuizResponse {
   correctAnswer: string;
   solution: { title: string; content: string }[];
   difficulty: "easy" | "medium" | "hard";
-  encouragement: string | null;
+  encouragementIfCorrect: string;
+  encouragementIfIncorrect: string;
   readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
 }
 
-const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the original input problem (e.g., if the input is about heat transfer, the quiz must also be about heat transfer). The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. Provide a brief context or scenario to make the problem engaging. Do not repeat problems from the session history. Do not reference images in the problem text. Additionally, assess the student's readiness for an end-of-semester test based on their overall performance in the chat history, considering quiz performance (correctness, consistency, and difficulty), engagement with lessons and examples (e.g., fewer example requests might indicate mastery), and inferred skill level and progress (e.g., improvement over time). Provide two confidence levels: one if the student answers this quiz correctly, and one if they answer incorrectly. Structure: {"problem": "Quiz problem text", "answerFormat": "multiple-choice", "options": ["option1", "option2", "option3", "option4"], "correctAnswer": "correct option", "solution": [{"title": "Step 1", "content": "Step content in Markdown"}, ...], "difficulty": "easy|medium|hard", "encouragement": "Words of encouragement if the last quiz was answered correctly, otherwise null", "readiness": {"confidenceIfCorrect": 0.92, "confidenceIfIncorrect": 0.75}}. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 95% success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz correctly or incorrectly. Ensure all fields are present, especially the "solution" field with at least two steps.`;
+const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the original input problem (e.g., if the input is about heat transfer, the quiz must also be about heat transfer). The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. Provide a brief context or scenario to make the problem engaging. Do not repeat problems from the session history. Do not reference images in the problem text. Additionally, assess the student's readiness for an end-of-semester test based on their overall performance in the chat history, considering quiz performance (correctness, consistency, and difficulty), engagement with lessons and examples (e.g., fewer example requests might indicate mastery), and inferred skill level and progress (e.g., improvement over time). Provide two encouragement messages: one for if the student answers correctly, and one for if they answer incorrectly. Structure: {"problem": "Quiz problem text", "answerFormat": "multiple-choice", "options": ["option1", "option2", "option3", "option4"], "correctAnswer": "correct option", "solution": [{"title": "Step 1", "content": "Step content in Markdown"}, ...], "difficulty": "easy|medium|hard", "encouragementIfCorrect": "Message if correct", "encouragementIfIncorrect": "Message if incorrect", "readiness": {"confidenceIfCorrect": 0.92, "confidenceIfIncorrect": 0.75}}. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 95% success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz correctly or incorrectly. Ensure all fields are present, especially the "solution" field with at least two steps.`;
 
 // Default response if the AI fails to generate a valid quiz
 const defaultResponse: QuizResponse = {
@@ -29,7 +30,8 @@ const defaultResponse: QuizResponse = {
     { title: "Step 2", content: "Please try requesting another quiz." },
   ],
   difficulty: "easy",
-  encouragement: null,
+  encouragementIfCorrect: "Great job! Keep it up!",
+  encouragementIfIncorrect: "Nice try! Let's review and try again.",
   readiness: { confidenceIfCorrect: 0.5, confidenceIfIncorrect: 0.4 },
 };
 
@@ -101,14 +103,16 @@ export async function POST(req: NextRequest) {
       !content.difficulty ||
       !content.readiness ||
       typeof content.readiness.confidenceIfCorrect !== "number" ||
-      typeof content.readiness.confidenceIfIncorrect !== "number"
+      typeof content.readiness.confidenceIfIncorrect !== "number" ||
+      !content.encouragementIfCorrect ||
+      !content.encouragementIfIncorrect
     ) {
       console.error("Invalid quiz format:", content);
       content = defaultResponse;
     }
 
     // Store the full quiz data server-side, including sensitive fields
-    // Sensitive fields (correctAnswer, solution, encouragement, readiness) are
+    // Sensitive fields (correctAnswer, solution, encouragementIfCorrect, encouragementIfIncorrect, readiness) are
     // retained in the session but not sent to the client until validation
     // via /api/validate
     const quizToStore = {
@@ -118,7 +122,8 @@ export async function POST(req: NextRequest) {
       correctAnswer: content.correctAnswer,
       solution: content.solution,
       difficulty: content.difficulty,
-      encouragement: content.encouragement,
+      encouragementIfCorrect: content.encouragementIfCorrect,
+      encouragementIfIncorrect: content.encouragementIfIncorrect,
       readiness: content.readiness,
     };
 
@@ -154,7 +159,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Return only the quiz question data to the client
-    // Excludes correctAnswer, solution, encouragement, and readiness to prevent
+    // Excludes correctAnswer, solution, encouragementIfCorrect, encouragementIfIncorrect, and readiness to prevent
     // leaking sensitive information before the student submits their answer
     // These fields are returned only after validation via /api/validate
     return NextResponse.json(

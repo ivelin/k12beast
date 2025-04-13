@@ -12,23 +12,9 @@ import { PromptSuggestions } from "@/components/ui/prompt-suggestions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import useAppStore from "@/store";
+import { Message, Quiz, Session } from "@/store/types";
 import QuizSection from "../QuizSection";
 import React from "react";
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  renderAs?: "markdown" | "html";
-  experimental_attachments?: { name: string; url: string }[];
-}
-
-interface Session {
-  id: string;
-  problem: string | null;
-  images: string[] | null;
-  lesson?: string;
-  messages: Message[];
-}
 
 export default function ChatPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = React.use(params);
