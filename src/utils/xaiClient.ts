@@ -17,6 +17,8 @@ interface XAIResponse {
   options?: string[];
   correctAnswer?: string;
   readiness?: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
+  difficulty?: "easy" | "medium" | "hard";
+  encouragement?: string | null;
 }
 
 interface XAIRequestOptions {
@@ -25,7 +27,6 @@ interface XAIRequestOptions {
   responseFormat: string;
   defaultResponse: XAIResponse;
   maxTokens?: number;
-  validateK12?: boolean;
   chatHistory?: { role: string; content: string; renderAs?: "markdown" | "html" }[];
 }
 
@@ -42,7 +43,6 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     responseFormat,
     defaultResponse,
     maxTokens = 1000,
-    validateK12 = false,
     chatHistory = [],
   } = options;
 
@@ -57,24 +57,18 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     {
       role: "system",
       content: `You are a K12 tutor. Assist with educational queries related to K12 subjects.
-Respond only to valid K12 queries using the chat history for context.
 Respond in a conversational style as if you are speaking directly with a K12 student.
-Return a raw JSON object (formatted for JSON.parse()) with response fields in a string with plain text or minimal HTML formatting (use only <p>, <strong>, <ul>, <li> tags, no attributes or scripts).
+Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions. Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history. Adapt your response based on this history—e.g., avoid repeating examples or quiz problems already given (as specified in the chat history), and adjust difficulty based on performance trends. If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.
+Respond in the natural language used in the original input problem text and images.
+Return a raw JSON object (formatted for JSON.parse()) with the response fields specified in the user prompt.
+Use plain text or minimal HTML formatting (only <p>, <strong>, <ul>, <li> tags, no attributes or scripts) for any HTML content.
 Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
 Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
 Ensure the response is a single, valid JSON object with no trailing commas or syntax errors.`,
     },
     {
       role: "user",
-      content: `Instructions: Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions. Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history. Adapt your response based on this history—e.g., avoid repeating examples or quiz problems already given (as specified in the chat history), and adjust difficulty based on performance trends. If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.`,
-    },
-    {
-      role: "user",
       content: `Original Input Problem (if provided): "${problem || 'No text provided'}"`,
-    },
-    {
-      role: "user",
-      content: `Respond in the natural language used in the Original Input Problem text and images`,
     },
     {
       role: "user",

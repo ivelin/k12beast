@@ -1,3 +1,4 @@
+// src/store/index.ts
 import { create } from "zustand";
 import { toast } from "sonner";
 
@@ -7,10 +8,10 @@ export interface Quiz {
   problem: string;
   answerFormat: string;
   options: string[];
-  correctAnswer: string;
+  correctAnswer?: string;
   difficulty: string;
-  encouragement: string | null;
-  readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
+  encouragement?: string | null;
+  readiness?: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
 }
 
 interface Example {
@@ -22,6 +23,7 @@ interface QuizFeedback {
   isCorrect: boolean;
   commentary: string;
   solution: { title: string; content: string }[] | null;
+  readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
 }
 
 interface Message {
@@ -46,6 +48,8 @@ interface AppState {
   quizFeedback: QuizFeedback | null;
   messages: Message[];
   hasSubmittedProblem: boolean;
+  sessionTerminated: boolean;
+  showErrorPopup: boolean;
   set: (updates: Partial<AppState>) => void;
   setStep: (step: Step) => void;
   setError: (error: string | null) => void;
@@ -73,6 +77,8 @@ const useAppStore = create<AppState>((set, get) => ({
   quizFeedback: null,
   messages: [],
   hasSubmittedProblem: false,
+  sessionTerminated: false,
+  showErrorPopup: false,
   set: (updates) => set(updates),
   setStep: (step) => set({ step }),
   setError: (error) => set({ error }),
@@ -83,7 +89,15 @@ const useAppStore = create<AppState>((set, get) => ({
       return; // Silently ignore duplicate requests
     }
 
-    set({ loading: true, problem, imageUrls, hasSubmittedProblem: true });
+    // Clear any previous error state
+    set({ 
+      loading: true, 
+      problem, 
+      imageUrls, 
+      hasSubmittedProblem: true, 
+      error: null, 
+      showErrorPopup: false 
+    });
 
     try {
       let uploadedImageUrls: string[] = [];
@@ -124,9 +138,9 @@ const useAppStore = create<AppState>((set, get) => ({
         role: "user",
         content: problem,
         renderAs: "markdown",
-        experimental_attachments: uploadedImageUrls.map((url, i) => ({
-          name: images[i]?.name || `Image ${i + 1}`,
-          url,
+        experimental_attachments: uploadedImageUrls.map((i, idx) => ({
+          name: images[idx]?.name || `Image ${idx + 1}`,
+          url: uploadedImageUrls[idx],
         })),
       });
 
@@ -149,28 +163,77 @@ const useAppStore = create<AppState>((set, get) => ({
         headers,
         body: JSON.stringify({ problem, images: uploadedImageUrls }),
       });
-      const lessonContent = await res.text();
 
-      set({ sessionId: res.headers.get("x-session-id") || sessionId, lesson: lessonContent, step: "lesson" });
+      if (!res.ok) {
+        const data = await res.json();
+        // Check if the session should be terminated (e.g., non-K12 prompt)
+        if (data.terminateSession) {
+          set({
+            error: data.error || "An error occurred",
+            sessionTerminated: true,
+            showErrorPopup: true,
+            sessionId: null,
+            step: "problem",
+            lesson: null,
+            examples: null,
+            quiz: null,
+            quizAnswer: "",
+            quizFeedback: null,
+            messages: [],
+            hasSubmittedProblem: false,
+            problem: "",
+            imageUrls: [],
+            images: [],
+          });
+          return;
+        }
+        throw new Error(data.error || "Failed to submit problem");
+      }
+
+      const lessonContent = await res.text(); // Response is now plain text (HTML)
+
+      set({
+        sessionId: res.headers.get("x-session-id") || sessionId,
+        lesson: lessonContent,
+        step: "lesson",
+        sessionTerminated: false,
+        showErrorPopup: false,
+      });
       addMessage({ role: "assistant", content: lessonContent, renderAs: "html" });
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while starting your lesson. Let's try again!";
       console.error("Error in handleSubmit:", err);
-      set({ error: errorMsg });
-      toast.error(errorMsg);
+      set({
+        error: errorMsg,
+        showErrorPopup: true,
+        sessionTerminated: true,
+        sessionId: null,
+        step: "problem",
+        lesson: null,
+        examples: null,
+        quiz: null,
+        quizAnswer: "",
+        quizFeedback: null,
+        messages: [],
+        hasSubmittedProblem: false,
+        problem: "",
+        imageUrls: [],
+        images: [],
+      });
     } finally {
       set({ loading: false });
     }
   },
   handleExamplesRequest: async () => {
-    const { problem, imageUrls, sessionId, addMessage, loading } = get();
-    if (loading) {
-      return; // Silently ignore duplicate requests
+    const { problem, imageUrls, sessionId, addMessage, loading, sessionTerminated } = get();
+    if (loading || sessionTerminated) {
+      return; // Prevent actions if session is terminated or loading
     }
 
     set({ loading: true });
     try {
       addMessage({ role: "user", content: "Request Example", renderAs: "markdown" });
+
       const token = document.cookie
         .split("; ")
         .find((row) => row.startsWith("supabase-auth-token="))
@@ -184,11 +247,10 @@ const useAppStore = create<AppState>((set, get) => ({
         Authorization: `Bearer ${token}`,
       };
 
-      // Set up a timeout for the fetch request
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-      }, 30000); // 30 seconds timeout
+      }, 30000);
 
       try {
         const res = await fetch("/api/examples", {
@@ -216,7 +278,7 @@ const useAppStore = create<AppState>((set, get) => ({
           renderAs: "html",
         });
       } catch (err: unknown) {
-        if (err.name === "AbortError") {
+        if (err instanceof Error && err.name === "AbortError") {
           throw new Error("Oops! The AI had a little glitch and was snoozing. Let's try again in a moment!");
         }
         throw err;
@@ -224,20 +286,23 @@ const useAppStore = create<AppState>((set, get) => ({
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while fetching an example. Let's try again!";
       console.error("Error in handleExamplesRequest:", err);
-      set({ error: errorMsg });
-      toast.error(errorMsg);
+      set({ error: errorMsg, showErrorPopup: true });
     } finally {
       set({ loading: false });
     }
   },
   handleQuizSubmit: async () => {
-    const { problem, imageUrls, sessionId, addMessage, loading } = get();
-    if (loading) {
-      return; // Silently ignore duplicate requests
+    const { problem, imageUrls, sessionId, addMessage, loading, sessionTerminated } = get();
+    if (loading || sessionTerminated) {
+      return; // Prevent actions if session is terminated or loading
     }
 
     set({ loading: true, step: "quizzes" });
     try {
+      if (!sessionId) {
+        throw new Error("No active session. Please start a new chat session.");
+      }
+
       addMessage({ role: "user", content: "Take a Quiz", renderAs: "markdown" });
       const token = document.cookie
         .split("; ")
@@ -248,7 +313,7 @@ const useAppStore = create<AppState>((set, get) => ({
       }
       const headers: HeadersInit = {
         "Content-Type": "application/json",
-        "x-session-id": sessionId || "",
+        "x-session-id": sessionId,
         Authorization: `Bearer ${token}`,
       };
 
@@ -257,8 +322,12 @@ const useAppStore = create<AppState>((set, get) => ({
         headers,
         body: JSON.stringify({ problem, images: imageUrls }),
       });
-      const data = (await res.json()) as Quiz;
-      if (!res.ok) throw new Error((data as any).error || "Failed to fetch quiz");
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch quiz. Please try again.");
+      }
 
       set({ quiz: data, quizAnswer: "", quizFeedback: null });
       addMessage({
@@ -267,17 +336,17 @@ const useAppStore = create<AppState>((set, get) => ({
         renderAs: "html",
       });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to fetch quiz";
+      const errorMsg = err instanceof Error ? err.message : "Failed to fetch quiz. Please try again.";
       console.error("Error in handleQuizSubmit:", err);
-      set({ error: errorMsg });
+      set({ error: errorMsg, showErrorPopup: true });
     } finally {
       set({ loading: false });
     }
   },
   handleValidate: async (answer, quiz) => {
-    const { sessionId, addMessage, loading } = get();
-    if (loading) {
-      return; // Silently ignore duplicate requests
+    const { sessionId, addMessage, loading, sessionTerminated } = get();
+    if (loading || sessionTerminated) {
+      return; // Prevent actions if session is terminated or loading
     }
 
     set({ loading: true });
@@ -295,6 +364,13 @@ const useAppStore = create<AppState>((set, get) => ({
         Authorization: `Bearer ${token}`,
       };
 
+      // Add the user's quiz response as a chat message
+      addMessage({
+        role: "user",
+        content: answer,
+        renderAs: "markdown",
+      });
+
       const res = await fetch("/api/validate", {
         method: "POST",
         headers,
@@ -306,10 +382,10 @@ const useAppStore = create<AppState>((set, get) => ({
         throw new Error(errorMsg);
       }
 
-      const isCorrect = answer === quiz.correctAnswer;
+      const isCorrect = data.isCorrect;
       const readinessConfidence = isCorrect
-        ? quiz.readiness.confidenceIfCorrect
-        : quiz.readiness.confidenceIfIncorrect;
+        ? data.readiness.confidenceIfCorrect
+        : data.readiness.confidenceIfIncorrect;
       const readinessPercentage = Math.round(readinessConfidence * 100);
 
       const motivationalMessage =
@@ -321,7 +397,7 @@ const useAppStore = create<AppState>((set, get) => ({
           ? "You're making progress! Let's keep working to boost your confidence for the big test."
           : "Let's keep practicing! More effort will help you succeed on your big test.";
 
-      set({ quizAnswer: answer, quizFeedback: data });
+      // Add the feedback message
       addMessage({
         role: "assistant",
         content: `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${answer}</p><p>${
@@ -340,20 +416,20 @@ const useAppStore = create<AppState>((set, get) => ({
           .join("")}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}% - ${motivationalMessage}</p>`,
         renderAs: "html",
       });
+
+      set({ quizAnswer: answer, quizFeedback: data });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to validate quiz";
+      const errorMsg = err instanceof Error ? err.message : "Failed to validate quiz answer. Please try again.";
       console.error("Error in handleValidate:", err);
-      set({ error: errorMsg });
-      toast.error(errorMsg);
-      throw err;
+      set({ error: errorMsg, showErrorPopup: true });
     } finally {
       set({ loading: false });
     }
   },
   append: async (msg, imageUrls, images) => {
-    const { handleSubmit, loading } = get();
-    if (loading) {
-      return; // Silently ignore duplicate requests
+    const { handleSubmit, loading, sessionTerminated } = get();
+    if (loading || sessionTerminated) {
+      return; // Prevent actions if session is terminated or loading
     }
     await handleSubmit(msg.content, imageUrls, images);
   },
@@ -373,6 +449,8 @@ const useAppStore = create<AppState>((set, get) => ({
       quizFeedback: null,
       messages: [],
       hasSubmittedProblem: false,
+      sessionTerminated: false,
+      showErrorPopup: false,
     }),
 }));
 

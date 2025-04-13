@@ -1,123 +1,138 @@
+// src/app/api/validate/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import supabase from "@/supabase/serverClient";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+interface QuizFeedback {
+  isCorrect: boolean;
+  commentary: string;
+  solution: { title: string; content: string }[] | null;
+  readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
+}
 
-export async function POST(request: NextRequest) {
-  const sessionId = request.headers.get("x-session-id");
-  const { problem, answer } = await request.json();
+interface Quiz {
+  problem: string;
+  answerFormat: string;
+  options: string[];
+  correctAnswer: string;
+  solution: { title: string; content: string }[];
+  difficulty: "easy" | "medium" | "hard";
+  encouragement: string | null;
+  readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
+}
 
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  renderAs?: "markdown" | "html";
+  experimental_attachments?: { name: string; url: string }[];
+}
+
+export async function POST(req: NextRequest) {
   try {
-    if (!sessionId) {
-      throw new Error("Session ID is required");
-    }
-    if (!problem || !answer) {
-      throw new Error("Problem and answer are required");
+    const { sessionId, problem, answer } = await req.json();
+    console.log("Validate request body:", { sessionId, problem, answer });
+
+    if (!sessionId || !problem || !answer) {
+      return NextResponse.json(
+        { error: "Missing sessionId, problem, or answer in request" },
+        { status: 400 }
+      );
     }
 
-    const { data: session, error: sessionError } = await supabase
+    const { data: sessionData, error: fetchError } = await supabase
       .from("sessions")
       .select("*")
       .eq("id", sessionId)
       .single();
 
-    if (sessionError) {
-      throw new Error(`Failed to fetch session: ${sessionError.message}`);
+    if (fetchError || !sessionData) {
+      console.error("Error fetching session:", fetchError?.message || "No session data");
+      return NextResponse.json(
+        { error: "Session not found. Please start a new chat session." },
+        { status: 404 }
+      );
     }
 
-    console.log("Session data:", session);
+    console.log("Session data:", sessionData);
+
+    const quizzes: Quiz[] = sessionData.quizzes || [];
     console.log("Looking for quiz with problem:", problem);
+    const quiz = quizzes.find((q: Quiz) => q.problem === problem);
 
-    const quiz = session.quizzes?.find((q: any) => q.problem.trim() === problem.trim());
     if (!quiz) {
-      console.error("Quiz not found in session. Available quizzes:", session.quizzes);
-      throw new Error("Quiz not found in session");
+      return NextResponse.json(
+        { error: "Quiz not found in session." },
+        { status: 404 }
+      );
     }
-
-    console.log("Quiz data from session:", quiz);
 
     const isCorrect = answer === quiz.correctAnswer;
     const commentary = isCorrect
-      ? "<p>Great job! You got it right!</p>"
-      : `<p>Not quite. The correct answer is ${quiz.correctAnswer}.</p>`;
+      ? "Great job! You got it right!"
+      : "Nice try! Let's go over the correct answer.";
 
-    // Determine the readiness confidence based on whether the answer is correct
     const readinessConfidence = isCorrect
       ? quiz.readiness.confidenceIfCorrect
       : quiz.readiness.confidenceIfIncorrect;
     const readinessPercentage = Math.round(readinessConfidence * 100);
 
-    // Add a motivational message based on the readiness confidence
-    let motivationalMessage = "";
-    if (readinessPercentage >= 90) {
-      motivationalMessage = "You're doing amazing! You're very likely to ace your big test!";
-    } else if (readinessPercentage >= 70) {
-      motivationalMessage = "Great progress! You're on track to do well on your big test. Keep practicing!";
-    } else if (readinessPercentage >= 50) {
-      motivationalMessage = "You're making progress! Let's keep working to boost your confidence for the big test.";
-    } else {
-      motivationalMessage = "Let's keep practicing! More effort will help you succeed on your big test.";
-    }
+    const motivationalMessage =
+      readinessPercentage >= 90
+        ? "You're doing amazing! You're very likely to ace your big test!"
+        : readinessPercentage >= 70
+        ? "Great progress! You're on track to do well on your big test. Keep practicing!"
+        : readinessPercentage >= 50
+        ? "You're making progress! Let's keep working to boost your confidence for the big test."
+        : "Let's keep practicing! More effort will help you succeed on your big test.";
 
-    const updatedQuizzes = [
-      ...session.quizzes.filter((q: any) => q.problem !== problem),
-      { ...quiz, answer, isCorrect, commentary },
-    ];
+    const feedbackMessage = `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${answer}</p><p>${commentary}</p>${
+      quiz.solution
+        ? `<p>${quiz.solution.map((s) => `<strong>${s.title}:</strong> ${s.content}`).join("</p><p>")}</p>`
+        : ""
+    }<p><strong>Options:</strong></p><ul>${quiz.options
+      .map(
+        (o) =>
+          `<li>${o}${o === answer ? " (Your answer)" : ""}${
+            o === quiz.correctAnswer ? " (Correct answer)" : ""
+          }</li>`
+      )
+      .join("")}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}% - ${motivationalMessage}</p>`;
 
-    // Append the feedback to the messages array, including readiness
+    const feedback: QuizFeedback = {
+      isCorrect,
+      commentary,
+      solution: quiz.solution,
+      readiness: quiz.readiness,
+    };
+
+    // Fetch the current messages and append the new ones
+    const currentMessages: Message[] = sessionData.messages || [];
     const updatedMessages = [
-      ...(session.messages || []),
-      {
-        role: "assistant",
-        content: `<strong>Feedback:</strong><br><strong>Your Answer:</strong> ${answer}<br>${commentary}${isCorrect ? "" : `<br><br>${quiz.solution.map((s: any) => `<strong>${s.title}:</strong> ${s.content}`).join("<br><br>")}`}<br><br><strong>Options:</strong><br><ul>${quiz.options.map((o: string) => `<li>${o}${o === answer ? " (Your answer)" : ""}${o === quiz.correctAnswer ? " (Correct answer)" : ""}</li>`).join("")}</ul><br><br><strong>Test Readiness:</strong><br><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}% - ${motivationalMessage}</p>`,
-        renderAs: "html",
-      },
+      ...currentMessages,
+      { role: "user", content: answer, renderAs: "markdown" },
+      { role: "assistant", content: feedbackMessage, renderAs: "html" },
     ];
 
+    // Update the session with the new messages
     const { error: updateError } = await supabase
       .from("sessions")
-      .update({
-        quizzes: updatedQuizzes,
-        messages: updatedMessages,
-        performanceHistory: [
-          ...(session.performanceHistory || []),
-          { isCorrect },
-        ],
-        updated_at: new Date().toISOString(),
-      })
+      .update({ messages: updatedMessages, updated_at: new Date().toISOString() })
       .eq("id", sessionId);
 
     if (updateError) {
-      throw new Error(`Failed to update session: ${updateError.message}`);
+      console.error("Error updating session messages:", updateError.message);
+      return NextResponse.json(
+        { error: `Failed to update session messages: ${updateError.message}` },
+        { status: 500 }
+      );
     }
 
-    const { data: updatedSession, error: fetchError } = await supabase
-      .from("sessions")
-      .select("*")
-      .eq("id", sessionId)
-      .single();
-
-    if (fetchError) {
-      throw new Error(`Failed to fetch updated session: ${fetchError.message}`);
-    }
-
-    console.log("Session updated successfully:", updatedSession);
-
-    return NextResponse.json({
-      isCorrect,
-      commentary,
-      solution: isCorrect ? null : quiz.solution, // Only send solution if the answer is incorrect
-    });
-  } catch (error) {
-    // Type assertion to handle unknown error type
-    const err = error instanceof Error ? error : new Error(String(error));
-    console.error("Error validating quiz:", err);
+    return NextResponse.json(feedback, { status: 200 });
+  } catch (err) {
+    console.error("Error in /api/validate:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to validate quiz" },
-      { status: 400 }
+      { error: "Failed to validate quiz answer." },
+      { status: 500 }
     );
   }
 }

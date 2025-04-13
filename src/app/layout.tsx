@@ -1,3 +1,4 @@
+// src/app/layout.tsx
 "use client";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -11,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useRouter, usePathname } from "next/navigation";
 import supabase from '@/supabase/browserClient';
 import useAppStore from '@/store';
+
 
 // Modal component for session expiration
 const SessionExpiredModal = ({ onLogin }: { onLogin: () => void }) => (
@@ -203,7 +205,16 @@ export default function RootLayout({
           </nav>
           <main className="p-4">{children}</main>
           {sessionExpired && <SessionExpiredModal onLogin={handleLoginRedirect} />}
-          <Toaster />
+          <Toaster 
+            position="top-center" // Position toasts in the top-right corner
+            duration={2000} // Default duration of 2 seconds
+            closeButton={false} // Add a close button to toasts
+            toastOptions={{
+              style: {
+                zIndex: 1000, // Ensure toasts appear above other elements
+              },
+            }}
+            />
           <SpeedInsights />
         </ThemeProvider>
       </body>
