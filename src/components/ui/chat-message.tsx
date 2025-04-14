@@ -1,3 +1,4 @@
+/* src/components/ui/chat-message.tsx */
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -138,8 +139,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       return html;
     }
     return domPurify.sanitize(html, {
-      ALLOWED_TAGS: ["p", "strong", "ul", "li", "br", "span"],
-      ALLOWED_ATTR: ["class"],
+      ALLOWED_TAGS: ["p", "strong", "ul", "li", "br", "span", "div"],
+      ALLOWED_ATTR: ["class", "style"],
     });
   };
 

@@ -1,15 +1,15 @@
+/* src/app/chat/QuizSection.tsx */
 "use client";
 
 import { useEffect, useState } from "react";
-import useAppStore from "../../store";
+import useAppStore from "@/store";
+import { Quiz } from "@/store/types";
 
 // Define the type for the onQuizUpdate prop
 interface QuizUpdate {
   type: string;
   content: string;
 }
-
-import { Quiz } from "@/store/types";
 
 export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: QuizUpdate) => void }) {
   const {
@@ -52,7 +52,7 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
       await handleValidate(answer, quiz);
       const updatedFeedback = useAppStore.getState().quizFeedback;
       if (updatedFeedback) {
-        setStep("lesson");
+        setStep("lesson"); // Transition to lesson step to show feedback in chat
       } else {
         console.error("No feedback received after validation");
         setError("Failed to validate quiz answer. Please try again.");
@@ -65,7 +65,7 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
   };
 
   // Hide the QuizSection if step is not "quizzes" or if quizFeedback is present
-  if (step !== "quizzes" || !quiz || quizFeedback) return null;
+  if (step !== "quizzes" || !quiz) return null;
 
   return (
     <div className="mb-4 flex flex-col items-center">
