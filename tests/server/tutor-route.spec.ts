@@ -1,8 +1,8 @@
 // tests/server/tutor-route.spec.ts
 import { NextRequest } from 'next/server';
 
-// Mock xaiClient using the abstracted mock
-jest.mock('../../src/utils/xaiClient', () => jest.requireActual('../../tests/server/mocks/xaiClient'));
+// Mock xaiClient
+jest.mock('../../src/utils/xaiClient', () => jest.requireActual('./mocks/xaiClient'));
 
 // Mock Supabase
 jest.mock('../../src/supabase/serverClient', () => ({
@@ -15,6 +15,7 @@ jest.mock('../../src/supabase/serverClient', () => ({
   from: jest.fn().mockReturnThis(),
   insert: jest.fn().mockReturnThis(),
   update: jest.fn().mockReturnThis(),
+  upsert: jest.fn().mockReturnThis(),
   select: jest.fn().mockReturnThis(),
   eq: jest.fn().mockReturnThis(),
   single: jest.fn().mockResolvedValue({
@@ -32,7 +33,7 @@ beforeAll(async () => {
 
 describe('POST /api/tutor', () => {
   it('should create a session and return a lesson', async () => {
-    // Mock NextRequest with x-session-id header
+    // Mock NextRequest
     const mockRequest = {
       headers: new Headers({
         Authorization: 'Bearer mock-token',
@@ -44,7 +45,7 @@ describe('POST /api/tutor', () => {
       }),
     } as unknown as NextRequest;
 
-    // Call the POST function directly
+    // Call the POST function
     const response = await POST(mockRequest);
 
     // Assertions
@@ -52,12 +53,20 @@ describe('POST /api/tutor', () => {
     const responseText = await response.text();
     expect(responseText).toBe('<p>The answer to your question is simple: 4!</p>');
     expect(response.headers.get('x-session-id')).toBe('mock-session-id');
-    expect(jest.requireMock('../../src/supabase/serverClient').from).toHaveBeenCalledWith('sessions');
-    expect(jest.requireMock('../../src/supabase/serverClient').insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        problem: 'What is 2 + 2?',
-        user_id: 'test-user-id',
-      })
-    );
+    expect(jest.requireMock('../../src/supabase/serverClient').upsert)
+      .toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'mock-session-id',
+          problem: 'What is 2 + 2?',
+          user_id: 'test-user-id',
+        }),
+        { onConflict: "id" }
+      );
+    expect(jest.requireMock('../../src/supabase/serverClient').update)
+      .toHaveBeenCalledWith(
+        expect.objectContaining({
+          lesson: '<p>The answer to your question is simple: 4!</p>',
+        })
+      );
   });
 });

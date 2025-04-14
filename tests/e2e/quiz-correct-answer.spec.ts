@@ -1,31 +1,20 @@
-// tests/e2e/examples-quiz-share.spec.ts
+// tests/e2e/quiz-correct-answer.spec.ts
 import { test, expect } from "@playwright/test";
 
-test.describe("Examples and Quiz Flow E2E Test", () => {
-  test("should request example and complete quiz", async ({ page, context }) => {
+test.describe("Quiz Correct Answer Feedback", () => {
+  test("should show encouragement and readiness for correct answer", async ({ page }) => {
     // Mock APIs
-    await page.route("**/api/tutor", (route) =>
+    await page.route("**/api/tutor", (route) => {
+      console.log("Mocking /api/tutor");
       route.fulfill({
         status: 200,
         contentType: "text/plain",
         headers: { "x-session-id": "mock-session-id" },
         body: "<p>Lesson: Adding numbers.</p>",
-      })
-    );
-    await page.route("**/api/examples", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          problem: "Example: 1 + 1",
-          solution: [
-            { title: "Step 1", content: "Add: 1 + 1." },
-            { title: "Step 2", content: "Total is 2." },
-          ],
-        }),
-      })
-    );
-    await page.route("**/api/quiz", (route) =>
+      });
+    });
+    await page.route("**/api/quiz", (route) => {
+      console.log("Mocking /api/quiz");
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -36,9 +25,10 @@ test.describe("Examples and Quiz Flow E2E Test", () => {
           options: ["3", "4", "5", "6"],
           difficulty: "easy",
         }),
-      })
-    );
-    await page.route("**/api/validate", (route) =>
+      });
+    });
+    await page.route("**/api/validate", (route) => {
+      console.log("Mocking /api/validate with readiness: 0.92");
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -51,8 +41,8 @@ test.describe("Examples and Quiz Flow E2E Test", () => {
           ],
           readiness: 0.92,
         }),
-      })
-    );
+      });
+    });
 
     // Start chat
     await page.goto("/chat/new");
@@ -64,10 +54,6 @@ test.describe("Examples and Quiz Flow E2E Test", () => {
     await page.click('button[aria-label="Send message"]');
     await expect(page.locator("text=Lesson: Adding numbers.")).toBeVisible({ timeout: 5000 });
 
-    // Request example
-    await page.click('button:has-text("Request Example")');
-    await expect(page.locator("text=Example: 1 + 1")).toBeVisible({ timeout: 5000 });
-
     // Request quiz
     await page.click('button:has-text("Take a Quiz")');
     await expect(page.locator("text=What is 2 + 3?")).toBeVisible({ timeout: 5000 });
@@ -76,7 +62,7 @@ test.describe("Examples and Quiz Flow E2E Test", () => {
     await page.click('label:has-text("5")');
     await page.click('button:has-text("Submit Quiz")');
 
-    // Verify quiz feedback
+    // Verify critical feedback
     await expect(page.locator("text=Well done! You nailed it!")).toBeVisible({ timeout: 5000 });
     await expect(page.locator("text=Test Readiness:")).toBeVisible({ timeout: 5000 });
     await expect(page.locator("text=92%")).toBeVisible({ timeout: 5000 });

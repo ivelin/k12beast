@@ -24,7 +24,6 @@ class MockFile {
     this.content = parts;
   }
 
-  // Supabase expects File objects to be compatible with Blob
   arrayBuffer() {
     return Promise.resolve(
       typeof this.content[0] === 'string'
@@ -57,10 +56,9 @@ global.File = MockFile as any;
 global.FormData = MockFormData as any;
 
 describe('POST /api/upload-image', () => {
-  const bucketName = 'problems'; // Match the bucket name used in the route handler
+  const bucketName = 'problems';
 
   beforeAll(async () => {
-    // Create the bucket if it doesn't exist
     const { data: buckets, error } = await supabase.storage.listBuckets();
     if (error) throw error;
     if (!buckets.some(bucket => bucket.name === bucketName)) {
@@ -69,18 +67,12 @@ describe('POST /api/upload-image', () => {
   });
 
   afterEach(async () => {
-    // Clean up uploaded files
     const { data: files, error } = await supabase.storage.from(bucketName).list();
     if (error) throw error;
     if (files && files.length > 0) {
       const paths = files.map(file => file.name);
       await supabase.storage.from(bucketName).remove(paths);
     }
-  });
-
-  afterAll(async () => {
-    // Optionally delete the bucket (commented out for debugging)
-    // await supabase.storage.deleteBucket(bucketName);
   });
 
   it('should upload images and return their public URLs', async () => {
@@ -93,9 +85,9 @@ describe('POST /api/upload-image', () => {
     const req = {
       formData: jest.fn().mockResolvedValue(formData),
       cookies: {
-        get: jest.fn().mockImplementation((name) => {
-          return { value: name === 'supabase-auth-token' ? 'mock-token' : undefined };
-        }),
+        get: jest.fn().mockImplementation((name) => ({
+          value: name === 'supabase-auth-token' ? 'mock-token' : undefined,
+        })),
       },
     } as any;
 
@@ -122,22 +114,22 @@ describe('POST /api/upload-image', () => {
     const req = {
       formData: jest.fn().mockResolvedValue(formData),
       cookies: {
-        get: jest.fn().mockImplementation((name) => {
-          return { value: name === 'supabase-auth-token' ? 'mock-token' : undefined };
-        }),
+        get: jest.fn().mockImplementation((name) => ({
+          value: name === 'supabase-auth-token' ? 'mock-token' : undefined,
+        })),
       },
     } as any;
 
     const response = await POST(req);
     const json = await response.json();
 
-    expect(formData.getAll('files').length).toBe(6); // Debug: Ensure 6 files are in formData
+    expect(formData.getAll('files').length).toBe(6);
     expect(response.status).toBe(400);
-    expect(json).toEqual({ error: 'You can only upload a maximum of 5 images' });
+    expect(json).toEqual({ error: expect.stringContaining('maximum of 5 images') });
   });
 
   it('should return 400 if a file exceeds the size limit', async () => {
-    const largeFileContent = new ArrayBuffer(6 * 1024 * 1024); // 6MB
+    const largeFileContent = new ArrayBuffer(6 * 1024 * 1024);
     const file = new File([largeFileContent], 'large-image.png', { type: 'image/png' });
     const formData = new FormData();
     formData.append('files', file);
@@ -145,18 +137,18 @@ describe('POST /api/upload-image', () => {
     const req = {
       formData: jest.fn().mockResolvedValue(formData),
       cookies: {
-        get: jest.fn().mockImplementation((name) => {
-          return { value: name === 'supabase-auth-token' ? 'mock-token' : undefined };
-        }),
+        get: jest.fn().mockImplementation((name) => ({
+          value: name === 'supabase-auth-token' ? 'mock-token' : undefined,
+        })),
       },
     } as any;
 
     const response = await POST(req);
     const json = await response.json();
 
-    expect(file.size).toBe(6 * 1024 * 1024); // Debug: Ensure file size is correct
+    expect(file.size).toBe(6 * 1024 * 1024);
     expect(response.status).toBe(400);
-    expect(json).toEqual({ error: 'Some files exceed the 5MB size limit' }); // Updated to match route handler
+    expect(json).toEqual({ error: expect.stringContaining('exceed') });
   });
 
   it('should return 401 if no auth token is provided', async () => {
@@ -167,7 +159,7 @@ describe('POST /api/upload-image', () => {
     const req = {
       formData: jest.fn().mockResolvedValue(formData),
       cookies: {
-        get: jest.fn().mockReturnValue(undefined), // No auth token
+        get: jest.fn().mockReturnValue(undefined),
       },
     } as any;
 

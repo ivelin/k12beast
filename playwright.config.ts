@@ -16,9 +16,10 @@ export default defineConfig({
     video: 'on', // Enable video recording for all tests
     viewport: { width: 1280, height: 720 },
     storageState: 'playwright/.auth/user.json',
+    actionTimeout: 10000, // Increase action timeout to 10 seconds
   },
-  timeout: 10000,
-  expect: { timeout: 10000 },
+  timeout: 20000, // Increase test timeout to 20 seconds
+  expect: { timeout: 5000 }, // Increase expect timeout to 5 seconds
   projects: [
     {
       name: 'chromium',

@@ -71,6 +71,13 @@ export async function middleware(request: NextRequest) {
       if (res.ok) {
         user = await res.json();
         console.log(`Middleware [${requestId}]: User fetched -`, user.email || "no email");
+      } else if (res.status === 401) {
+        console.log(`Middleware [${requestId}]: 401 Unauthorized, redirect to /public/login`);
+        const loginUrl = new URL("/public/login", request.url);
+        loginUrl.searchParams.set("redirect", pathname);
+        const response = NextResponse.redirect(loginUrl);
+        response.headers.set("x-request-id", requestId);
+        return response;
       } else {
         console.log(`Middleware [${requestId}]: Auth API failed -`, res.statusText);
         user = null;
@@ -115,5 +122,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/chat/:path*", "/history", "/session/:path*", "/public/login", "/api/upload-image"],
+  matcher: ["/", "/chat/:path*", "/history", "/session/:path*", "/public/:path*", "/api/upload-image", "/logout"],
 };

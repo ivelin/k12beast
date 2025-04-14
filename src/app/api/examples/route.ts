@@ -9,7 +9,11 @@ interface ExampleResponse {
   solution: { title: string; content: string }[];
 }
 
-const responseFormat = `Return a JSON object with a new example problem and its solution, related to the same topic as the original input problem. Structure: {"problem": "Example problem text", "solution": [{"title": "Step 1", "content": "Step content..."}, ...]}. Do not repeat problems from the session history or the original input problem. Do not reference images unless provided in the current request. Ensure the problem and solution steps are concise and appropriate for the student's inferred skill level.`;
+const responseFormat = `Return a JSON object with a new example problem and its solution, related to the same topic as the original input problem. 
+  Structure: {"problem": "Example problem text", "solution": [{"title": "Step 1", "content": "Step content..."}, ...]}. 
+  Do not repeat problems from the session history or the original input problem. 
+  Do not reference images unless provided in the current request. 
+  Ensure the problem and solution steps are concise and appropriate for the student's inferred skill level.`;
 
 const defaultResponse: ExampleResponse = {
   problem: "",

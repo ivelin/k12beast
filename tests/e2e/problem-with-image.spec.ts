@@ -4,12 +4,12 @@ import { test, expect } from '@playwright/test';
 test.describe('Problem Submission with Image', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/chat/new');
-    await expect(page).toHaveURL(/\/chat\/new/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\/new/, { timeout: 5000 });
     await page.waitForSelector('button[aria-label="Attach a file"]');
   });
 
   test('should submit a problem with multiple images and see lesson', async ({ page }) => {
-    test.setTimeout(30000);
+    test.setTimeout(5000);
 
     await page.route('**/api/upload-image', (route) => {
       route.fulfill({
@@ -49,7 +49,7 @@ test.describe('Problem Submission with Image', () => {
   });
 
   test('should handle oversized image upload failure', async ({ page }) => {
-    test.setTimeout(30000);
+    test.setTimeout(5000);
 
     await page.route('**/api/upload-image', (route) => {
       route.fulfill({

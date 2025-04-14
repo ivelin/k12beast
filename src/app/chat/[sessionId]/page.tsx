@@ -9,26 +9,12 @@ import { ChatContainer, ChatMessages, ChatForm } from "@/components/ui/chat";
 import { MessageList } from "@/components/ui/message-list";
 import { MessageInput } from "@/components/ui/message-input";
 import { PromptSuggestions } from "@/components/ui/prompt-suggestions";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import useAppStore from "@/store";
+import { Message, Quiz, Session } from "@/store/types";
 import QuizSection from "../QuizSection";
 import React from "react";
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  renderAs?: "markdown" | "html";
-  experimental_attachments?: { name: string; url: string }[];
-}
-
-interface Session {
-  id: string;
-  problem: string | null;
-  images: string[] | null;
-  lesson?: string;
-  messages: Message[];
-}
 
 export default function ChatPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = React.use(params);
@@ -43,6 +29,9 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     quizFeedback,
     hasSubmittedProblem,
     sessionId: storeSessionId,
+    error,
+    sessionTerminated,
+    showErrorPopup,
     setStep,
     handleExamplesRequest,
     handleQuizSubmit,
@@ -59,17 +48,17 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareableLink, setShareableLink] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isStoreReady, setIsStoreReady] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
     async function loadSession() {
+      // Clear any previous error state when starting to load a session
+      set({ error: null, showErrorPopup: false });
+
       if (sessionId === "new") {
         reset();
         setLocalProblem("");
         setLocalImages([]);
-        setIsStoreReady(true);
         setIsLoadingSession(false);
         return;
       }
@@ -113,7 +102,15 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
             })),
           });
         }
-        updatedMessages.push(...(fetchedSession.messages || []));
+        // Validate messages from the server
+        const serverMessages = fetchedSession.messages || [];
+        serverMessages.forEach((msg: Message) => {
+          if (msg && typeof msg.content === "string") {
+            updatedMessages.push(msg);
+          } else {
+            console.warn("Invalid message format from server:", msg);
+          }
+        });
         const hasLessonInMessages = updatedMessages.some(msg => msg.role === "assistant");
         if (!hasLessonInMessages && fetchedSession.lesson) {
           updatedMessages.push({
@@ -129,6 +126,9 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           messages: updatedMessages,
           hasSubmittedProblem: true,
           step: updatedMessages.some(msg => msg.role === "assistant") ? "lesson" : "problem",
+          sessionTerminated: false,
+          showErrorPopup: false,
+          error: null, // Clear error on successful load
         });
         setLocalProblem(fetchedSession.problem || "");
         setLocalImages([]);
@@ -138,10 +138,9 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         }
       } catch (err) {
         if (err.name !== "AbortError") {
-          setError(err.message || "Error loading session");
+          set({ error: err.message || "Error loading session", showErrorPopup: true });
         }
       } finally {
-        setIsStoreReady(true);
         setIsLoadingSession(false);
       }
     }
@@ -197,12 +196,15 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   const handleCopyLink = async () => {
     if (shareableLink) {
       try {
+        // Dismiss any existing toasts to prevent stacking
+        toast.dismiss();
         await navigator.clipboard.writeText(shareableLink);
-        toast.success("Link copied to clipboard!");
+        toast.success("Link copied to clipboard!", { duration: 2000 }); // Ensure duration is set
         setIsShareModalOpen(false);
       } catch (err) {
         console.error("Error copying link:", err);
-        toast.error("Failed to copy link to clipboard.");
+        toast.dismiss();
+        toast.error("Failed to copy link to clipboard.", { duration: 2000 });
       }
     }
   };
@@ -223,39 +225,13 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     window.location.href = "/chat/new";
   };
 
-  const filteredMessages = messages.map((message) => {
-    if (
-      message.role === "assistant" &&
-      message.content.startsWith("<strong>Quiz:</strong>") &&
-      step === "quizzes" &&
-      !quizFeedback
-    ) {
-      const problemEndIndex = message.content.indexOf("<ul>");
-      if (problemEndIndex !== -1) {
-        return {
-          ...message,
-          content: message.content.substring(0, problemEndIndex),
-        };
-      }
-    }
-    return message;
-  });
+  const handleClosePopup = () => {
+    set({ showErrorPopup: false, error: null });
+    window.location.href = "/public/login"; // Redirect to /public/login
+  };
 
-  if (isLoadingSession || !isStoreReady) {
+  if (isLoadingSession) {
     return <div className="container mx-auto p-4">Loading session, please wait...</div>;
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto p-4">
-        <p>{error}</p>
-        <Link href="/history">
-          <Button variant="outline" className="mt-4">
-            Back to History
-          </Button>
-        </Link>
-      </div>
-    );
   }
 
   return (
@@ -278,7 +254,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
                 New Chat
               </span>
             </div>
-            {hasSubmittedProblem && (
+            {hasSubmittedProblem && !sessionTerminated && (
               <div className="relative group">
                 <Button
                   onClick={handleShare}
@@ -299,7 +275,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         </div>
         <ChatContainer className="flex-1">
           <ChatMessages className="flex flex-col items-start">
-            <MessageList messages={filteredMessages} isTyping={loading} />
+            <MessageList messages={messages} isTyping={loading} />
           </ChatMessages>
           {!loading && step === "problem" && !hasSubmittedProblem && (
             <PromptSuggestions
@@ -314,7 +290,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
               ]}
             />
           )}
-          {!loading && (step === "lesson" || step === "examples") && (
+          {!loading && (step === "lesson" || step === "examples") && !sessionTerminated && (
             <PromptSuggestions
               className="mb-8"
               label="What would you like to do next?"
@@ -350,12 +326,25 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         )}
       </div>
 
+      {/* Error Popup Modal */}
+      <Dialog open={showErrorPopup} onOpenChange={handleClosePopup}>
+        <DialogContent aria-describedby="error-description">
+          <DialogHeader>
+            <DialogTitle>Oops!</DialogTitle>
+          </DialogHeader>
+          <p id="error-description">{error}</p>
+          <DialogFooter>
+            <Button onClick={handleClosePopup}>Start New Chat</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="share-description">
           <DialogHeader>
             <DialogTitle>Share Your Session</DialogTitle>
           </DialogHeader>
-          <p>Copy this link to share your session:</p>
+          <p id="share-description">Copy this link to share your session:</p>
           <input
             type="text"
             value={shareableLink || ""}

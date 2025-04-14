@@ -1,10 +1,10 @@
+// src/app/api/quiz/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { sendXAIRequest } from "@/utils/xaiClient";
 import { handleXAIError } from "@/utils/xaiUtils";
 import supabase from "../../../supabase/serverClient";
-import { v4 as uuidv4 } from "uuid";
 
-// Define the expected response structure
+// Define the expected response structure from the xAI API
 interface QuizResponse {
   problem: string;
   answerFormat: string;
@@ -12,30 +12,40 @@ interface QuizResponse {
   correctAnswer: string;
   solution: { title: string; content: string }[];
   difficulty: "easy" | "medium" | "hard";
-  encouragement: string | null;
+  encouragementIfCorrect: string;
+  encouragementIfIncorrect: string;
   readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
 }
 
-const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the
-original input problem (e.g., if the input is about heat transfer, the quiz must also be about heat
-transfer). The quiz must be a multiple-choice question with exactly four distinct and plausible options
-that test the student's understanding of the topic. Provide a brief context or scenario to make the
-problem engaging. Do not repeat problems from the session history. Do not reference images in the
-problem text. Additionally, assess the student's readiness for an end-of-semester test based on their
-overall performance in the chat history, considering quiz performance (correctness, consistency, and
-difficulty), engagement with lessons and examples (e.g., fewer example requests might indicate mastery),
-and inferred skill level and progress (e.g., improvement over time). Provide two confidence levels: one
-if the student answers this quiz correctly, and one if they answer incorrectly. Structure: {"problem":
-"Quiz problem text", "answerFormat": "multiple-choice", "options": ["option1", "option2", "option3",
-"option4"], "correctAnswer": "correct option", "solution": [{"title": "Step 1", "content": "Step
-content in Markdown"}, ...], "difficulty": "easy|medium|hard", "encouragement": "Words of encouragement
-if the last quiz was answered correctly, otherwise null", "readiness": {"confidenceIfCorrect": 0.92,
-"confidenceIfIncorrect": 0.75}}. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be
-numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 95%
-success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz
-correctly or incorrectly. Ensure all fields are present, especially the "solution" field with at least
-two steps.`;
+const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the original input problem (e.g., if the input is about heat transfer, the quiz must also be about heat transfer). 
+  The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. 
+  Provide a brief context or scenario to make the problem engaging. 
+  Do not repeat problems from the session history. 
+  Do not reference images in the problem text. 
+  Additionally, assess the student's readiness for an end-of-semester test based on their overall performance in the chat history, considering quiz performance (correctness, consistency, and difficulty), 
+  engagement with lessons and examples (e.g., fewer example requests might indicate mastery), 
+  and inferred skill level and progress (e.g., improvement over time). 
+  Provide two encouragement messages: one for if the student answers correctly, 
+  and one for if they answer incorrectly. 
+  Structure: 
+    {
+    "problem": "Quiz problem text", 
+    "answerFormat": "multiple-choice", 
+    "options": ["option1", "option2", "option3", "option4"], 
+    "correctAnswer": "correct option", 
+    "solution": [{"title": "Step 1", "content": "Step content with formatting as needed"}, ...], 
+    "difficulty": "easy|medium|hard", 
+    "encouragementIfCorrect": "Gamified message if correct", 
+    "encouragementIfIncorrect": "Gamified message if incorrect", 
+    "readiness": {"confidenceIfCorrect": 0.92, "confidenceIfIncorrect": 0.75}
+    }. 
+    The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence 
+    that the student would achieve at least a 95% success rate on an end-of-semester test without AI assistance, 
+    depending on whether they answer this quiz correctly or incorrectly. 
+    Ensure all fields are present, especially the "solution" field with at least two steps.
+  `;
 
+// Default response if the AI fails to generate a valid quiz
 const defaultResponse: QuizResponse = {
   problem: "Unable to generate quiz due to API response format.",
   answerFormat: "multiple-choice",
@@ -46,89 +56,68 @@ const defaultResponse: QuizResponse = {
     { title: "Step 2", content: "Please try requesting another quiz." },
   ],
   difficulty: "easy",
-  encouragement: null,
+  encouragementIfCorrect: "Great job! Keep it up!",
+  encouragementIfIncorrect: "Nice try! Let's review and try again.",
   readiness: { confidenceIfCorrect: 0.5, confidenceIfIncorrect: 0.4 },
 };
 
+// Handles POST requests to generate a new quiz for an existing session
+// Sessions are created only when a user submits a new problem via /api/tutor
+// Quiz requests must include a valid sessionId tied to a problem submission
 export async function POST(req: NextRequest) {
   try {
     const { problem, images } = await req.json();
-    let sessionId = req.headers.get("x-session-id");
+    const sessionId = req.headers.get("x-session-id");
 
     console.log("Quiz request body:", { problem, images });
     console.log("Quiz session ID from header:", sessionId);
 
-    // Fetch or create session
-    let sessionHistory = null;
-    if (sessionId) {
-      const { data, error } = await supabase
-        .from("sessions")
-        .select("*")
-        .eq("id", sessionId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching session:", error.message);
-      } else if (data) {
-        sessionHistory = data;
-        console.log("Fetched session history for quiz:", sessionHistory);
-      }
+    // Require a valid sessionId; do not create a new session
+    // Sessions are tied to a user's problem submission and must exist
+    if (!sessionId) {
+      console.error("Missing sessionId in quiz request");
+      return NextResponse.json(
+        { error: "A valid session is required to request a quiz. Please start a new chat session." },
+        { status: 400 }
+      );
     }
 
-    if (!sessionId || !sessionHistory) {
-      sessionId = uuidv4();
-      const { error } = await supabase
-        .from("sessions")
-        .insert({
-          id: sessionId,
-          messages: [{ role: "user", content: "Take a Quiz" }],
-          created_at: new Date().toISOString(),
-        });
+    // Fetch the existing session to retrieve problem, images, quizzes, and messages
+    const { data: sessionHistory, error: fetchError } = await supabase
+      .from("sessions")
+      .select("problem, images, quizzes, messages")
+      .eq("id", sessionId)
+      .single();
 
-      if (error) {
-        console.error("Error creating session:", error.message);
-        return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
-      }
-      sessionHistory = { id: sessionId, created_at: new Date().toISOString(), messages: [{ role: "user", content: "Take a Quiz" }] };
-      console.log("Created new session for quiz:", sessionId);
-    } else {
-      // Update the session with the user's request for a quiz
-      const updatedMessages = [
-        ...(sessionHistory.messages || []),
-        { role: "user", content: "Take a Quiz" },
-      ];
-      const { error } = await supabase
-        .from("sessions")
-        .update({
-          messages: updatedMessages,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sessionId);
-
-      if (error) {
-        console.error("Error updating session with messages:", error.message);
-      }
-      sessionHistory.messages = updatedMessages;
+    if (fetchError || !sessionHistory) {
+      console.error("Error fetching session or session not found:", fetchError?.message || "No session data");
+      return NextResponse.json(
+        { error: "Session not found. Please start a new chat session." },
+        { status: 404 }
+      );
     }
 
+    console.log("Fetched session history for quiz:", sessionHistory);
+
+    // Request a new quiz from the xAI API
     let content = await sendXAIRequest({
-      problem,
-      images,
+      problem: problem || sessionHistory.problem,
+      images: images || sessionHistory.images,
       responseFormat,
       defaultResponse,
       maxTokens: 1000,
-      chatHistory: sessionHistory?.messages || [],
+      chatHistory: sessionHistory.messages || [],
     }) as QuizResponse;
 
     console.log("Generated quiz:", content);
 
-    // Ensure the solution is present; if not, use the default
+    // Ensure solution is present; fallback to default if missing
     if (!content.solution || content.solution.length === 0) {
       console.warn("Model did not provide a solution; using default.");
       content.solution = defaultResponse.solution;
     }
 
-    // Validate the formatted content
+    // Validate the quiz format to ensure all required fields are present
     if (
       !content.problem ||
       !content.answerFormat ||
@@ -140,56 +129,71 @@ export async function POST(req: NextRequest) {
       !content.difficulty ||
       !content.readiness ||
       typeof content.readiness.confidenceIfCorrect !== "number" ||
-      typeof content.readiness.confidenceIfIncorrect !== "number"
+      typeof content.readiness.confidenceIfIncorrect !== "number" ||
+      !content.encouragementIfCorrect ||
+      !content.encouragementIfIncorrect
     ) {
       console.error("Invalid quiz format:", content);
       content = defaultResponse;
     }
 
-    // Store the quiz in the session without the solution (to prevent client-side access)
+    // Store the full quiz data server-side, including sensitive fields
+    // Sensitive fields (correctAnswer, solution, encouragementIfCorrect, encouragementIfIncorrect, readiness) are
+    // retained in the session but not sent to the client until validation
+    // via /api/validate
     const quizToStore = {
       problem: content.problem,
       answerFormat: content.answerFormat,
       options: content.options,
       correctAnswer: content.correctAnswer,
-      solution: content.solution, // Store the solution server-side
+      solution: content.solution,
       difficulty: content.difficulty,
-      encouragement: content.encouragement,
+      encouragementIfCorrect: content.encouragementIfCorrect,
+      encouragementIfIncorrect: content.encouragementIfIncorrect,
       readiness: content.readiness,
     };
 
-    const updatedQuizzes = [...(sessionHistory.quizzes || []), quizToStore];
-    const updatedMessages = [
-      ...(sessionHistory?.messages || []),
-      {
-        role: "assistant",
-        content: `<strong>Quiz:</strong><br>${content.problem}`,
-        renderAs: "html",
-      },
-    ];
-    const { error: updateError } = await supabase
+    // Ensure messages and quizzes are arrays, even if null or corrupted
+    const currentMessages = Array.isArray(sessionHistory.messages) ? sessionHistory.messages : [];
+    const currentQuizzes = Array.isArray(sessionHistory.quizzes) ? sessionHistory.quizzes : [];
+
+    // Append the user's quiz prompt and the quiz problem in a single update
+    // Ensures messages and quizzes remain arrays, tied to the original problem's session
+    const userQuizPrompt = { role: "user", content: "Take a Quiz" };
+    const quizProblem = {
+      role: "assistant",
+      content: `<strong>Quiz:</strong><br>${content.problem}`, // Only include the problem text
+      renderAs: "html",
+    };
+    const { data: updateResult, error: updateError } = await supabase
       .from("sessions")
       .update({
-        quizzes: updatedQuizzes,
-        messages: updatedMessages,
+        messages: [...currentMessages, userQuizPrompt, quizProblem],
+        quizzes: [...currentQuizzes, quizToStore],
         updated_at: new Date().toISOString(),
       })
-      .eq("id", sessionId);
+      .eq("id", sessionId)
+      .select("id")
+      .single();
 
-    if (updateError) {
-      console.error("Error updating session with quiz:", updateError.message);
+    if (updateError || !updateResult) {
+      console.error("Error updating session with quiz and message:", updateError?.message || "No update result");
+      return NextResponse.json(
+        { error: "Failed to update session with quiz." },
+        { status: 500 }
+      );
     }
 
-    // Return the quiz to the client without the solution
+    // Return only the quiz question data to the client
+    // Excludes correctAnswer, solution, encouragementIfCorrect, encouragementIfIncorrect, and readiness to prevent
+    // leaking sensitive information before the student submits their answer
+    // These fields are returned only after validation via /api/validate
     return NextResponse.json(
       {
         problem: content.problem,
         answerFormat: content.answerFormat,
         options: content.options,
-        correctAnswer: content.correctAnswer,
         difficulty: content.difficulty,
-        encouragement: content.encouragement,
-        readiness: content.readiness,
       },
       {
         status: 200,
