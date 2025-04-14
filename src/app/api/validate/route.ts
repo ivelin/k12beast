@@ -1,12 +1,14 @@
 // src/app/api/validate/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import supabase from "@/supabase/serverClient";
+import { formatQuizFeedbackMessage } from "@/utils/quizUtils";
 
 interface QuizFeedback {
   isCorrect: boolean;
   encouragement: string;
   solution: { title: string; content: string }[] | null;
-  readiness: number; // Single readiness value based on answer correctness
+  readiness: number;
+  correctAnswer?: string; // Add correctAnswer to the response
 }
 
 interface Quiz {
@@ -79,27 +81,17 @@ export async function POST(req: NextRequest) {
     const readiness = isCorrect
       ? quiz.readiness.confidenceIfCorrect
       : quiz.readiness.confidenceIfIncorrect;
-    const readinessPercentage = Math.round(readiness * 100);
-
-    const feedbackMessage = `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${answer}</p><p>${encouragement}</p>${
-      quiz.solution
-        ? `<p>${quiz.solution.map((s) => `<strong>${s.title}:</strong> ${s.content}`).join("</p><p>")}</p>`
-        : ""
-    }<p><strong>Options:</strong></p><ul>${quiz.options
-      .map(
-        (o) =>
-          `<li>${o}${o === answer ? " (Your answer)" : ""}${
-            o === quiz.correctAnswer ? " (Correct answer)" : ""
-          }</li>`
-      )
-      .join("")}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}%</p>`;
 
     const feedback: QuizFeedback = {
       isCorrect,
       encouragement,
       solution: quiz.solution,
-      readiness, // Return only the selected readiness value
+      readiness,
+      correctAnswer: quiz.correctAnswer, // Include the correct answer in the response
     };
+
+    // Use utility function to format the feedback message
+    const feedbackMessage = formatQuizFeedbackMessage(quiz, answer, feedback);
 
     // Fetch the current messages and append the new ones
     const currentMessages: Message[] = sessionData.messages || [];

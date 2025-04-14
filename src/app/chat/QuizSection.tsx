@@ -1,4 +1,3 @@
-// src/app/chat/QuizSection.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -21,13 +20,15 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
     setError,
     handleQuizSubmit,
     handleValidate,
+    quizAnswer,
+    quizFeedback,
+    loading,
   } = useAppStore();
 
   const [hasFetchedQuiz, setHasFetchedQuiz] = useState(false);
 
-  const answer = useAppStore((state) => state.quizAnswer);
+  const answer = quizAnswer;
   const setAnswer = (value: string) => useAppStore.setState({ quizAnswer: value });
-  const loading = useAppStore((state) => state.loading);
 
   useEffect(() => {
     if (step === "quizzes" && !quiz && !hasFetchedQuiz) {
@@ -63,7 +64,8 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
     }
   };
 
-  if (step !== "quizzes" || !quiz) return null;
+  // Hide the QuizSection if step is not "quizzes" or if quizFeedback is present
+  if (step !== "quizzes" || !quiz || quizFeedback) return null;
 
   return (
     <div className="mb-4 flex flex-col items-center">
@@ -72,29 +74,32 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
       )}
       {quiz.answerFormat === "multiple-choice" && quiz.options && quiz.options.length > 0 ? (
         <div className="w-full max-w-md">
-          {quiz.options.map((option: string, index: number) => (
-            <div key={index} className="my-2 flex items-center">
-              <input
-                type="radio"
-                id={`option-${index}`}
-                name="quiz-answer"
-                value={option}
-                checked={answer === option}
-                onChange={(e) => setAnswer(e.target.value)}
-                className="mr-2"
-                disabled={loading}
-                aria-label={`Option ${index + 1}: ${option}`}
-              />
-              <label
-                htmlFor={`option-${index}`}
-                className={`flex-1 p-2 rounded-md transition-colors ${
-                  answer === option ? "bg-primary text-primary-foreground font-bold" : "bg-background"
-                }`}
-              >
-                {option}
-              </label>
-            </div>
-          ))}
+          {quiz.options.map((option: string, index: number) => {
+            const isUserAnswer = option === answer;
+            return (
+              <div key={index} className="my-2 flex items-center">
+                <input
+                  type="radio"
+                  id={`option-${index}`}
+                  name="quiz-answer"
+                  value={option}
+                  checked={isUserAnswer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  className="mr-2"
+                  disabled={loading}
+                  aria-label={`Option ${index + 1}: ${option}`}
+                />
+                <label
+                  htmlFor={`option-${index}`}
+                  className={`flex-1 p-2 rounded-md transition-colors ${
+                    isUserAnswer ? "bg-primary text-primary-foreground font-bold" : "bg-background"
+                  }`}
+                >
+                  {option}
+                </label>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="text-red-500">

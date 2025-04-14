@@ -1,4 +1,3 @@
-// src/store/types.ts
 export type Step = "problem" | "lesson" | "examples" | "quizzes" | "end";
 
 export interface Quiz {
@@ -22,6 +21,7 @@ export interface QuizFeedback {
   encouragement: string;
   solution: { title: string; content: string }[] | null;
   readiness: number;
+  correctAnswer?: string; // Add correctAnswer to QuizFeedback
 }
 
 export interface Message {

@@ -119,6 +119,7 @@ describe("/api/validate Route", () => {
         { title: "Step 2", content: "Total is 5 cups." },
       ],
       readiness: 0.92,
+      correctAnswer: "5 cups", // Added correctAnswer to match the updated route response
     });
 
     expect(jest.requireMock("@/supabase/serverClient").from).toHaveBeenCalledWith("sessions");
@@ -134,7 +135,9 @@ describe("/api/validate Route", () => {
           { role: "user", content: mockAnswerCorrect, renderAs: "markdown" },
           {
             role: "assistant",
-            content: `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${mockAnswerCorrect}</p><p>Great job!</p><p><strong>Step 1:</strong> Add the cups: 2 + 3.</p><p><strong>Step 2:</strong> Total is 5 cups.</p><p><strong>Options:</strong></p><ul><li>4 cups</li><li>5 cups (Your answer) (Correct answer)</li><li>6 cups</li><li>7 cups</li></ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: 92%"></div></div><p>92%</p>`,
+            content: expect.stringContaining(
+              `<li class="correct-answer user-answer">5 cups <span class="answer-tag">(Your answer)</span> <span class="correct-tag">(Correct answer)</span></li>`
+            ),
             renderAs: "html",
           },
         ]),
@@ -165,6 +168,7 @@ describe("/api/validate Route", () => {
         { title: "Step 2", content: "Total is 5 cups." },
       ],
       readiness: 0.75,
+      correctAnswer: "5 cups", // Added correctAnswer to match the updated route response
     });
 
     expect(jest.requireMock("@/supabase/serverClient").from).toHaveBeenCalledWith("sessions");
@@ -180,7 +184,9 @@ describe("/api/validate Route", () => {
           { role: "user", content: mockAnswerIncorrect, renderAs: "markdown" },
           {
             role: "assistant",
-            content: `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${mockAnswerIncorrect}</p><p>Nice try! Let's review the correct answer.</p><p><strong>Step 1:</strong> Add the cups: 2 + 3.</p><p><strong>Step 2:</strong> Total is 5 cups.</p><p><strong>Options:</strong></p><ul><li>4 cups</li><li>5 cups (Correct answer)</li><li>6 cups (Your answer)</li><li>7 cups</li></ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: 75%"></div></div><p>75%</p>`,
+            content: expect.stringContaining(
+              `<li class="correct-answer">5 cups <span class="correct-tag">(Correct answer)</span></li>`
+            ),
             renderAs: "html",
           },
         ]),

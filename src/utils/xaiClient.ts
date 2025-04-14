@@ -61,7 +61,7 @@ Respond in a conversational style as if you are speaking directly with a K12 stu
 Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions. Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history. Adapt your response based on this history—e.g., avoid repeating examples or quiz problems already given (as specified in the chat history), and adjust difficulty based on performance trends. If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.
 Respond in the natural language used in the original input problem text and images.
 Return a raw JSON object (formatted for JSON.parse()) with the response fields specified in the user prompt.
-Use plain text or minimal HTML formatting (only <p>, <strong>, <ul>, <li> tags, no attributes or scripts) for any HTML content.
+Use plain text or minimal HTML formatting (only <p>, <strong>, <ul>, <li> tags, no attributes or scripts) for any content with formatting.
 Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
 Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
 Ensure the response is a single, valid JSON object with no trailing commas or syntax errors.`,

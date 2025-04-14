@@ -138,8 +138,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       return html;
     }
     return domPurify.sanitize(html, {
-      ALLOWED_TAGS: ["p", "strong", "ul", "li", "br"],
-      ALLOWED_ATTR: [],
+      ALLOWED_TAGS: ["p", "strong", "ul", "li", "br", "span"],
+      ALLOWED_ATTR: ["class"],
     });
   };
 

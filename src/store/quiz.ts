@@ -2,11 +2,13 @@
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
 import { AppState, Quiz, QuizFeedback, Message } from "./types";
+import { formatQuizFeedbackMessage } from "@/utils/quizUtils";
 
 export interface QuizState {
   quiz: Quiz | null;
   quizAnswer: string;
   quizFeedback: QuizFeedback | null;
+  correctAnswer: string | null; // Add correctAnswer to the state
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
   handleValidate: (answer: string, quiz: Quiz) => Promise<void>;
@@ -16,6 +18,7 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
   quiz: null,
   quizAnswer: "",
   quizFeedback: null,
+  correctAnswer: null, // Initialize correctAnswer
   handleExamplesRequest: async () => {
     const { problem, imageUrls, sessionId, addMessage, loading, sessionTerminated } = get();
     if (loading || sessionTerminated) return;
@@ -87,7 +90,7 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch quiz. Please try again.");
-      set({ quiz: data, quizAnswer: "", quizFeedback: null });
+      set({ quiz: data, quizAnswer: "", quizFeedback: null, correctAnswer: null }); // Reset correctAnswer
       addMessage({
         role: "assistant",
         content: `<p><strong>Quiz:</strong></p><p>${data.problem}</p>`,
@@ -124,22 +127,14 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         const errorMsg = (data as any).error || "Failed to validate quiz";
         throw new Error(errorMsg);
       }
-      const isCorrect = data.isCorrect;
-      const readiness = data.readiness;
-      const readinessPercentage = Math.round(readiness * 100);
-      const encouragement = data.encouragement;
+      // Update the quiz with the correct answer from the validate response
+      const updatedQuiz = { ...quiz, correctAnswer: data.correctAnswer };
       addMessage({
         role: "assistant",
-        content: `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${answer}</p><p>${encouragement}</p>${
-          data.solution
-            ? `<p>${data.solution.map((s) => `<strong>${s.title}:</strong> ${s.content}`).join("</p><p>")}</p>`
-            : ""
-        }<p><strong>Options:</strong></p><ul>${quiz.options
-          .map((o) => `<li>${o}${o === answer ? " (Your answer)" : ""}${o === quiz.correctAnswer ? " (Correct answer)" : ""}</li>`)
-          .join("")}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}%</p>`,
+        content: formatQuizFeedbackMessage(updatedQuiz, answer, data),
         renderAs: "html",
       });
-      set({ quizAnswer: answer, quizFeedback: data });
+      set({ quizAnswer: answer, quizFeedback: data, correctAnswer: data.correctAnswer }); // Store correctAnswer
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Failed to validate quiz answer. Please try again.";
       console.error("Error in handleValidate:", err);
