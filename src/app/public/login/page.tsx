@@ -80,7 +80,7 @@ export default function Login() {
           return;
         }
         console.log("Sign-up successful");
-        setMessage("Sign-up successful!");
+        setMessage("Sign-up successful! Check email.");
         setLoading(false);
       } else {
         console.log("Attempting login with email:", trimmedEmail);
