@@ -125,27 +125,28 @@ async function ensureTablesExist(supabase) {
       );
     `, supabase);
 
-    // Log sessions table schema for debugging
-    const { data: schemaCheck } = await supabase.rpc("execute_sql", {
-      sql_text: `
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'sessions';
-      `
-    });
-    console.log("Sessions table columns before migrations:", schemaCheck);
+    // Verify sessions table existence by attempting a simple select
+    const { data: sessionsCheck, error: sessionsCheckError } = await supabase
+      .from("sessions")
+      .select("id")
+      .limit(1);
+    if (sessionsCheckError && sessionsCheckError.code !== "PGRST116") {
+      console.error("Failed to verify sessions table existence:", sessionsCheckError.message);
+      console.log("Sessions table status before migrations: Unable to confirm existence");
+      throw new Error(`Failed to verify sessions table: ${sessionsCheckError.message}`);
+    }
 
     await executeSql(`
       GRANT ALL PRIVILEGES ON TABLE sessions TO postgres;
     `, supabase);
 
-    const { data: sessionsCheck, error: sessionsCheckError } = await supabase
+    const { data: sessionsVerify, error: sessionsVerifyError } = await supabase
       .from("sessions")
       .select("*")
       .limit(1);
-    if (sessionsCheckError && sessionsCheckError.code !== "PGRST116") {
-      console.error("Failed to verify sessions table:", sessionsCheckError.message);
-      throw new Error(`Failed to verify sessions table: ${sessionsCheckError.message}`);
+    if (sessionsVerifyError && sessionsVerifyError.code !== "PGRST116") {
+      console.error("Failed to verify sessions table:", sessionsVerifyError.message);
+      throw new Error(`Failed to verify sessions table: ${sessionsVerifyError.message}`);
     }
 
     console.log("All required tables ensured and verified.");

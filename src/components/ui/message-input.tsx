@@ -343,9 +343,7 @@ async function showFileUploadDialog(): Promise<File[] | null> {
 
     input.type = "file";
     input.multiple = true;
-    input.accept = "*/*";
-    // Explicitly allow camera access for mobile devices
-    input.setAttribute("capture", "environment");
+    input.accept = "image/*"; // Restrict to images for iOS gallery and camera access
     input.click();
 
     const handleChange = () => {
@@ -369,12 +367,12 @@ async function showFileUploadDialog(): Promise<File[] | null> {
     input.addEventListener("change", handleChange);
     input.addEventListener("cancel", handleCancel);
 
-    // Add a timeout to ensure iOS processes the camera input
+    // Add a timeout to ensure iOS processes the input
     setTimeout(() => {
       if (!input.files || input.files.length === 0) {
         handleCancel();
       }
-    }, 60000); // 60 seconds timeout for user to take a photo
+    }, 60000); // 60 seconds timeout for user to select files
   });
 }
 

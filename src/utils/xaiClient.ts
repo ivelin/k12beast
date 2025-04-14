@@ -30,10 +30,21 @@ interface XAIRequestOptions {
   chatHistory?: { role: string; content: string; renderAs?: "markdown" | "html" }[];
 }
 
+// Sanitize raw API response to extract valid JSON, removing invalid characters and extraneous text
 function sanitizeResponse(rawContent: string): string {
-  return rawContent
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F](?=(?:(?:[^"]*"){2})*[^"]*$)/g, "")
-    .trim();
+  // Remove control characters outside quotes
+  let cleaned = rawContent.replace(
+    /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F](?=(?:(?:[^"]*"){2})*[^"]*$)/g,
+    ""
+  );
+
+  // Extract content between ```json and ```, or the first valid JSON object if no markers
+  const jsonMatch = cleaned.match(/```json\s*([\s\S]*?)\s*```/) || cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    cleaned = jsonMatch[1] || jsonMatch[0];
+  }
+
+  return cleaned.trim();
 }
 
 export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
@@ -48,16 +59,18 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
 
   validateRequestInputs(problem, images);
 
-  const chatHistoryText = chatHistory.length > 0
-    ? `Chat History:\n${chatHistory.map(msg =>
-        `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`).join("\n")}`
-    : "No chat history available.";
+  const chatHistoryText =
+    chatHistory.length > 0
+      ? `Chat History:\n${chatHistory
+          .map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+          .join("\n")}`
+      : "No chat history available.";
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     {
       role: "system",
       content: `You are a K12 tutor. Assist with educational queries related to K12 subjects.
-Respond in a conversational style as if you are speaking directly with a K12 student.
+Respond in a conversational style as if you are speaking directly with a K12 student using emojis and images as appropriate.
 Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions. Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history. Adapt your response based on this history—e.g., avoid repeating examples or quiz problems already given (as specified in the chat history), and adjust difficulty based on performance trends. If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.
 Respond in the natural language used in the original input problem text and images.
 Return a raw JSON object (formatted for JSON.parse()) with the response fields specified in the user prompt.
@@ -68,7 +81,7 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
     },
     {
       role: "user",
-      content: `Original Input Problem (if provided): "${problem || 'No text provided'}"`,
+      content: `Original Input Problem (if provided): "${problem || "No text provided"}"`,
     },
     {
       role: "user",
@@ -112,18 +125,21 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
 
       return content;
     } catch (error: unknown) {
-      console.warn(`xAI request failed (attempt ${attempt}/${maxRetries}):`, (error as Error).message);
+      console.warn(
+        `xAI request failed (attempt ${attempt}/${maxRetries}):`,
+        (error as Error).message
+      );
       if (attempt === maxRetries) {
         console.error("Final attempt failed. Raw response:", rawContent ?? "No response");
         console.error("Returning default response with error message.");
         return {
           ...defaultResponse,
           lesson: defaultResponse.lesson
-            ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON characters.`
-            : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON characters.`,
+            ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON format.`
+            : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON format.`,
         };
       }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
   return defaultResponse;

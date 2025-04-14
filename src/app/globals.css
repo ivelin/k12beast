@@ -101,20 +101,153 @@ button[type="submit"]:hover {
 }
 
 /* Style the readiness progress bar */
-.chat-message-assistant .readiness-container {
+.readiness-container {
   width: 100%;
   max-width: 300px;
-  background-color: hsl(var(--muted));
+  background-color: hsl(var(--muted)); /* Use theme variable for background */
   border-radius: var(--radius);
   overflow: hidden;
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
+  min-height: 10px; /* Ensure container has visible height */
 }
 
-.chat-message-assistant .readiness-bar {
+.readiness-bar {
   height: 10px;
-  background-color: hsl(var(--primary));
-  transition: width 0.3s ease-in-out;
+  background-color: hsl(var(--primary)); /* Default color */
+}
+
+/* Dynamic color changes based on readiness percentage */
+.readiness-bar[style*="width: 0%"],
+.readiness-bar[style*="width: 1%"],
+.readiness-bar[style*="width: 2%"],
+.readiness-bar[style*="width: 3%"],
+.readiness-bar[style*="width: 4%"],
+.readiness-bar[style*="width: 5%"],
+.readiness-bar[style*="width: 6%"],
+.readiness-bar[style*="width: 7%"],
+.readiness-bar[style*="width: 8%"],
+.readiness-bar[style*="width: 9%"],
+.readiness-bar[style*="width: 10%"],
+.readiness-bar[style*="width: 11%"],
+.readiness-bar[style*="width: 12%"],
+.readiness-bar[style*="width: 13%"],
+.readiness-bar[style*="width: 14%"],
+.readiness-bar[style*="width: 15%"],
+.readiness-bar[style*="width: 16%"],
+.readiness-bar[style*="width: 17%"],
+.readiness-bar[style*="width: 18%"],
+.readiness-bar[style*="width: 19%"],
+.readiness-bar[style*="width: 20%"] {
+  background-color: #f44336; /* Red for 0-20% */
+}
+
+.readiness-bar[style*="width: 21%"],
+.readiness-bar[style*="width: 22%"],
+.readiness-bar[style*="width: 23%"],
+.readiness-bar[style*="width: 24%"],
+.readiness-bar[style*="width: 25%"],
+.readiness-bar[style*="width: 26%"],
+.readiness-bar[style*="width: 27%"],
+.readiness-bar[style*="width: 28%"],
+.readiness-bar[style*="width: 29%"],
+.readiness-bar[style*="width: 30%"],
+.readiness-bar[style*="width: 31%"],
+.readiness-bar[style*="width: 32%"],
+.readiness-bar[style*="width: 33%"],
+.readiness-bar[style*="width: 34%"],
+.readiness-bar[style*="width: 35%"],
+.readiness-bar[style*="width: 36%"],
+.readiness-bar[style*="width: 37%"],
+.readiness-bar[style*="width: 38%"],
+.readiness-bar[style*="width: 39%"],
+.readiness-bar[style*="width: 40%"],
+.readiness-bar[style*="width: 41%"],
+.readiness-bar[style*="width: 42%"],
+.readiness-bar[style*="width: 43%"],
+.readiness-bar[style*="width: 44%"],
+.readiness-bar[style*="width: 45%"],
+.readiness-bar[style*="width: 46%"],
+.readiness-bar[style*="width: 47%"],
+.readiness-bar[style*="width: 48%"],
+.readiness-bar[style*="width: 49%"],
+.readiness-bar[style*="width: 50%"] {
+  background-color: #ff9800; /* Orange for 21-50% */
+}
+
+.readiness-bar[style*="width: 51%"],
+.readiness-bar[style*="width: 52%"],
+.readiness-bar[style*="width: 53%"],
+.readiness-bar[style*="width: 54%"],
+.readiness-bar[style*="width: 55%"],
+.readiness-bar[style*="width: 56%"],
+.readiness-bar[style*="width: 57%"],
+.readiness-bar[style*="width: 58%"],
+.readiness-bar[style*="width: 59%"],
+.readiness-bar[style*="width: 60%"],
+.readiness-bar[style*="width: 61%"],
+.readiness-bar[style*="width: 62%"],
+.readiness-bar[style*="width: 63%"],
+.readiness-bar[style*="width: 64%"],
+.readiness-bar[style*="width: 65%"],
+.readiness-bar[style*="width: 66%"],
+.readiness-bar[style*="width: 67%"],
+.readiness-bar[style*="width: 68%"],
+.readiness-bar[style*="width: 69%"],
+.readiness-bar[style*="width: 70%"] {
+  background-color: #ffeb3b; /* Yellow for 51-70% */
+}
+
+.readiness-bar[style*="width: 71%"],
+.readiness-bar[style*="width: 72%"],
+.readiness-bar[style*="width: 73%"],
+.readiness-bar[style*="width: 74%"],
+.readiness-bar[style*="width: 75%"],
+.readiness-bar[style*="width: 76%"],
+.readiness-bar[style*="width: 77%"],
+.readiness-bar[style*="width: 78%"],
+.readiness-bar[style*="width: 79%"],
+.readiness-bar[style*="width: 80%"],
+.readiness-bar[style*="width: 81%"],
+.readiness-bar[style*="width: 82%"],
+.readiness-bar[style*="width: 83%"],
+.readiness-bar[style*="width: 84%"],
+.readiness-bar[style*="width: 85%"],
+.readiness-bar[style*="width: 86%"],
+.readiness-bar[style*="width: 87%"],
+.readiness-bar[style*="width: 88%"],
+.readiness-bar[style*="width: 89%"] {
+  background-color: #cddc39; /* Yellow-green for 71-89% */
+}
+
+.readiness-bar[style*="width: 90%"],
+.readiness-bar[style*="width: 91%"],
+.readiness-bar[style*="width: 92%"],
+.readiness-bar[style*="width: 93%"],
+.readiness-bar[style*="width: 94%"],
+.readiness-bar[style*="width: 95%"],
+.readiness-bar[style*="width: 96%"],
+.readiness-bar[style*="width: 97%"],
+.readiness-bar[style*="width: 98%"],
+.readiness-bar[style*="width: 99%"],
+.readiness-bar[style*="width: 100%"] {
+  background-color: #4caf50; /* Green for 90-100% */
+}
+
+/* Ensure correct answer tags are styled for visibility */
+.chat-message-assistant .correct-answer {
+  color: hsl(var(--primary));
+  font-weight: bold;
+}
+
+.chat-message-assistant .user-answer {
+  color: hsl(var(--accent-foreground));
+}
+
+.chat-message-assistant .correct-tag,
+.chat-message-assistant .answer-tag {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
 }
 
 /* Custom styles for input area */

@@ -9,6 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+// Utility to debounce a function
+const debounce = (func: (...args: any[]) => void, wait: number) => {
+  let timeout: NodeJS.Timeout | null = null;
+  return (...args: any[]) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,11 +43,10 @@ export default function Login() {
       }
     };
 
-    checkAutofill();
+    // Run once after a short delay to catch autofill
     const timer = setTimeout(checkAutofill, 500);
-
     return () => clearTimeout(timer);
-  }, []);
+  }, [email, password]);
 
   useEffect(() => {
     console.log("Email state updated:", email);
@@ -142,6 +150,11 @@ export default function Login() {
     }
   };
 
+  // Debounced handler for opening the reset dialog
+  const debouncedOpenResetDialog = debounce(() => {
+    setIsResetDialogOpen(true);
+  }, 300);
+
   const isFormValid = email.trim().length > 0 && password.trim().length > 0;
   const isResetFormValid = resetEmail.trim().length > 0;
 
@@ -186,7 +199,7 @@ export default function Login() {
             {!isSignUp && (
               <button
                 type="button"
-                onClick={() => setIsResetDialogOpen(true)}
+                onClick={debouncedOpenResetDialog}
                 className="text-sm text-primary hover:underline mt-2"
                 disabled={loading}
               >

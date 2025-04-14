@@ -1,7 +1,13 @@
 // src/utils/quizUtils.ts
 import { Quiz, QuizFeedback } from "@/store/types";
 
-// Formats the quiz feedback message as HTML for consistent rendering
+/**
+ * Formats the quiz feedback message as HTML for consistent rendering.
+ * @param quiz - The quiz object containing options and correct answer
+ * @param answer - The user's answer
+ * @param feedback - The feedback object containing readiness and encouragement
+ * @returns The formatted HTML string for the feedback message
+ */
 export function formatQuizFeedbackMessage(
   quiz: Quiz,
   answer: string,
@@ -48,5 +54,5 @@ export function formatQuizFeedbackMessage(
 
   return `<p><strong>Feedback:</strong></p><p><strong>Your Answer:</strong> ${answer}</p><p>${feedback.encouragement}</p>${
     solutionHtml ? `<p>${solutionHtml}</p>` : ""
-  }<p><strong>Options:</strong></p><ul>${optionsHtml}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%"></div></div><p>${readinessPercentage}%</p>`;
+  }<p><strong>Options:</strong></p><ul>${optionsHtml}</ul><p><strong>Test Readiness:</strong></p><div class="readiness-container"><div class="readiness-bar" style="width: ${readinessPercentage}%;"></div></div><p>${readinessPercentage}%</p>`;
 }

@@ -53,12 +53,13 @@ const ImageFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
         >
           <div className="flex w-full items-center space-x-2">
             <img
-              alt={`Attachment ${name || "Image"}`}
+              alt={`Attachment ${name || file?.name || "Image"}`}
               className="grid h-10 w-10 shrink-0 place-items-center rounded-sm border bg-muted object-cover"
               src={src}
             />
+            {/* Updated to show the actual file name instead of "Image" */}
             <span className="w-full truncate text-muted-foreground">
-              {name || "Image"}
+              {name || file?.name || "Image"}
             </span>
           </div>
 
@@ -88,7 +89,7 @@ const ImageFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
             <div className="relative">
               <img
                 src={src}
-                alt={name || "Full-size image"}
+                alt={name || file?.name || "Full-size image"}
                 className="w-full h-auto max-h-[80vh] object-contain"
               />
               <a

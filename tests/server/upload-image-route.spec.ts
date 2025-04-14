@@ -55,6 +55,42 @@ class MockFormData {
 global.File = MockFile as any;
 global.FormData = MockFormData as any;
 
+// Mock Supabase client to include both auth and storage
+jest.mock('@/supabase/serverClient', () => {
+  const mockStorageFrom = {
+    list: jest.fn().mockResolvedValue({ data: [], error: null }),
+    remove: jest.fn().mockResolvedValue({ data: [], error: null }),
+    upload: jest.fn().mockImplementation((path, file) => ({
+      data: { path },
+      error: null,
+    })),
+    getPublicUrl: jest.fn().mockImplementation((path) => ({
+      data: { publicUrl: `https://mock.supabase.co/storage/v1/object/public/problems/${path}` },
+      error: null,
+    })),
+  };
+
+  return {
+    auth: {
+      getUser: jest.fn().mockResolvedValue({
+        data: { user: { id: 'test-user-id' } },
+        error: null,
+      }),
+    },
+    storage: {
+      listBuckets: jest.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      }),
+      createBucket: jest.fn().mockResolvedValue({
+        data: { name: 'problems' },
+        error: null,
+      }),
+      from: jest.fn().mockReturnValue(mockStorageFrom),
+    },
+  };
+});
+
 describe('POST /api/upload-image', () => {
   const bucketName = 'problems';
 
@@ -98,8 +134,8 @@ describe('POST /api/upload-image', () => {
     expect(json).toEqual({
       success: true,
       files: [
-        { name: 'image1.png', url: expect.stringMatching(/https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/problems\/.*image1\.png/) },
-        { name: 'image2.png', url: expect.stringMatching(/https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/problems\/.*image2\.png/) },
+        { name: 'image1.png', url: expect.stringMatching(/https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/problems\/test-user-id\/[0-9a-f-]+\.png/) },
+        { name: 'image2.png', url: expect.stringMatching(/https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/problems\/test-user-id\/[0-9a-f-]+\.png/) },
       ],
     });
   });
