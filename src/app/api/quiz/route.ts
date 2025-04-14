@@ -25,8 +25,9 @@ const responseFormat = `Return a JSON object with a new quiz problem related to 
   Additionally, assess the student's readiness for an end-of-semester test based on their overall performance in the chat history, considering quiz performance (correctness, consistency, and difficulty), 
   engagement with lessons and examples (e.g., fewer example requests might indicate mastery), 
   and inferred skill level and progress (e.g., improvement over time). 
-  Provide two encouragement messages: one for if the student answers correctly, 
-  and one for if they answer incorrectly. 
+  Provide two alternative encouragement messages using emojis, XP points, leveling up, etc.: 
+  one for if the student answers correctly, 
+  and another one for if they answer incorrectly. 
   Structure: 
     {
     "problem": "Quiz problem text", 
@@ -35,8 +36,8 @@ const responseFormat = `Return a JSON object with a new quiz problem related to 
     "correctAnswer": "correct option", 
     "solution": [{"title": "Step 1", "content": "Step content with formatting as needed"}, ...], 
     "difficulty": "easy|medium|hard", 
-    "encouragementIfCorrect": "Gamified message if correct", 
-    "encouragementIfIncorrect": "Gamified message if incorrect", 
+    "encouragementIfCorrect": "Gamified message of if correct ", 
+    "encouragementIfIncorrect": "Gamified message if incorrect using emojis, XP points, leveling up, etc.",
     "readiness": {"confidenceIfCorrect": 0.92, "confidenceIfIncorrect": 0.75}
     }. 
     The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence 
