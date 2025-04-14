@@ -72,4 +72,70 @@ test.describe('Problem Submission with Image', () => {
     await page.click('button[aria-label="Send message"]');
     await expect(page.getByText('Some files exceed the 5MB size limit')).toBeVisible();
   });
+
+  test('should allow photo library upload and show preview on mobile', async ({ page }) => {
+    test.setTimeout(5000);
+
+    // Simulate mobile device (iPhone-like viewport)
+    await page.setViewportSize({ width: 375, height: 667 });
+
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await page.click('button[aria-label="Attach a file"]');
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles({
+      name: 'gallery-photo.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from('mock gallery photo'),
+    });
+
+    // Verify file preview appears with the correct file name
+    await expect(page.getByText('gallery-photo.jpg')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('button[aria-label="Remove attachment"]')).toBeVisible();
+  });
+
+  test('should trigger camera and gallery options for attachment', async ({ page }) => {
+    test.setTimeout(5000);
+
+    // Simulate mobile device
+    await page.setViewportSize({ width: 375, height: 667 });
+
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await page.click('button[aria-label="Attach a file"]');
+    const fileChooser = await fileChooserPromise;
+
+    // Verify file chooser is triggered (simulates iOS prompt for camera/gallery)
+    expect(fileChooser).toBeTruthy();
+
+    // Select a file to simulate gallery choice
+    await fileChooser.setFiles({
+      name: 'selected-photo.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from('mock selected photo'),
+    });
+
+    // Verify file preview with the correct file name
+    await expect(page.getByText('selected-photo.jpg')).toBeVisible({ timeout: 2000 });
+  });
+
+  test('should display and remove file preview before submission', async ({ page }) => {
+    test.setTimeout(5000);
+
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await page.click('button[aria-label="Attach a file"]');
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles({
+      name: 'test-photo.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from('mock test photo'),
+    });
+
+    // Verify file preview with the correct file name
+    await expect(page.getByText('test-photo.jpg')).toBeVisible({ timeout: 2000 });
+
+    // Remove file
+    await page.click('button[aria-label="Remove attachment"]');
+
+    // Verify file preview is gone
+    await expect(page.getByText('test-photo.jpg')).not.toBeVisible();
+  });
 });

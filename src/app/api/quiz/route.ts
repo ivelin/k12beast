@@ -17,7 +17,7 @@ interface QuizResponse {
   readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
 }
 
-const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the original input problem (e.g., if the input is about heat transfer, the quiz must also be about heat transfer). 
+const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the original k12 input problem prompt by the user. 
   The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. 
   Provide a brief context or scenario to make the problem engaging. 
   Do not repeat problems from the session history. 

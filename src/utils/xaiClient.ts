@@ -30,10 +30,21 @@ interface XAIRequestOptions {
   chatHistory?: { role: string; content: string; renderAs?: "markdown" | "html" }[];
 }
 
+// Sanitize raw API response to extract valid JSON, removing invalid characters and extraneous text
 function sanitizeResponse(rawContent: string): string {
-  return rawContent
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F](?=(?:(?:[^"]*"){2})*[^"]*$)/g, "")
-    .trim();
+  // Remove control characters outside quotes
+  let cleaned = rawContent.replace(
+    /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F](?=(?:(?:[^"]*"){2})*[^"]*$)/g,
+    ""
+  );
+
+  // Extract content between ```json and ```, or the first valid JSON object if no markers
+  const jsonMatch = cleaned.match(/```json\s*([\s\S]*?)\s*```/) || cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    cleaned = jsonMatch[1] || jsonMatch[0];
+  }
+
+  return cleaned.trim();
 }
 
 export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
@@ -48,10 +59,12 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
 
   validateRequestInputs(problem, images);
 
-  const chatHistoryText = chatHistory.length > 0
-    ? `Chat History:\n${chatHistory.map(msg =>
-        `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`).join("\n")}`
-    : "No chat history available.";
+  const chatHistoryText =
+    chatHistory.length > 0
+      ? `Chat History:\n${chatHistory
+          .map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+          .join("\n")}`
+      : "No chat history available.";
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     {
@@ -68,7 +81,7 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
     },
     {
       role: "user",
-      content: `Original Input Problem (if provided): "${problem || 'No text provided'}"`,
+      content: `Original Input Problem (if provided): "${problem || "No text provided"}"`,
     },
     {
       role: "user",
@@ -112,18 +125,21 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
 
       return content;
     } catch (error: unknown) {
-      console.warn(`xAI request failed (attempt ${attempt}/${maxRetries}):`, (error as Error).message);
+      console.warn(
+        `xAI request failed (attempt ${attempt}/${maxRetries}):`,
+        (error as Error).message
+      );
       if (attempt === maxRetries) {
         console.error("Final attempt failed. Raw response:", rawContent ?? "No response");
         console.error("Returning default response with error message.");
         return {
           ...defaultResponse,
           lesson: defaultResponse.lesson
-            ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON characters.`
-            : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON characters.`,
+            ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON format.`
+            : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON format.`,
         };
       }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
   return defaultResponse;

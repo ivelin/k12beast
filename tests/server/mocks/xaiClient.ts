@@ -1,3 +1,5 @@
+// tests/server/mocks/xaiClient.ts
+
 export const sendXAIRequest = jest.fn().mockImplementation((options) => {
   if (options.responseFormat.includes("example problem")) {
     // Check for a failure flag in options (for testing)
