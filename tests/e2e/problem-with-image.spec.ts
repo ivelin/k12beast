@@ -48,6 +48,48 @@ test.describe('Problem Submission with Image', () => {
     await expect(page.getByText('Lesson based on your images: test1.jpg and test2.jpg!')).toBeVisible();
   });
 
+  test('should submit a problem with image only and see lesson', async ({ page }) => {
+    test.setTimeout(5000);
+
+    await page.route('**/api/upload-image', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          files: [
+            { name: 'test-image.jpg', url: 'http://mockurl.com/test-image.jpg' },
+          ],
+        }),
+      });
+    });
+
+    await page.route('**/api/tutor', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'text/plain',
+        headers: { 'x-session-id': 'mock-session-id' },
+        body: '<p>Lesson based on your image: test-image.jpg!</p>',
+      });
+    });
+
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await page.click('button[aria-label="Attach a file"]');
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([
+      { name: 'test-image.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('mock image') },
+    ]);
+
+    // Verify image preview appears (user-facing check)
+    await expect(page.getByText('test-image.jpg')).toBeVisible({ timeout: 2000 });
+
+    // Submit the form without text (critical user flow)
+    await page.click('button[aria-label="Send message"]');
+
+    // Verify lesson appears (critical user-facing check)
+    await expect(page.getByText('Lesson based on your image: test-image.jpg!')).toBeVisible();
+  });
+
   test('should handle oversized image upload failure', async ({ page }) => {
     test.setTimeout(5000);
 
