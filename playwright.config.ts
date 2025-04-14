@@ -1,7 +1,9 @@
 // playwright.config.ts
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
 
 export default defineConfig({
+  // E2E test configuration
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -24,6 +26,23 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+    },
+    // Add component testing project
+    {
+      name: 'component',
+      testDir: './tests/component',
+      testMatch: '*.spec.tsx', // Match component test files
+      use: {
+        // Configure Playwright Component Testing for React
+        ctFramework: '@playwright/experimental-ct-react',
+        ctViteConfig: {
+          resolve: {
+            alias: {
+              '@': path.resolve(__dirname, './src'), // Match the alias from tsconfig.json
+            },
+          },
+        },
+      },
     },
   ],
   webServer: {

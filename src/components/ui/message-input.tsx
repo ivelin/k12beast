@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { FilePreview } from "@/components/ui/file-preview"
 import { InterruptPrompt } from "@/components/ui/interrupt-prompt"
 
+// Props for the MessageInput component without file attachments
 interface MessageInputBaseProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   value: string
@@ -24,10 +25,12 @@ interface MessageInputBaseProps
   transcribeAudio?: (blob: Blob) => Promise<string>
 }
 
+// Props when attachments are not allowed
 interface MessageInputWithoutAttachmentProps extends MessageInputBaseProps {
   allowAttachments?: false
 }
 
+// Props when attachments are allowed, including file state management
 interface MessageInputWithAttachmentsProps extends MessageInputBaseProps {
   allowAttachments: true
   files: File[] | null
@@ -38,6 +41,7 @@ type MessageInputProps =
   | MessageInputWithoutAttachmentProps
   | MessageInputWithAttachmentsProps
 
+// MessageInput component for user input, supporting text, audio, and file attachments
 export function MessageInput({
   placeholder = "Ask AI...",
   className,
@@ -67,23 +71,23 @@ export function MessageInput({
     },
   })
 
+  // Reset interrupt prompt when generation stops
   useEffect(() => {
     if (!isGenerating) {
       setShowInterruptPrompt(false)
     }
   }, [isGenerating])
 
+  // Add files to the current file list
   const addFiles = (files: File[] | null) => {
     if (props.allowAttachments) {
       props.setFiles((currentFiles) => {
         if (currentFiles === null) {
           return files
         }
-
         if (files === null) {
           return currentFiles
         }
-
         return [...currentFiles, ...files]
       })
     }
@@ -174,10 +178,15 @@ export function MessageInput({
 
   useAutosizeTextArea({
     ref: textAreaRef,
-    maxHeight: 120, // Reduced max height for mobile
+    maxHeight: 120,
     borderWidth: 1,
     dependencies: [props.value, showFileList],
   })
+
+  // Check if submission is allowed (text or files present)
+  const canSubmit =
+    props.value.trim() ||
+    (props.allowAttachments && props.files && props.files.length > 0)
 
   return (
     <div
@@ -228,7 +237,6 @@ export function MessageInput({
                         onRemove={() => {
                           props.setFiles((files) => {
                             if (!files) return null
-
                             const filtered = Array.from(files).filter(
                               (f) => f !== file
                             )
@@ -289,10 +297,10 @@ export function MessageInput({
             type="submit"
             size="icon"
             className={`h-8 w-8 transition-opacity ${
-              !props.value || isGenerating ? "bg-muted text-muted-foreground" : ""
+              !canSubmit || isGenerating ? "bg-muted text-muted-foreground" : ""
             }`}
             aria-label="Send message"
-            disabled={!props.value || isGenerating}
+            disabled={!canSubmit || isGenerating}
           >
             <ArrowUp className="h-5 w-5" />
           </Button>
@@ -313,6 +321,7 @@ export function MessageInput({
 }
 MessageInput.displayName = "MessageInput"
 
+// Overlay displayed when dragging files over the input
 interface FileUploadOverlayProps {
   isDragging: boolean
 }
@@ -337,45 +346,44 @@ function FileUploadOverlay({ isDragging }: FileUploadOverlayProps) {
   )
 }
 
+// Opens a file picker dialog for selecting images
 async function showFileUploadDialog(): Promise<File[] | null> {
   return new Promise((resolve) => {
-    const input = document.createElement("input");
-
-    input.type = "file";
-    input.multiple = true;
-    input.accept = "image/*"; // Restrict to images for iOS gallery and camera access
-    input.click();
+    const input = document.createElement("input")
+    input.type = "file"
+    input.multiple = true
+    input.accept = "image/*"
+    input.click()
 
     const handleChange = () => {
-      const files = input.files;
+      const files = input.files
       if (files) {
-        resolve(Array.from(files));
+        resolve(Array.from(files))
       } else {
-        resolve(null);
+        resolve(null)
       }
-      // Clean up event listeners to prevent memory leaks
-      input.removeEventListener("change", handleChange);
-      input.removeEventListener("cancel", handleCancel);
-    };
+      input.removeEventListener("change", handleChange)
+      input.removeEventListener("cancel", handleCancel)
+    }
 
     const handleCancel = () => {
-      resolve(null);
-      input.removeEventListener("change", handleChange);
-      input.removeEventListener("cancel", handleCancel);
-    };
+      resolve(null)
+      input.removeEventListener("change", handleChange)
+      input.removeEventListener("cancel", handleCancel)
+    }
 
-    input.addEventListener("change", handleChange);
-    input.addEventListener("cancel", handleCancel);
+    input.addEventListener("change", handleChange)
+    input.addEventListener("cancel", handleCancel)
 
-    // Add a timeout to ensure iOS processes the input
     setTimeout(() => {
       if (!input.files || input.files.length === 0) {
-        handleCancel();
+        handleCancel()
       }
-    }, 60000); // 60 seconds timeout for user to select files
-  });
+    }, 60000)
+  })
 }
 
+// Overlay displayed while transcribing audio
 function TranscribingOverlay() {
   return (
     <motion.div
@@ -406,6 +414,7 @@ function TranscribingOverlay() {
   )
 }
 
+// Prompt displayed while recording audio
 interface RecordingPromptProps {
   isVisible: boolean
   onStopRecording: () => void
@@ -439,6 +448,7 @@ function RecordingPrompt({ isVisible, onStopRecording }: RecordingPromptProps) {
   )
 }
 
+// Controls for audio recording, including visualizer
 interface RecordingControlsProps {
   isRecording: boolean
   isTranscribing: boolean
