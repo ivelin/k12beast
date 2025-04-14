@@ -1,12 +1,10 @@
-// .github/workflows/e2e-tests.yaml
+# .github/workflows/e2e-tests.yaml
 name: Tests
-
 on:
   push:
     branches: [main, dev]
   pull_request:
     branches: [main]
-
 jobs:
   e2e-tests:
     timeout-minutes: 60
