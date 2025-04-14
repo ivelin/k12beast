@@ -21,16 +21,39 @@ async function globalSetup(config: FullConfig) {
   const page = await browser.newPage();
 
   try {
-    // Navigate to the login page
-    await page.goto('http://localhost:3000/public/login', { timeout: 5000 });
+    // Retry login up to 3 times
+    let attempts = 3;
+    let success = false;
+    while (attempts > 0 && !success) {
+      try {
+        // Navigate to the login page
+        await page.goto('http://localhost:3000/public/login', { timeout: 10000 });
 
-    // Fill in the login form (critical check)
-    await page.fill('#email', testUserEmail);
-    await page.fill('#password', testUserPassword);
-    await page.click('button[type="submit"]');
+        // Fill in the login form (critical check)
+        await page.fill('#email', testUserEmail);
+        await page.fill('#password', testUserPassword);
+        await page.click('button[type="submit"]');
 
-    // Wait for redirect to /chat/new (updated app behavior)
-    await page.waitForURL(/\/chat\/new/, { timeout: 5000, waitUntil: "domcontentloaded" });
+        // Wait for redirect to /chat/new with increased timeout
+        await page.waitForURL(/\/chat\/new/, { timeout: 10000, waitUntil: "domcontentloaded" });
+        success = true;
+      } catch (error) {
+        attempts--;
+        console.warn(`Login attempt failed (${3 - attempts}/3):`, error.message);
+        if (attempts === 0) {
+          // Log page content for debugging
+          console.error('Final login attempt failed. Page content:', await page.content());
+          // Check for error message
+          const errorMessage = await page.locator('text=Invalid email or password').textContent({ timeout: 2000 }).catch(() => null);
+          if (errorMessage) {
+            throw new Error(`Login failed: ${errorMessage}. Verify TEST_USER_EMAIL and TEST_USER_PASSWORD.`);
+          }
+          throw error;
+        }
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
 
     // Save the authenticated state
     await page.context().storageState({ path: 'playwright/.auth/user.json' });
