@@ -1,3 +1,4 @@
+// src/app/api/examples/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import supabase from "../../../supabase/serverClient";
 import { sendXAIRequest } from "../../../utils/xaiClient";

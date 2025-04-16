@@ -1,4 +1,6 @@
-// src/app/chat/[sessionId]/page.tsx
+// File path: src/app/chat/[sessionId]/page.tsx
+// Renders the live chat page for both new and existing sessions, ensuring consistent message rendering
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -15,6 +17,7 @@ import useAppStore from "@/store";
 import { Message, Quiz, Session } from "@/store/types";
 import QuizSection from "../QuizSection";
 import React from "react";
+import { buildSessionMessages } from "@/utils/sessionUtils"; // Import the shared utility
 
 export default function ChatPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = React.use(params);
@@ -89,34 +92,9 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         const data = await res.json();
         const fetchedSession: Session = data.session;
 
-        const updatedMessages: Message[] = [];
-        if (fetchedSession.problem || (fetchedSession.images && fetchedSession.images.length > 0)) {
-          updatedMessages.push({
-            role: "user",
-            content: fetchedSession.problem || "Image-based problem",
-            renderAs: "markdown",
-            experimental_attachments: fetchedSession.images?.map((url, index) => ({
-              name: `Image ${index + 1}`,
-              url,
-            })),
-          });
-        }
-        const serverMessages = fetchedSession.messages || [];
-        serverMessages.forEach((msg: Message) => {
-          if (msg && typeof msg.content === "string") {
-            updatedMessages.push(msg);
-          } else {
-            console.warn("Invalid message format from server:", msg);
-          }
-        });
-        const hasLessonInMessages = updatedMessages.some(msg => msg.role === "assistant");
-        if (!hasLessonInMessages && fetchedSession.lesson) {
-          updatedMessages.push({
-            role: "assistant",
-            content: fetchedSession.lesson,
-            renderAs: "html",
-          });
-        }
+        // Use the shared utility to build messages
+        const updatedMessages = buildSessionMessages(fetchedSession);
+
         set({
           sessionId: fetchedSession.id,
           problem: fetchedSession.problem || "",
@@ -127,7 +105,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           sessionTerminated: false,
           showErrorPopup: false,
           error: null,
-          cloned_from: fetchedSession.cloned_from || null, // Ensure cloned_from is set in the store
+          cloned_from: fetchedSession.cloned_from || null,
         });
         setLocalProblem(fetchedSession.problem || "");
         setLocalImages([]);
