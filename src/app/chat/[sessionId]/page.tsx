@@ -52,7 +52,6 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   useEffect(() => {
     const controller = new AbortController();
     async function loadSession() {
-      // Clear any previous error state when starting to load a session
       set({ error: null, showErrorPopup: false });
 
       if (sessionId === "new") {
@@ -102,7 +101,6 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
             })),
           });
         }
-        // Validate messages from the server
         const serverMessages = fetchedSession.messages || [];
         serverMessages.forEach((msg: Message) => {
           if (msg && typeof msg.content === "string") {
@@ -128,7 +126,8 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           step: updatedMessages.some(msg => msg.role === "assistant") ? "lesson" : "problem",
           sessionTerminated: false,
           showErrorPopup: false,
-          error: null, // Clear error on successful load
+          error: null,
+          cloned_from: fetchedSession.cloned_from || null, // Ensure cloned_from is set in the store
         });
         setLocalProblem(fetchedSession.problem || "");
         setLocalImages([]);
@@ -196,10 +195,9 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   const handleCopyLink = async () => {
     if (shareableLink) {
       try {
-        // Dismiss any existing toasts to prevent stacking
         toast.dismiss();
         await navigator.clipboard.writeText(shareableLink);
-        toast.success("Link copied to clipboard!", { duration: 2000 }); // Ensure duration is set
+        toast.success("Link copied to clipboard!", { duration: 2000 });
         setIsShareModalOpen(false);
       } catch (err) {
         console.error("Error copying link:", err);
@@ -227,7 +225,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
 
   const handleClosePopup = () => {
     set({ showErrorPopup: false, error: null });
-    window.location.href = "/public/login"; // Redirect to /public/login
+    window.location.href = "/public/login";
   };
 
   if (isLoadingSession) {
@@ -237,6 +235,22 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col relative">
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 flex flex-col">
+        {/* Cloned From Label */}
+        {store.cloned_from && (
+          <div className="text-sm text-muted-foreground mb-4">
+            <p>
+              This session was cloned from{" "}
+              <Link
+                href={`/public/session/${store.cloned_from}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline hover:text-primary-dark"
+              >
+                a shared session
+              </Link>.
+            </p>
+          </div>
+        )}
         <div className="flex justify-end items-center mb-4">
           <div className="flex space-x-2">
             <div className="relative group">
@@ -326,7 +340,6 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         )}
       </div>
 
-      {/* Error Popup Modal */}
       <Dialog open={showErrorPopup} onOpenChange={handleClosePopup}>
         <DialogContent aria-describedby="error-description">
           <DialogHeader>
@@ -351,9 +364,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
             readOnly
             className="w-full p-2 border rounded"
           />
-          <Button onClick={handleCopyLink}>
-            Copy Link
-          </Button>
+          <Button onClick={handleCopyLink}>Copy Link</Button>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,4 +1,6 @@
 // scripts/dbMigrations.js
+// Manages database migrations for K12Beast, ensuring schema compatibility with app versions
+
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env.local") });
 const { createClient } = require("@supabase/supabase-js");
 const packageJson = require("../package.json");
@@ -50,6 +52,7 @@ const migrationV10 = require("./migrations/migrationV10");
 const migrationV11 = require("./migrations/migrationV11");
 const migrationV12 = require("./migrations/migrationV12");
 const migrationV13 = require("./migrations/migrationV13");
+const migrationV14 = require("./migrations/migrationV14");
 
 // Define app version
 const APP_VERSION = packageJson.version;
@@ -69,6 +72,7 @@ const migrations = [
   migrationV11,
   migrationV12,
   migrationV13,
+  migrationV14,
 ];
 
 // Mapping of database versions to app versions
@@ -86,6 +90,7 @@ const dbVersionRequiredByAppVersion = [
   { dbVersion: 11, appVersion: "0.6.6" },
   { dbVersion: 12, appVersion: "0.6.6" },
   { dbVersion: 13, appVersion: "0.6.6" },
+  { dbVersion: 14, appVersion: "0.8.2" },
 ];
 
 // Run pending migrations

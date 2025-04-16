@@ -43,7 +43,6 @@ export default function Login() {
       }
     };
 
-    // Run once after a short delay to catch autofill
     const timer = setTimeout(checkAutofill, 500);
     return () => clearTimeout(timer);
   }, [email, password]);
@@ -109,8 +108,13 @@ export default function Login() {
         }
         console.log("Login successful, session data:", data);
         document.cookie = `supabase-auth-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
+
+        // Handle redirectTo
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectTo = urlParams.get("redirectTo") || "/chat/new";
+        console.log("Redirecting to:", redirectTo);
+        window.location.href = redirectTo; // Redirect to the provided URL
         setLoading(false);
-        window.location.href = "/chat/new"; // Redirect to /chat/new
       }
     } catch (error: any) {
       console.error("Authentication error:", error);
@@ -150,7 +154,6 @@ export default function Login() {
     }
   };
 
-  // Debounced handler for opening the reset dialog
   const debouncedOpenResetDialog = debounce(() => {
     setIsResetDialogOpen(true);
   }, 300);
