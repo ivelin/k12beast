@@ -1,5 +1,4 @@
 // src/app/public/session/[sessionId]/page.tsx
-// File path: src/app/public/session/[sessionId]/page.tsx
 // Renders a public session page with client-side data fetching and Supabase auth
 
 "use client";
@@ -51,8 +50,7 @@ export default function PublicSessionPage({ params }: PublicSessionPageProps) {
       setLoading(true);
       try {
         // Fetch session
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-        const sessionRes = await fetch(`${baseUrl}/api/session/${sessionId}`, {
+        const sessionRes = await fetch(`/api/session/${sessionId}`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
