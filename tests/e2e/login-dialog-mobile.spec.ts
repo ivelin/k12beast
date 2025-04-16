@@ -1,12 +1,15 @@
-// tests/e2e/login-dialog-mobile.spec.ts
+// File path: tests/e2e/login-dialog-mobile.spec.ts
+// End-to-end tests for login page on mobile (iPhone), focusing on Forgot Password dialog behavior
+
 import { test, expect, devices } from '@playwright/test';
 
-// Configure mobile device emulation for all tests
+// Configure mobile device emulation for all tests to replicate iPhone issue
 test.use({ ...devices['iPhone 12'] });
 
 test.describe('Login Page - Forgot Password Dialog on Mobile', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/auth/v1/token?grant_type=password', async (route) => {
+    // Mock authentication API to allow login and password reset flows
+    await page.route('**/auth/v1/**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -17,34 +20,54 @@ test.describe('Login Page - Forgot Password Dialog on Mobile', () => {
       });
     });
 
-    await page.route('**/auth/v1/reset_password_for_email', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({}),
-      });
-    });
-
+    // Navigate to login page and wait for form to load
     await page.goto('/public/login');
     await page.waitForSelector('input[type="email"]', { timeout: 5000 });
   });
 
-  test('should not open forgot password dialog when entering credentials on mobile', async ({ page }) => {
-    await page.fill('input[type="email"]', 'testuser@validemail.com'); // Use a valid email
+  test('should not open forgot password dialog when entering credentials manually', async ({ page }) => {
+    // Simulate manual credential entry (critical user flow)
+    await page.fill('input[type="email"]', 'testuser@example.com');
     await page.fill('input[type="password"]', 'password123');
 
-    await expect(page.locator('text=Reset Your Password')).not.toBeVisible();
+    // Verify dialog does not appear unexpectedly
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 3000 });
   });
 
-  test('should open forgot password dialog when clicking button on mobile', async ({ page }) => {
-    await page.click('text=Forgot Password?');
+  test('should not open forgot password dialog during autofill', async ({ page }) => {
+    // Simulate autofill by programmatically setting input values (mimics iOS Keychain)
+    await page.evaluate(() => {
+      const emailInput = document.querySelector('input[type="email"]') as HTMLInputElement;
+      const passwordInput = document.querySelector('input[type="password"]') as HTMLInputElement;
+      emailInput.value = 'testuser@example.com';
+      passwordInput.value = 'password123';
+      emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+      passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
 
-    await expect(page.locator('text=Reset Your Password')).toBeVisible({ timeout: 5000 });
+    // Wait briefly to allow any unintended dialog triggers
+    await page.waitForTimeout(1000);
 
-    // Use a valid email to pass validation
-    await page.fill('input[id="reset-email"]', 'testuser@validemail.com');
+    // Verify dialog does not appear unexpectedly (critical for iPhone issue)
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 3000 });
+  });
+
+  test('should open forgot password dialog and send reset email when clicked', async ({ page }) => {
+    // Click Forgot Password button (critical user flow)
+    await page.click('button:has-text("Forgot Password")');
+
+    // Verify dialog opens
+    const dialog = page.locator('[role="dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+
+    // Fill reset email form and submit
+    await page.fill('input[id="reset-email"]', 'testuser@example.com');
     await page.click('button:has-text("Send Reset Email")');
 
-    await expect(page.locator('text=Password reset email sent! Please check your inbox.')).toBeVisible({ timeout: 5000 });
+    // Verify success message appears (critical user-facing check)
+    await expect(page.locator('text=Password reset email sent')).toBeVisible({ timeout: 5000 });
+
+    // Verify dialog closes after success
+    await expect(dialog).not.toBeVisible({ timeout: 3000 });
   });
 });
