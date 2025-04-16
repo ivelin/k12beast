@@ -1,7 +1,14 @@
 // src/app/public/session/[sessionId]/page.tsx
+// File path: src/app/public/session/[sessionId]/page.tsx
+// Renders a public session page with client-side data fetching and Supabase auth
+
+"use client";
+
+import { useEffect, useState } from "react";
+import { use } from "react"; // Import React.use
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { ArrowLeft } from "lucide-react";
+import supabase from '@/supabase/browserClient';
 import { Button } from "@/components/ui/button";
 import { ChatMessages } from "@/components/ui/chat";
 import { MessageList } from "@/components/ui/message-list";
@@ -25,61 +32,58 @@ interface Session {
   updated_at: string;
 }
 
-async function fetchSession(sessionId: string): Promise<Session> {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const res = await fetch(`${baseUrl}/api/session/${sessionId}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.error || "Failed to fetch session");
-  }
-
-  const data = await res.json();
-  return data.session;
+interface PublicSessionPageProps {
+  params: Promise<{ sessionId: string }>; // Define params as a Promise
 }
 
-async function checkAuth(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const authToken = cookieStore.get("supabase-auth-token")?.value;
+export default function PublicSessionPage({ params }: PublicSessionPageProps) {
+  // Unwrap params using React.use
+  const { sessionId } = use(params);
 
-  if (!authToken) {
-    return false;
-  }
+  const [session, setSession] = useState<Session | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const res = await fetch(`${baseUrl}/api/auth/user`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${authToken}`,
-    },
-  });
+  // Fetch session data and auth status client-side
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      try {
+        // Fetch session
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+        const sessionRes = await fetch(`${baseUrl}/api/session/${sessionId}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
 
-  return res.ok;
-}
+        if (!sessionRes.ok) {
+          const errorData = await sessionRes.json();
+          throw new Error(errorData.error || "Failed to fetch session");
+        }
 
-export default async function PublicSessionPage({
-  params: paramsPromise,
-}: {
-  params: Promise<{ sessionId: string }>;
-}) {
-  const params = await paramsPromise;
-  const { sessionId } = params;
+        const sessionData = await sessionRes.json();
+        setSession(sessionData.session);
 
-  // Fetch session data server-side
-  let session: Session | null = null;
-  let error: string | null = null;
-  try {
-    session = await fetchSession(sessionId);
-  } catch (err: any) {
-    error = err.message || "Error loading session";
-  }
+        // Check auth status using Supabase client
+        const { data: authSessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.error("Supabase auth error:", sessionError.message);
+          setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(!!authSessionData.session);
+        }
+      } catch (err: any) {
+        console.error("Fetch error:", err.message);
+        setError(err.message || "Error loading session");
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  // Check authentication server-side
-  const isAuthenticated = await checkAuth();
+    fetchData();
+  }, [sessionId]);
 
   // Build messages array
   const messages: Message[] = [];
@@ -105,6 +109,16 @@ export default async function PublicSessionPage({
     messages.push(...(session.messages || []));
   }
 
+  // Render loading state
+  if (loading) {
+    return (
+      <div className="container">
+        <p>Loading session...</p>
+      </div>
+    );
+  }
+
+  // Render error state
   if (error) {
     return (
       <div className="container">
@@ -120,6 +134,7 @@ export default async function PublicSessionPage({
     );
   }
 
+  // Render session content
   return (
     <div className="container">
       <Link href="/">
