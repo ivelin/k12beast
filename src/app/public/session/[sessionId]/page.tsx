@@ -1,10 +1,10 @@
-// src/app/public/session/[sessionId]/page.tsx
+// File path: src/app/public/session/[sessionId]/page.tsx
 // Renders a public session page with client-side data fetching and Supabase auth
 
 "use client";
 
 import { useEffect, useState } from "react";
-import { use } from "react"; // Import React.use
+import { use } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import supabase from '@/supabase/browserClient';
@@ -13,6 +13,7 @@ import { ChatMessages } from "@/components/ui/chat";
 import { MessageList } from "@/components/ui/message-list";
 import ClientCloneButton from "./ClientCloneButton";
 import FormattedTimestamp from "@/components/ui/formatted-timestamp";
+import { buildSessionMessages } from "@/utils/sessionUtils"; // Import the shared utility
 
 // Define interfaces for TypeScript type safety
 interface Message {
@@ -32,11 +33,10 @@ interface Session {
 }
 
 interface PublicSessionPageProps {
-  params: Promise<{ sessionId: string }>; // Define params as a Promise
+  params: Promise<{ sessionId: string }>;
 }
 
 export default function PublicSessionPage({ params }: PublicSessionPageProps) {
-  // Unwrap params using React.use
   const { sessionId } = use(params);
 
   const [session, setSession] = useState<Session | null>(null);
@@ -49,7 +49,6 @@ export default function PublicSessionPage({ params }: PublicSessionPageProps) {
     async function fetchData() {
       setLoading(true);
       try {
-        // Fetch session
         const sessionRes = await fetch(`/api/session/${sessionId}`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
@@ -64,7 +63,6 @@ export default function PublicSessionPage({ params }: PublicSessionPageProps) {
         const sessionData = await sessionRes.json();
         setSession(sessionData.session);
 
-        // Check auth status using Supabase client
         const { data: authSessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
           console.error("Supabase auth error:", sessionError.message);
@@ -83,31 +81,9 @@ export default function PublicSessionPage({ params }: PublicSessionPageProps) {
     fetchData();
   }, [sessionId]);
 
-  // Build messages array
-  const messages: Message[] = [];
-  if (session) {
-    if (session.problem || (session.images && session.images.length > 0)) {
-      messages.push({
-        role: "user",
-        content: session.problem || "Image-based problem",
-        renderAs: "markdown",
-        experimental_attachments: session.images?.map((url, index) => ({
-          name: `Image ${index + 1}`,
-          url,
-        })),
-      });
-    }
+  // Use the shared utility to build messages
+  const messages = session ? buildSessionMessages(session) : [];
 
-    messages.push({
-      role: "assistant",
-      content: session.lesson || "No lesson provided",
-      renderAs: "html",
-    });
-
-    messages.push(...(session.messages || []));
-  }
-
-  // Render loading state
   if (loading) {
     return (
       <div className="container">
@@ -116,7 +92,6 @@ export default function PublicSessionPage({ params }: PublicSessionPageProps) {
     );
   }
 
-  // Render error state
   if (error) {
     return (
       <div className="container">
@@ -132,7 +107,6 @@ export default function PublicSessionPage({ params }: PublicSessionPageProps) {
     );
   }
 
-  // Render session content
   return (
     <div className="container">
       <Link href="/">

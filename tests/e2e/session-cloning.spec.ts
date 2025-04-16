@@ -1,4 +1,3 @@
-// tests/e2e/session-cloning.spec.ts
 // File path: tests/e2e/session-cloning.spec.ts
 // Handles end-to-end testing for authenticated and non-cloned session cloning flows
 
@@ -7,6 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Session Cloning Flows', () => {
   const originalSessionId = 'mock-session-id';
   const newSessionId = 'mock-new-session-id';
+  const mockLesson = '<p>Mock lesson content</p>';
 
   test('Authenticated user clones a session', async ({ page, context }) => {
     // Mock the @/supabase/browserClient module
@@ -46,7 +46,7 @@ test.describe('Session Cloning Flows', () => {
       });
     });
 
-    // Mock /api/session/[sessionId]
+    // Mock /api/session/[sessionId] for the original session
     await context.route(`**/api/session/${originalSessionId}`, async (route) => {
       console.log(`Mocking API request for /api/session/${originalSessionId}`);
       return route.fulfill({
@@ -57,7 +57,7 @@ test.describe('Session Cloning Flows', () => {
             id: originalSessionId,
             problem: 'Test session for cloning',
             images: [],
-            lesson: '<p>Mock lesson content</p>',
+            lesson: mockLesson,
             messages: [],
             created_at: '2025-04-15T22:46:59.123Z',
             updated_at: '2025-04-15T22:46:59.123Z',
@@ -78,7 +78,7 @@ test.describe('Session Cloning Flows', () => {
       });
     });
 
-    // Mock /api/session/[newSessionId]
+    // Mock /api/session/[newSessionId] for the cloned session
     await context.route(`**/api/session/${newSessionId}`, async (route) => {
       console.log(`Mocking API request for /api/session/${newSessionId}`);
       return route.fulfill({
@@ -89,8 +89,8 @@ test.describe('Session Cloning Flows', () => {
             id: newSessionId,
             problem: 'Test session for cloning',
             images: [],
-            lesson: '<p>Mock lesson content</p>',
-            messages: [],
+            lesson: mockLesson,
+            messages: [], // Messages are empty, lesson will be added by buildSessionMessages
             created_at: '2025-04-15T22:46:59.123Z',
             updated_at: '2025-04-15T22:46:59.123Z',
             cloned_from: originalSessionId,
@@ -113,16 +113,20 @@ test.describe('Session Cloning Flows', () => {
     // Verify redirect to live chat page
     await page.waitForURL(`/chat/${newSessionId}`, { timeout: 20000 });
 
-    // Verify the cloned session label
+    // Verify the cloned session label (critical user-facing check)
     await expect(page.getByText('This session was cloned from a shared session.')).toBeVisible({ timeout: 20000 });
 
     // Verify the link to the original session
     const link = page.getByRole('link', { name: 'a shared session' });
     await expect(link).toHaveAttribute('href', `/public/session/${originalSessionId}`);
+
+    // Verify the lesson content appears exactly once on the cloned chat page (critical user-facing check)
+    const lessonElements = page.getByText('Mock lesson content');
+    await expect(lessonElements).toHaveCount(1, { timeout: 20000 });
+    await expect(lessonElements.first()).toBeVisible({ timeout: 20000 });
   });
 
   test('Non-cloned session does not show cloned label', async ({ browser }) => {
-    // Use a fresh context with authenticated state
     const context = await browser.newContext();
     const page = await context.newPage();
 
@@ -186,7 +190,7 @@ test.describe('Session Cloning Flows', () => {
             problem: 'What is 2 + 2 in math?',
             images: [],
             lesson: '<p>Lesson: Adding numbers.</p>',
-            messages: [],
+            messages: [], // Messages are empty, lesson will be added by buildSessionMessages
             created_at: '2025-04-15T22:46:59.123Z',
             updated_at: '2025-04-15T22:46:59.123Z',
             cloned_from: null,
