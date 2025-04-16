@@ -16,6 +16,12 @@ async function globalSetup(config: FullConfig) {
   if (!testUserPassword) {
     throw new Error('TEST_USER_PASSWORD environment variable is not set. Please provide the password for the test user.');
   }
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is not set. Please provide the Supabase URL.');
+  }
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable is not set. Please provide the Supabase anon key.');
+  }
 
   const browser = await chromium.launch();
   const page = await browser.newPage();

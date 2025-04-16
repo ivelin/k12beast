@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { MessageList } from "@/components/ui/message-list";
 import { ChatMessages } from "@/components/ui/chat";
+import FormattedTimestamp from "@/components/ui/formatted-timestamp"; // Import the new component
 
 interface Message {
   role: "user" | "assistant";
@@ -80,14 +81,6 @@ export default function SessionItem({ session }: SessionItemProps) {
     });
   }
 
-  let lastUpdatedDisplay;
-  try {
-    lastUpdatedDisplay = new Date(session.updated_at).toLocaleString();
-  } catch (error) {
-    console.error("Error formatting updated_at:", error);
-    lastUpdatedDisplay = "Invalid date";
-  }
-
   return (
     <>
       <div className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-muted transition">
@@ -101,12 +94,14 @@ export default function SessionItem({ session }: SessionItemProps) {
             )}
           </ChatMessages>
           <p className="text-sm text-muted-foreground">
-            {session.created_at
-              ? new Date(session.created_at).toLocaleString()
-              : "No date available"}
+            {session.created_at ? (
+              <FormattedTimestamp timestamp={session.created_at} format="short" />
+            ) : (
+              "No date available"
+            )}
           </p>
           <p className="text-sm mt-2">
-            Last Updated: {lastUpdatedDisplay}
+            Last Updated: <FormattedTimestamp timestamp={session.updated_at} format="short" />
           </p>
         </Link>
         <Button

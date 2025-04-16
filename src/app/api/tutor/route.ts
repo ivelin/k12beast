@@ -7,17 +7,19 @@ import { handleApiError } from "@/utils/errorHandler";
 
 const responseFormat = `Return a JSON object with the tutoring lesson based on the provided chat history and original input problem or image. 
   If the problem is not related to K12 education, return {"isK12": false, "error": "..."}. Otherwise, proceed as follows:
-  For K12-related problems, evaluate the student's problem and proposed solution (if provided), followed by a personalized lesson plan, 
-  all combined into a single HTML string with safe formatting. 
-  If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn. 
-  Encourage the student to request more examples and quizzes when ready, but do not provide a quiz in this response.
-
-  Structure for K12-related problems: 
-  {
-    "isK12": true, 
-    "lesson": "<p>Evaluation: [evaluation text]</p><p>Lesson: [lesson text]</p><p>If you feel comfortable with this, let me know, and we can go over more examples or you can ask for a quiz when you're ready!</p>"
-  }. 
-  Ensure the "lesson" field is a single HTML string with no nested JSON objects.`;
+  1. If there are multiple problems detected:
+    - pick the first one and ignore the rest
+    - inform the user that currently each chat session focuses on one problem but multiple problem support may be available in the future.
+  2. For K12-related problems, evaluate the student's problem and proposed solution (if provided), followed by a personalized lesson plan, 
+    all combined into a single HTML string with safe formatting. 
+  3. If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn. 
+  4. Encourage the student to request more examples and quizzes when ready, but do not provide a quiz in this response.
+  5. Structure for K12-related problems: 
+    {
+      "isK12": true, 
+      "lesson": "<p>Evaluation: [evaluation text]</p><p>Lesson: [lesson text]</p><p>If you feel comfortable with this, let me know, and we can go over more examples or you can ask for a quiz when you're ready!</p>"
+    }. 
+    Ensure the "lesson" field is a single HTML string with no nested JSON objects.`;
 
 // Handles POST requests to create a new tutoring session when a user submits a problem
 // Only creates a session if the problem is K12-related; otherwise, returns an error

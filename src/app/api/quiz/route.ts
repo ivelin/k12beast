@@ -21,7 +21,7 @@ const responseFormat = `Return a JSON object with a new quiz problem related to 
   The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. 
   Provide a brief context or scenario to make the problem engaging. 
   Do not repeat problems from the session history. 
-  Do not reference images in the problem text. 
+  Do not reference images in the problem prompt. 
   Additionally, assess the student's readiness for an end-of-semester test based on their overall performance in the chat history, considering quiz performance (correctness, consistency, and difficulty), 
   engagement with lessons and examples (e.g., fewer example requests might indicate mastery), 
   and inferred skill level and progress (e.g., improvement over time). 
