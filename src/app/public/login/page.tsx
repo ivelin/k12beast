@@ -1,4 +1,6 @@
-// src/app/public/login/page.tsx
+// File path: src/app/public/login/page.tsx
+// Updated to prevent unexpected "Forgot Password" dialog on iPhone by validating click events and improving autofill handling
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -43,6 +45,7 @@ export default function Login() {
       }
     };
 
+    // Check autofill after a short delay to ensure DOM is ready
     const timer = setTimeout(checkAutofill, 500);
     return () => clearTimeout(timer);
   }, [email, password]);
@@ -154,7 +157,24 @@ export default function Login() {
     }
   };
 
+  const handleForgotPasswordClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Log the event for debugging
+    console.log("Forgot Password button clicked:", {
+      eventType: e.type,
+      target: e.currentTarget.textContent,
+      isTouchEvent: e.nativeEvent instanceof TouchEvent,
+    });
+
+    // Only open dialog for intentional clicks (ignore autofill or programmatic triggers)
+    if (e.isTrusted && e.type === "click") {
+      setIsResetDialogOpen(true);
+    } else {
+      console.log("Ignored non-user-initiated click event on Forgot Password button");
+    }
+  };
+
   const debouncedOpenResetDialog = debounce(() => {
+    console.log("Debounced reset dialog triggered");
     setIsResetDialogOpen(true);
   }, 300);
 
@@ -182,6 +202,7 @@ export default function Login() {
               className="mt-1"
               required
               disabled={loading}
+              autoComplete="email"
             />
           </div>
           <div>
@@ -198,13 +219,14 @@ export default function Login() {
               className="mt-1"
               required
               disabled={loading}
+              autoComplete="current-password"
             />
             {!isSignUp && (
               <button
                 type="button"
-                onClick={debouncedOpenResetDialog}
+                onClick={handleForgotPasswordClick}
                 className="text-sm text-primary hover:underline mt-2"
-                disabled={loading}
+                disabled={loading || isResetDialogOpen}
               >
                 Forgot Password?
               </button>
@@ -254,6 +276,7 @@ export default function Login() {
                 className="mt-1"
                 required
                 disabled={loading}
+                autoComplete="email"
               />
             </div>
             {resetMessage && (
