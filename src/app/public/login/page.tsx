@@ -110,7 +110,8 @@ export default function Login() {
           return;
         }
         console.log("Login successful, session data:", data);
-        document.cookie = `supabase-auth-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
+        document.cookie = `supabase-auth-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=None; Secure`;
+        console.log("Cookie set for session:", data.session.access_token);
 
         // Handle redirectTo
         const urlParams = new URLSearchParams(window.location.search);
