@@ -14,7 +14,7 @@ export default function Home() {
         </p>
         <div className="flex justify-center gap-4">
           <Button asChild size="lg">
-            <Link href="/public/login" className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Link href="/chat" className="bg-primary text-primary-foreground hover:bg-primary/90">
               Get Started
             </Link>
           </Button>
