@@ -1,4 +1,6 @@
 // src/app/layout.tsx
+// Root layout for K12Beast, including navigation with Feedback and Open Source links on home page
+
 "use client";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -6,13 +8,12 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Github, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Toaster } from "@/components/ui/sonner";
 import { useRouter, usePathname } from "next/navigation";
-import supabase from '@/supabase/browserClient';
-import useAppStore from '@/store';
-
+import supabase from "@/supabase/browserClient";
+import useAppStore from "@/store";
 
 // Modal component for session expiration
 const SessionExpiredModal = ({ onLogin }: { onLogin: () => void }) => (
@@ -59,7 +60,12 @@ export default function RootLayout({
       const isSessionValid = !error && data.session;
       setIsLoggedIn(isSessionValid);
       setIsAuthChecked(true);
-      if (!isSessionValid && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session"))) {
+      if (
+        !isSessionValid &&
+        (pathname.startsWith("/chat") ||
+          pathname.startsWith("/history") ||
+          pathname.startsWith("/session"))
+      ) {
         console.log("Initial session check failed, setting session expired");
         setSessionExpired(true);
       }
@@ -72,7 +78,12 @@ export default function RootLayout({
       const isSessionValid = !!session?.user;
       setIsLoggedIn(isSessionValid);
       setIsAuthChecked(true);
-      if (!isSessionValid && (pathname.startsWith("/chat") || pathname.startsWith("/history") || pathname.startsWith("/session"))) {
+      if (
+        !isSessionValid &&
+        (pathname.startsWith("/chat") ||
+          pathname.startsWith("/history") ||
+          pathname.startsWith("/session"))
+      ) {
         console.log("Auth state changed to logged out, setting session expired");
         setSessionExpired(true);
       }
@@ -86,11 +97,12 @@ export default function RootLayout({
         handleAuthStateChange(customEvent.detail.event, customEvent.detail.session);
       }
     };
-    window.addEventListener('supabase:auth', customAuthListener);
+    window.addEventListener("supabase:auth", customAuthListener);
 
     // Periodic session check every 5 minutes
     const interval = setInterval(async () => {
-      if (pathname.startsWith("/public") || pathname === "/" || pathname === "/confirm-success") return; // Skip for public routes
+      if (pathname.startsWith("/public") || pathname === "/" || pathname === "/confirm-success")
+        return; // Skip for public routes
 
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) {
@@ -102,7 +114,7 @@ export default function RootLayout({
     // Cleanup on unmount
     return () => {
       authListener.subscription.unsubscribe();
-      window.removeEventListener('supabase:auth', customAuthListener);
+      window.removeEventListener("supabase:auth", customAuthListener);
       clearInterval(interval);
     };
   }, [pathname]);
@@ -112,7 +124,8 @@ export default function RootLayout({
     try {
       if (isLoggedIn) {
         await supabase.auth.signOut();
-        document.cookie = "supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+        document.cookie =
+          "supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
         setIsLoggedIn(false);
         setSessionExpired(false); // Reset session expired state on logout
         router.push("/");
@@ -157,12 +170,30 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <nav className="flex items-center justify-between p-4 bg-muted">
-            <div className="text-lg font-bold">K12Beast</div>
-            <div className="flex space-x-2 sm:space-x-4">
-              {!isLoggedIn && (
-                <Link href="/" className={`hover:underline text-sm sm:text-base ${pathname === "/" ? "text-muted-foreground cursor-default" : ""}`}>
-                  Home
-                </Link>
+            <div className="text-lg font-bold">
+              <Link href="/">K12Beast</Link>
+            </div>
+            <div className="flex space-x-2 sm:space-x-4 items-center">
+              {pathname === "/" && (
+                <>
+                  <Link
+                    href="https://github.com/ivelin/k12beast/issues/new"
+                    className="hover:underline text-sm sm:text-base"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Feedback
+                  </Link>
+                  <Link
+                    href="https://github.com/ivelin/k12beast"
+                    className="flex items-center hover:underline text-sm sm:text-base"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Github className="h-4 w-4 mr-1" />
+                    Open Source
+                  </Link>
+                </>
               )}
               {isLoggedIn && pathname !== "/" && !pathname.startsWith("/public") && (
                 <>
@@ -205,7 +236,7 @@ export default function RootLayout({
           </nav>
           <main className="p-4">{children}</main>
           {sessionExpired && <SessionExpiredModal onLogin={handleLoginRedirect} />}
-          <Toaster 
+          <Toaster
             position="top-center" // Position toasts in the top-right corner
             duration={2000} // Default duration of 2 seconds
             closeButton={false} // Add a close button to toasts
@@ -214,7 +245,7 @@ export default function RootLayout({
                 zIndex: 1000, // Ensure toasts appear above other elements
               },
             }}
-            />
+          />
           <SpeedInsights />
         </ThemeProvider>
       </body>
