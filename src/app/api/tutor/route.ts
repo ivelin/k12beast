@@ -6,7 +6,6 @@ import { sendXAIRequest } from "@/utils/xaiClient";
 import { handleApiError } from "@/utils/errorHandler";
 
 const responseFormat = `Return a JSON object with the tutoring lesson based on the provided chat history and original input problem or image. 
-  Detect the natural language of the user input and respond entirely in the same language.
   If the problem is not related to K12 education, return {"isK12": false, "error": "..."}. Otherwise, proceed as follows:
   1. If there are multiple problems detected:
     - pick the first one and ignore the rest
