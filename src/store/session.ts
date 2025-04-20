@@ -1,7 +1,7 @@
 // src/store/session.ts
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
-import { AppState, Step, Example, Message } from "./types";
+import { AppState, Step, Example, Message, Lesson } from "./types";
 
 export interface SessionState {
   step: Step;
@@ -107,15 +107,21 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         }
         throw new Error(data.error || "Failed to submit problem");
       }
-      const lessonContent = await res.text();
+      const lessonContent = await res.json() as Lesson;
       set({
         sessionId: res.headers.get("x-session-id") || sessionId,
-        lesson: lessonContent,
+        lesson: lessonContent.lesson,
+        charts: lessonContent.charts,
         step: "lesson",
         sessionTerminated: false,
         showErrorPopup: false,
       });
-      addMessage({ role: "assistant", content: lessonContent, renderAs: "html" });
+      addMessage({ 
+        role: "assistant", 
+        content: lessonContent.lesson, 
+        charts: lessonContent.charts, 
+        renderAs: "html" 
+      });
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while starting your lesson. Let's try again!";
       console.error("Error in handleSubmit:", err);

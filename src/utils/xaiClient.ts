@@ -1,7 +1,11 @@
-// src/utils/xaiClient.ts
+/* src/utils/xaiClient.ts
+ * Handles requests to xAI API for generating educational content.
+ */
+
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
-
+import { ChartConfiguration } from "chart.js";
+import { ChartConfig } from "@/store/types";
 const openai = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
   baseURL: "https://api.x.ai/v1",
@@ -13,13 +17,16 @@ interface XAIResponse {
   lesson?: string;
   problem?: string;
   solution?: { title: string; content: string }[];
+  charts?: ChartConfig[]; 
   answerFormat?: string;
   options?: string[];
   correctAnswer?: string;
   readiness?: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
   difficulty?: "easy" | "medium" | "hard";
   encouragement?: string | null;
-}
+  encouragementIfCorrect?: string;
+  encouragementIfIncorrect?: string;
+  }
 
 interface XAIRequestOptions {
   problem?: string;
@@ -28,6 +35,8 @@ interface XAIRequestOptions {
   defaultResponse: XAIResponse;
   maxTokens?: number;
   chatHistory?: { role: string; content: string; renderAs?: "markdown" | "html" }[];
+  sessionId?: string;
+  userId?: string;
 }
 
 // Sanitize raw API response to extract valid JSON, removing invalid characters and extraneous text
@@ -57,6 +66,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     chatHistory = [],
   } = options;
 
+  console.log("sendXAIRequest inputs:", { problem, images }); // Log inputs for debugging
   validateRequestInputs(problem, images);
 
   const chatHistoryText =
@@ -66,18 +76,43 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
           .join("\n")}`
       : "No chat history available.";
 
+  const systemResponse = `You are a K12 tutor. Assist with educational queries related to K12 subjects.
+      Follow these guidelines:
+
+      1. **Content Generation**:
+        - Detect the natural language of the user input problem text and images and respond entirely in the same language.
+        - Respond in a conversational style as if you are speaking directly with a K12 student using emojis.
+        - Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions. 
+        - Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history. 
+        - Adapt your response based on this chat history—e.g., avoid repeating examples or quiz problems already given (as specified in the chat history), and adjust difficulty based on performance trends. 
+        - If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.
+
+      2. **Response Format**:
+        - Always return a raw JSON object (formatted for JSON.parse()) with the response fields specified in the user prompt.
+        - Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
+        - Ensure the response is a single, valid JSON object with no trailing commas or syntax errors.
+        - For text content fields in the JSON response follow these guidelines:
+          - Use safe HTML formatting for text content. No script tags or inline JavaScript.
+          - Use emojis as appropriate to enhance engagement.
+          - Use charts, graphs, formulas and other visual aids to enhance explanations when appropriate.
+          - For math formulas, chemistry equations, and other scientific notations, use MathML syntax <math>...</math>.
+          - For charts and graphs (e.g., bar charts, line graphs, geometry shapes) use Chart.js compatible code as follows:
+            - Include a <canvas> tag in the HTML content with a unique id (e.g., <canvas id="chart1"></canvas>). 
+            - Do not include <script> tags or inline JavaScript in the HTML. Instead, provide the Chart.js configuration in a separate "charts" field in the outer JSON response structure.
+            - Ensure all charts labels are in the same language as the problem using plain and safe text format.
+          - Reference charts and diagrams in the response via numeric IDs (e.g., "See Chart 1" or "Refer to Diagram 2") and provide the corresponding <canvas> tag in the HTML content.
+          - Do not reference images, charts, diagrams and formulas outside of this immediate prompt and response.
+          - Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
+
+      3. **School Tests Alignment**:
+        - Align content with standardized school test formats, including technology-enhanced items (e.g., graphs, equations).
+        - Use examples and visualizations relevant to grades K-12.
+    `;
+
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: `You are a K12 tutor. Assist with educational queries related to K12 subjects.
-Respond in a conversational style as if you are speaking directly with a K12 student using emojis.
-Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions. Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history. Adapt your response based on this history—e.g., avoid repeating examples or quiz problems already given (as specified in the chat history), and adjust difficulty based on performance trends. If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.
-Detect the natural language of the user input problem text and images and respond entirely in the same language.
-Return a raw JSON object (formatted for JSON.parse()) with the response fields specified in the user prompt.
-Use plain text or minimal HTML formatting (only <p>, <strong>, <ul>, <li> tags, no attributes or scripts) for any content with formatting.
-Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
-Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
-Ensure the response is a single, valid JSON object with no trailing commas or syntax errors.`,
+      content: systemResponse,
     },
     {
       role: "user",
@@ -93,13 +128,15 @@ Ensure the response is a single, valid JSON object with no trailing commas or sy
     },
   ];
 
+
+
   if (images && images.length > 0) {
     messages.push({
       role: "user",
       content: images.map((url) => ({
-        type: "image_url" as const,
+        type: "image_url",
         image_url: { url },
-      })) as OpenAI.ChatCompletionMessageParam["content"],
+      })),
     });
   }
 

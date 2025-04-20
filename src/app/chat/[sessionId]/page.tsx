@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import useAppStore from "@/store";
 import { Message, Quiz, Session } from "@/store/types";
+
 import QuizSection from "../QuizSection";
 import React from "react";
 import { buildSessionMessages } from "@/utils/sessionUtils"; // Import the shared utility
@@ -189,7 +190,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     await storeHandleSubmit(problem, imageUrls, localImages);
   };
 
-  const append = async (message: { role: string; content: string }, imageUrls: string[]) => {
+  const append = async (message: Message, imageUrls: string[]) => {
     await storeAppend(message, imageUrls, localImages);
   };
 
@@ -278,7 +279,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
                 "Explain step-by-step how to solve this math problem: if x * x + 9 = 25, what is x?",
                 "Problem: Room 1 is at 18'C. Room 2 is at 22'C. Which direction will heat flow?.",
                 "Problem: Simplify 3(4x + 6z). I think the answer is: 12x+19z",
-                "Help me prepare for 6th grade STAAR tests: math, science, ELR."
+                "Help me prepare for 6th grade school tests: math, science, ELR."
               ]}
             />
           )}

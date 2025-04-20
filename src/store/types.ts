@@ -1,3 +1,7 @@
+import { ChartConfiguration } from "chart.js/auto";
+
+import { MessageElement } from "@/components/ui/chat-message";
+
 export type Step = "problem" | "lesson" | "examples" | "quizzes" | "end";
 
 export interface Quiz {
@@ -17,18 +21,26 @@ export interface Example {
 }
 
 export interface QuizFeedback {
+  charts: ChartConfig[];
   isCorrect: boolean;
   encouragement: string;
   solution: { title: string; content: string }[] | null;
   readiness: number;
   correctAnswer?: string; // Add correctAnswer to QuizFeedback
 }
-
 export interface Message {
-  role: "user" | "assistant";
+  id?: string;
+  role: "user" | "assistant" | (string & {});
   content: string;
+  createdAt?: Date;
   renderAs?: "markdown" | "html";
-  experimental_attachments?: { name: string; url: string }[];
+  charts?: ChartConfig[]; // Added to support Chart.js configurations
+}
+
+// Interface for Chart.js configuration
+export interface ChartConfig {
+  id: string; // Matches the canvas ID in the HTML
+  config: ChartConfiguration; // Chart.js configuration object
 }
 
 export interface AppState {
@@ -38,20 +50,24 @@ export interface AppState {
   images: File[];
   imageUrls: string[];
   lesson: string | null;
+  charts: ChartConfig[];
   examples: Example | null;
   quiz: Quiz | null;
   error: string | null;
   loading: boolean;
   quizAnswer: string;
+  correctAnswer: string | null; // Add correctAnswer to AppState
   quizFeedback: QuizFeedback | null;
   messages: Message[];
+  cloned_from?: string | null;
+
   hasSubmittedProblem: boolean;
   sessionTerminated: boolean;
   showErrorPopup: boolean;
   set: (updates: Partial<AppState>) => void;
   setStep: (step: Step) => void;
   setError: (error: string | null) => void;
-  addMessage: (message: Message) => void;
+  addMessage: (message: MessageElement) => void;
   handleSubmit: (problem: string, imageUrls: string[], images: File[]) => Promise<void>;
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
@@ -59,3 +75,28 @@ export interface AppState {
   append: (message: Message, imageUrls: string[], images: File[]) => Promise<void>;
   reset: () => void;
 }
+
+
+// Define Session type corresponding to session database table
+export type Session = {
+  id: string;
+  problem?: string;
+  images?: string[];
+  lesson?: string | null;
+  examples?: Example[] | null;
+  quizzes?: Quiz[] | null;
+  performanceHistory?: { correct: number; total: number } | null;
+  user_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  responseFormat?: string;
+  messages?: Message[];
+  cloned_from?: string | null;
+  // Add other fields as needed based on your API response
+};
+
+// Define Session type corresponding to session database table
+export type Lesson = {
+  lesson: string;
+  charts?: ChartConfig[];
+};

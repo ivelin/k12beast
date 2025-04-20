@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendXAIRequest } from "@/utils/xaiClient";
 import { handleXAIError } from "@/utils/xaiUtils";
 import supabase from "../../../supabase/serverClient";
+import { ChartConfig } from "@/store/types";
 
 // Define the expected response structure from the xAI API
 interface QuizResponse {
+  charts: ChartConfig[];
   problem: string;
   answerFormat: string;
   options: string[];
@@ -18,32 +20,72 @@ interface QuizResponse {
 }
 
 const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the original k12 input problem prompt by the user. 
-  The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. 
-  Provide a brief context or scenario to make the problem engaging. 
-  Do not repeat problems from the session history. 
-  Do not reference images in the problem prompt. 
-  Additionally, assess the student's readiness for an end-of-semester test based on their overall performance in the chat history, considering quiz performance (correctness, consistency, and difficulty), 
+  - The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. 
+  - Provide a brief context or scenario to make the problem engaging. 
+  - Do not repeat problems from the session history. 
+  - Additionally, assess the student's readiness for an end-of-semester test based on their overall performance in the chat history, considering quiz performance (correctness, consistency, and difficulty), 
   engagement with lessons and examples (e.g., fewer example requests might indicate mastery), 
   and inferred skill level and progress (e.g., improvement over time). 
-  Provide two alternative encouragement messages using emojis, XP points, leveling up, etc.: 
+  - Provide two alternative encouragement messages using emojis, XP points, leveling up, etc.: 
   one for if the student answers correctly, 
   and another one for if they answer incorrectly. 
-  Structure: 
+
+  - Structure: 
     {
-    "problem": "Quiz problem text", 
+      "problem": "<p>Here's an example problem: You save $100 in a bank account that earns 5% interest per year, compounded annually. The bank uses the formula <span class=\"math-tex\" data-math-type=\"inline\">A = P(1 + r)^n</span> to calculate your balance, where <span class=\"math-tex\" data-math-type=\"inline\">P</span> is the starting amount, <span class=\"math-tex\" data-math-type=\"inline\">r</span> is the interest rate, and <span class=\"math-tex\" data-math-type=\"inline\">n</span> is the number of years. How much money will you have after 2 years? To get a sense of how your savings might grow, take a look at Chart 1, which shows an example of compound interest growth over 3 years for a different amount. Chart 2 shows how compound interest compares to simple interest for that same example, helping you see why compound interest can be more powerful.</p><p><canvas id=\"chart1\"></canvas><br><canvas id=\"chart2\"></canvas></p>", 
+      "solution": [
+          {
+            "title": "Step 1", "content": "Step content with optional MathJax formulas and references to existing charts 1, 2 or even new 3, 4 ..."
+          },
+          {"title": "Step N", "content": "Step content..."}
+          ], 
+      "charts": [
+        {
+          "id": "chart1",
+          "config": {
+            "type": "line",
+            "data": {
+              "labels": ["Year 0", "Year 1", "Year 2"],
+              "datasets": [{
+                "label": "Balance ($)",
+                "data": [100, 105, 110.25],
+                "borderColor": "blue",
+                "fill": false,
+                "tension": 0.1
+              }]
+            },
+            "options": {
+              "plugins": {
+                "title": {
+                  "display": true,
+                  "text": "Chart 1"
+                }
+              },
+              "scales": {
+                "x": { "title": { "display": true, "text": "Time" } },
+                "y": { "title": { "display": true, "text": "Balance ($)" } }
+              }
+            }
+          }
+        },
+        {
+          "id": "chart2",
+          "config": {...}
+        }
+      ],
     "answerFormat": "multiple-choice", 
-    "options": ["option1", "option2", "option3", "option4"], 
+    "options": ["option1 with possible reference to charts from the example problem statement", "option2", "option3", "option4"], 
     "correctAnswer": "correct option", 
-    "solution": [{"title": "Step 1", "content": "Step content with formatting as needed"}, ...], 
     "difficulty": "easy|medium|hard", 
     "encouragementIfCorrect": "Gamified message of if correct ", 
     "encouragementIfIncorrect": "Gamified message if incorrect using emojis, XP points, leveling up, etc.",
     "readiness": {"confidenceIfCorrect": 0.92, "confidenceIfIncorrect": 0.75}
-    }. 
-    The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence 
-    that the student would achieve at least a 95% success rate on an end-of-semester test without AI assistance, 
+    }.
+
+    - The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence 
+    - that the student would achieve at least a 95% success rate on an end-of-semester test without AI assistance, 
     depending on whether they answer this quiz correctly or incorrectly. 
-    Ensure all fields are present, especially the "solution" field with at least two steps.
+    - Ensure all fields are present, especially the "solution" field with at least two steps.
   `;
 
 // Default response if the AI fails to generate a valid quiz
@@ -67,10 +109,8 @@ const defaultResponse: QuizResponse = {
 // Quiz requests must include a valid sessionId tied to a problem submission
 export async function POST(req: NextRequest) {
   try {
-    const { problem, images } = await req.json();
     const sessionId = req.headers.get("x-session-id");
 
-    console.log("Quiz request body:", { problem, images });
     console.log("Quiz session ID from header:", sessionId);
 
     // Require a valid sessionId; do not create a new session
@@ -100,10 +140,13 @@ export async function POST(req: NextRequest) {
 
     console.log("Fetched session history for quiz:", sessionHistory);
 
+    const problem = sessionHistory.problem;
+    const images = sessionHistory.images;
+
     // Request a new quiz from the xAI API
     let content = await sendXAIRequest({
-      problem: problem || sessionHistory.problem,
-      images: images || sessionHistory.images,
+      problem: problem,
+      images: images,
       responseFormat,
       defaultResponse,
       maxTokens: 1000,
@@ -114,8 +157,11 @@ export async function POST(req: NextRequest) {
 
     // Ensure solution is present; fallback to default if missing
     if (!content.solution || content.solution.length === 0) {
-      console.warn("Model did not provide a solution; using default.");
-      content.solution = defaultResponse.solution;
+      console.error("AI model did not provide a solution.");
+      return NextResponse.json(
+        { error: "AI model did not provide a solution." },
+        { status: 500 }
+      );    
     }
 
     // Validate the quiz format to ensure all required fields are present
@@ -135,7 +181,10 @@ export async function POST(req: NextRequest) {
       !content.encouragementIfIncorrect
     ) {
       console.error("Invalid quiz format:", content);
-      content = defaultResponse;
+      return NextResponse.json(
+        { error: "AI model returned invalid quiz response format." },
+        { status: 500 }
+      );    
     }
 
     // Store the full quiz data server-side, including sensitive fields
@@ -144,6 +193,7 @@ export async function POST(req: NextRequest) {
     // via /api/validate
     const quizToStore = {
       problem: content.problem,
+      charts: content.charts || [],
       answerFormat: content.answerFormat,
       options: content.options,
       correctAnswer: content.correctAnswer,
@@ -164,6 +214,7 @@ export async function POST(req: NextRequest) {
     const quizProblem = {
       role: "assistant",
       content: `<strong>Quiz:</strong><br>${content.problem}`, // Only include the problem text
+      charts: content.charts || [],
       renderAs: "html",
     };
     const { data: updateResult, error: updateError } = await supabase
@@ -189,18 +240,21 @@ export async function POST(req: NextRequest) {
     // Excludes correctAnswer, solution, encouragementIfCorrect, encouragementIfIncorrect, and readiness to prevent
     // leaking sensitive information before the student submits their answer
     // These fields are returned only after validation via /api/validate
-    return NextResponse.json(
-      {
-        problem: content.problem,
-        answerFormat: content.answerFormat,
-        options: content.options,
-        difficulty: content.difficulty,
-      },
-      {
-        status: 200,
-        headers: { "x-session-id": sessionId },
-      }
-    );
+    return NextResponse.json(content, { status: 200, headers: { "x-session-id": sessionId }, });
+
+    // return NextResponse.json(
+    //   {
+    //     problem: content.problem,
+    //     charts: content.charts || [],
+    //     answerFormat: content.answerFormat,
+    //     options: content.options,
+    //     difficulty: content.difficulty,
+    //   },
+    //   {
+    //     status: 200,
+    //     headers: { "x-session-id": sessionId },
+    //   }
+    // );
   } catch (err) {
     return handleXAIError(err);
   }

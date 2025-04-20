@@ -1,19 +1,19 @@
 import {
   ChatMessage,
   type ChatMessageProps,
-  type Message,
+  type MessageElement,
 } from "@/components/ui/chat-message"
 import { TypingIndicator } from "@/components/ui/typing-indicator"
 
-type AdditionalMessageOptions = Omit<ChatMessageProps, keyof Message>
+type AdditionalMessageOptions = Omit<ChatMessageProps, keyof MessageElement>
 
 interface MessageListProps {
-  messages: Message[]
+  messages: MessageElement[]
   showTimeStamps?: boolean
   isTyping?: boolean
   messageOptions?:
     | AdditionalMessageOptions
-    | ((message: Message) => AdditionalMessageOptions)
+    | ((message: MessageElement) => AdditionalMessageOptions)
 }
 
 export function MessageList({

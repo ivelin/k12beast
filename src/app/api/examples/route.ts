@@ -3,31 +3,74 @@ import { NextRequest, NextResponse } from "next/server";
 import supabase from "../../../supabase/serverClient";
 import { sendXAIRequest } from "../../../utils/xaiClient";
 import { handleXAIError } from "../../../utils/xaiUtils";
+import { ChartConfig } from "@/store/types";
 
 // Define the expected response structure
 interface ExampleResponse {
+  charts: ChartConfig[];
   problem: string;
   solution: { title: string; content: string }[];
 }
 
 const responseFormat = `Return a JSON object with a new example problem and its solution, related to the same topic as the original input problem. 
-  Structure: {"problem": "Example problem text", "solution": [{"title": "Step 1", "content": "Step content..."}, ...]}. 
-  Do not repeat problems from the session history or the original input problem. 
-  Do not reference images in the problem prompt. 
-  Ensure the problem and solution steps are concise and appropriate for the student's inferred skill level.  
+  Structure: 
+  {
+    "problem": "<p>Here's an example problem: You save $100 in a bank account that earns 5% interest per year, compounded annually. The bank uses the formula <span class=\"math-tex\" data-math-type=\"inline\">A = P(1 + r)^n</span> to calculate your balance, where <span class=\"math-tex\" data-math-type=\"inline\">P</span> is the starting amount, <span class=\"math-tex\" data-math-type=\"inline\">r</span> is the interest rate, and <span class=\"math-tex\" data-math-type=\"inline\">n</span> is the number of years. How much money will you have after 2 years? To get a sense of how your savings might grow, take a look at Chart 1, which shows an example of compound interest growth over 3 years for a different amount. Chart 2 shows how compound interest compares to simple interest for that same example, helping you see why compound interest can be more powerful.</p><p><canvas id=\"chart1\"></canvas><br><canvas id=\"chart2\"></canvas></p>", 
+    "solution": [
+          {
+            "title": "Step 1", "content": "Step content with optional MathJax formulas and references to existing charts 1, 2 or even new 3, 4 ..."
+          },
+          {"title": "Step N", "content": "Step content..."}
+          ], 
+    "charts": [
+      {
+        "id": "chart1",
+        "config": {
+          "type": "line",
+          "data": {
+            "labels": ["Year 0", "Year 1", "Year 2"],
+            "datasets": [{
+              "label": "Balance ($)",
+              "data": [100, 105, 110.25],
+              "borderColor": "blue",
+              "fill": false,
+              "tension": 0.1
+            }]
+          },
+          "options": {
+            "plugins": {
+              "title": {
+                "display": true,
+                "text": "Chart 1"
+              }
+            },
+            "scales": {
+              "x": { "title": { "display": true, "text": "Time" } },
+              "y": { "title": { "display": true, "text": "Balance ($)" } }
+            }
+          }
+        }
+      },
+      {
+        "id": "chart2",
+        "config": {...}
+      }
+  ]}
+ 
+  - Do not repeat problems from the session history or the original input problem. 
+  - Ensure the problem and solution steps are concise and appropriate for the student's inferred skill level.  
   `;
 
 const defaultResponse: ExampleResponse = {
   problem: "",
   solution: [],
+  charts: [],
 };
 
 export async function POST(req: NextRequest) {
   try {
-    const { problem, images } = await req.json();
     const sessionId = req.headers.get("x-session-id") || null;
 
-    console.log("Examples request body:", { problem, images });
     console.log("Examples session ID from header:", sessionId);
 
     let sessionHistory = null;
@@ -70,6 +113,9 @@ export async function POST(req: NextRequest) {
       sessionHistory.messages = updatedMessages;
     }
 
+    const problem = sessionHistory.problem;
+    const images =  sessionHistory.images || [];
+
     const content = await sendXAIRequest({
       problem,
       images,
@@ -87,13 +133,14 @@ export async function POST(req: NextRequest) {
     if (sessionId) {
       const updatedExamples = [
         ...(sessionHistory?.examples || []),
-        { problem: content.problem, solution: content.solution },
+        { problem: content.problem, solution: content.solution, charts: content.charts },
       ];
       const updatedMessages = [
         ...(sessionHistory?.messages || []),
         {
           role: "assistant",
           content: `<p><strong>Example:</strong> ${content.problem}</p><p><strong>Solution:</strong></p><ul>${content.solution.map((s) => `<li><strong>${s.title}:</strong> ${s.content}</li>`).join("")}</ul>`,
+          charts: content.charts,
           renderAs: "html",
         },
       ];

@@ -1,12 +1,16 @@
-/* src/components/ui/chat-message.tsx */
+/* src/components/ui/chat-message.tsx
+ * Renders a chat message with support for markdown, HTML, MathJax formulas (math/chemical),
+ * Chart.js charts, tool invocations, attachments, and reasoning blocks.
+ */
+
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react"; // Added useRef for chart refs
 import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "framer-motion";
 import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react";
 import DOMPurify from "dompurify";
-
+import Chart from "chart.js/auto"; // Added Chart.js import
 import { cn } from "@/utils";
 import {
   Collapsible,
@@ -15,6 +19,8 @@ import {
 } from "@/components/ui/collapsible";
 import { FilePreview } from "@/components/ui/file-preview";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { initializeMathJax, typesetMathJax } from "@/utils/mathjax-config"; // Added MathJax imports
+import { Message, ChartConfig } from "@/store/types";
 
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
@@ -87,8 +93,8 @@ interface SourcePart {
 
 type MessagePart = TextPart | ReasoningPart | ToolInvocationPart | SourcePart;
 
-export interface Message {
-  id: string;
+export interface MessageElement extends Message {
+  id?: string;
   role: "user" | "assistant" | (string & {});
   content: string;
   createdAt?: Date;
@@ -96,9 +102,10 @@ export interface Message {
   toolInvocations?: ToolInvocation[];
   parts?: MessagePart[];
   renderAs?: "markdown" | "html";
+  charts?: ChartConfig[]; // Added to support Chart.js configurations
 }
 
-export interface ChatMessageProps extends Message {
+export interface ChatMessageProps extends MessageElement {
   showTimeStamp?: boolean;
   animation?: Animation;
   actions?: React.ReactNode;
@@ -115,16 +122,60 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   toolInvocations,
   parts,
   renderAs = "markdown",
+  charts = [], // Added default empty array for charts
 }) => {
   const [domPurify, setDomPurify] = useState<typeof DOMPurify | null>(null);
   const [isDOMPurifyLoaded, setIsDOMPurifyLoaded] = useState(false);
+  const chartRefs = useRef<Map<string, Chart>>(new Map()); // Added to track Chart.js instances
+  const containerRef = useRef<HTMLDivElement>(null); // Added to reference the container for chart rendering
 
+  // Load DOMPurify and initialize MathJax
   useEffect(() => {
     import("dompurify").then((module) => {
       setDomPurify(() => module.default);
       setIsDOMPurifyLoaded(true);
     });
+    initializeMathJax(); // Initialize MathJax on mount
   }, []);
+
+  // Typeset MathJax and initialize charts after content updates
+  useEffect(() => {
+    if (renderAs === "html" && containerRef.current && isDOMPurifyLoaded) {
+      // Typeset MathJax for LaTeX formulas
+      typesetMathJax();
+
+      // Initialize Chart.js charts using configurations from the charts field
+      if (charts.length > 0) {
+        const canvases = containerRef.current.querySelectorAll("canvas");
+        canvases.forEach((canvas) => {
+          const id = canvas.id;
+          if (!id || chartRefs.current.has(id)) return;
+
+          const chartConfig = charts.find((chart) => chart.id === id);
+          if (chartConfig) {
+            try {
+              const ctx = canvas.getContext("2d");
+              if (ctx) {
+                const chartInstance = new Chart(ctx, chartConfig.config);
+                chartRefs.current.set(id, chartInstance);
+              }
+            } catch (error) {
+              console.error(`Failed to initialize Chart.js for canvas ${id}:`, error);
+              console.debug(`Chart config:`, chartConfig.config);
+            }
+          } else {
+            console.warn(`No Chart.js config found for canvas ${id}`);
+          }
+        });
+      }
+    }
+
+    // Cleanup charts on unmount
+    return () => {
+      chartRefs.current.forEach((chart) => chart.destroy());
+      chartRefs.current.clear();
+    };
+  }, [content, renderAs, isDOMPurifyLoaded, charts]); // Added charts as dependency
 
   const isUser = role === "user";
 
@@ -139,8 +190,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       return html;
     }
     return domPurify.sanitize(html, {
-      ALLOWED_TAGS: ["p", "strong", "ul", "li", "br", "span", "div"],
-      ALLOWED_ATTR: ["class", "style"],
+      ALLOWED_TAGS: [
+        "p", "strong", "ul", "li", "br", "span", "div", "h1", "h2", "h3",
+        "h4", "h5", "h6", "a", "img", "table", "tr", "td", "th", "tbody",
+        "thead", "tfoot", "caption", "sup", "sub", "canvas", "b",
+      ],
+      ALLOWED_ATTR: [
+        "class", "style", "href", "src", "alt", "id", "width", "height",
+        "aria-label", "data-math-type",
+      ],
     });
   };
 
@@ -182,8 +240,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 className={cn("flex flex-col", isUser ? "items-end" : "items-start")}
                 key={`text-${index}`}
               >
-                <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-                  <MarkdownRenderer>{part.text}</MarkdownRenderer>
+                <div
+                  ref={containerRef} // Added ref for chart rendering
+                  className={cn(chatBubbleVariants({ isUser, animation }))}
+                >
+                  {renderAs === "html" ? (
+                    isDOMPurifyLoaded ? (
+                      <div dangerouslySetInnerHTML={{ __html: sanitizeContent(part.text) }} />
+                    ) : (
+                      <div>Loading HTML content...</div>
+                    )
+                  ) : (
+                    <MarkdownRenderer>{part.text}</MarkdownRenderer>
+                  )}
                   {actions && (
                     <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
                       {actions}
@@ -225,7 +294,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-      <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+      <div
+        ref={containerRef} // Added ref for chart rendering
+        className={cn(chatBubbleVariants({ isUser, animation }))}
+      >
         {renderAs === "html" ? (
           isDOMPurifyLoaded ? (
             <div dangerouslySetInnerHTML={{ __html: sanitizeContent(content) }} />

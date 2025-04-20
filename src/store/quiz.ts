@@ -38,7 +38,7 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         const res = await fetch("/api/examples", {
           method: "POST",
           headers,
-          body: JSON.stringify({ problem, images: imageUrls }),
+          body: "",
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
@@ -47,12 +47,17 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
           throw new Error(errorData.error || "Oops! Something went wrong while fetching an example. Let's try again!");
         }
         const data = await res.json();
+        if (!data || !data.problem) {
+          throw new Error("No example response returned from xAI API");
+        }
+
         set({ examples: data, step: "examples" });
         addMessage({
           role: "assistant",
           content: `<p><strong>Example:</strong> ${data.problem}</p><p><strong>Solution:</strong></p><ul>${data.solution
             .map((s: any) => `<li><strong>${s.title}:</strong> ${s.content}</li>`)
             .join("")}</ul>`,
+          charts: data.charts,
           renderAs: "html",
         });
       } catch (err: unknown) {
@@ -86,7 +91,7 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers,
-        body: JSON.stringify({ problem, images: imageUrls }),
+        body: "",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch quiz. Please try again.");
@@ -94,6 +99,7 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
       addMessage({
         role: "assistant",
         content: `<p><strong>Quiz:</strong></p><p>${data.problem}</p>`,
+        charts: data.charts,
         renderAs: "html",
       });
     } catch (err: unknown) {
@@ -132,6 +138,7 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
       addMessage({
         role: "assistant",
         content: formatQuizFeedbackMessage(updatedQuiz, answer, data),
+        charts: data.charts,
         renderAs: "html",
       });
       set({ quizAnswer: answer, quizFeedback: data, correctAnswer: data.correctAnswer }); // Store correctAnswer

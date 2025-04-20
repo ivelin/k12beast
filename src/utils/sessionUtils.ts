@@ -1,19 +1,12 @@
 // File path: src/utils/sessionUtils.ts
 // Utility functions for session-related logic, shared across components
 
-import { Message } from "@/store/types";
-
-// Interface for session data (simplified for message building)
-interface SessionData {
-  problem: string | null;
-  images: string[] | null;
-  lesson: string | null;
-  messages: Message[] | null;
-}
+import { MessageElement } from "@/components/ui/chat-message";
+import { Session } from "@/store/types";
 
 // Builds the messages array for rendering a session's chat history
-export function buildSessionMessages(session: SessionData): Message[] {
-  const messages: Message[] = [];
+export function buildSessionMessages(session: Session): MessageElement[] {
+  const messages: MessageElement[] = [];
 
   // Add the problem as a user message if it exists
   if (session.problem || (session.images && session.images.length > 0)) {
@@ -30,9 +23,20 @@ export function buildSessionMessages(session: SessionData): Message[] {
 
   // Add the lesson as an assistant message if it exists and isn't already in messages
   if (session.lesson && !messages.some(msg => msg.role === "assistant" && msg.content === session.lesson)) {
+    let lessonContent = "";
+    let lessonCharts = [];
+    try {
+      const lessonObject = JSON.parse(session.lesson);
+      lessonContent = lessonObject.content;
+      lessonCharts = lessonObject.charts || [];
+    } catch (e) {
+      console.debug("Failed to parse lesson content as JSON. Falling back to plain text content:", e);
+      lessonContent = session.lesson;
+    }    
     messages.push({
       role: "assistant",
-      content: session.lesson,
+      content: lessonContent,
+      charts: lessonCharts,
       renderAs: "html",
     });
   }
