@@ -34,7 +34,8 @@ const responseFormat = `Return a JSON object with a new example problem and its 
         ]
       }
   2. Do not repeat problems from the session history or the original input problem. 
-  3. Ensure the problem and solution steps are concise and appropriate for the student's inferred skill level.  
+  3. Ensure the solution has at least 2 steps.
+  4. Ensure the problem and solution steps are concise and appropriate for the student's inferred skill level.  
   `;
 
 const defaultResponse: ExampleResponse = {

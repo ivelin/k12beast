@@ -1,5 +1,5 @@
 // File path: src/utils/mathjax-config.ts
-// Configures MathJax and provides utility functions for typesetting math.
+// Configures MathJax for MathML rendering and provides utility functions for typesetting math.
 
 import type { MathJaxObject } from "mathjax-full/js/mathjax";
 
@@ -20,14 +20,9 @@ export function initializeMathJax() {
   if (typeof window === "undefined" || window.MathJax) return;
 
   window.MathJax = {
-    tex: {
-      inlineMath: [["$", "$"]],
-      displayMath: [["$$", "$$"]],
-      packages: ["base", "ams", "mhchem"],
-    },
     options: {
       skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"],
-      ignoreHtmlClass: "tex2jax_ignore",
+      ignoreHtmlClass: "mathml-ignore",
     },
     startup: {
       typeset: false,
@@ -35,14 +30,11 @@ export function initializeMathJax() {
     chtml: {
       scale: 1,
     },
-    loader: {
-      load: ["[tex]/mhchem"],
-    },
   };
 
   mathJaxLoadedPromise = new Promise<void>((resolve) => {
     const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
+    script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js";
     script.async = true;
     script.onload = () => {
       resolve();
