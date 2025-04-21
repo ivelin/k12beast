@@ -19,58 +19,21 @@ const responseFormat = `Return a JSON object with the tutoring lesson based on t
   3. If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn. 
   4. Encourage the student to request more examples and quizzes when ready, but do not provide a quiz in this response.
   5. Structure for K12-related problems: 
-    {
-      "isK12": true, 
-      "lesson": "<p>[evaluation text]</p><p>[lesson text]</p><p>If you feel comfortable...</p>",
-      "charts": [
-        {
-          "id": "chart1",
-          "config": {...}
-        },
-        ...
-      ]
-    }
-
-{
-  "isK12": true,
-  "lesson": "<p>Since you're preparing for 6th grade tests in math...which is a great way to learn how money can grow over time. 🌟 ... understand the difference between simple and compound interest... Suppose you save $100 in a bank account that earns 5% interest per year, compounded annually... step by step. To help, see Chart 1 to visualize how your money grows each year, and refer to Chart 2 to compare simple interest vs. compound interest... The formula is <span class=\"math-tex\" data-math-type=\"display\">A = P(1 + r)^n</span>, where <span class=\"math-tex\" data-math-type=\"inline\">P</span> is your starting amount ($100), ... Check Chart 2 to see how compound interest (blue line) grows faster than simple interest (green line).</p><p><canvas id=\"chart1\"></canvas><br><canvas id=\"chart2\"></canvas></p><p>If you feel comfortable with this...</p>",
-  "charts": [
-    {
-      "id": "chart1",
-      "config": {
-        "type": "line",
-        "data": {
-          "labels": ["Year 0", "Year 1", "Year 2"],
-          "datasets": [{
-            "label": "Balance ($)",
-            "data": [100, 105, 110.25],
-            "borderColor": "blue",
-            "fill": false,
-            "tension": 0.1
-          }]
-        },
-        "options": {
-          "plugins": {
-            "title": {
-              "display": true,
-              "text": "Chart 1"
-            }
-          },
-          "scales": {
-            "x": { "title": { "display": true, "text": "Time" } },
-            "y": { "title": { "display": true, "text": "Balance ($)" } }
+      {
+        "isK12": true,
+        "lesson": "<p>Looks like...</p><p>To help, see Chart 1 to visualize, and refer to Chart 2 to... The formula is <math>...</math>...</p><p>If you feel comfortable with this...</p>",
+        "charts": [
+          {
+            "id": "chart1",
+            "config": {...},
+          {
+            "id": "chart2",
+            "config": {...}
           }
-        }
-      }
-    },
-    {
-      "id": "chart2",
-      "config": {...}
-    }
-  ]
-}    
-    
-    - Ensure the "lesson" field is a single HTML string with no nested JSON objects.`;
+        ]
+      }    
+  6. Ensure the "lesson" field is a single HTML string with no nested JSON objects.
+  `;
 
 // Handles POST requests to create a new tutoring session when a user submits a problem
 // Only creates a session if the problem is K12-related; otherwise, returns an error

@@ -1,5 +1,4 @@
-import { ChartConfiguration } from "chart.js/auto";
-
+// src/store/types.ts
 import { MessageElement } from "@/components/ui/chat-message";
 
 export type Step = "problem" | "lesson" | "examples" | "quizzes" | "end";
@@ -37,10 +36,34 @@ export interface Message {
   charts?: ChartConfig[]; // Added to support Chart.js configurations
 }
 
-// Interface for Chart.js configuration
+
+export interface PlotlyData {
+  x: (number | string)[];
+  y: (number | string)[];
+  type: string;
+  mode?: string;
+  name?: string;
+  line?: { color?: string };
+  marker?: { color?: string };
+  fill?: string;
+}
+
+export interface PlotlyLayout {
+  width?: number;
+  height?: number;
+  title?: { text: string };
+  xaxis?: { title?: string };
+  yaxis?: { title?: string };
+  margin?: { t?: number; b?: number; l?: number; r?: number };
+  showlegend?: boolean;
+}
+
 export interface ChartConfig {
-  id: string; // Matches the canvas ID in the HTML
-  config: ChartConfiguration; // Chart.js configuration object
+  id: string;
+  config: {
+    data: PlotlyData[];
+    layout: PlotlyLayout;
+  };
 }
 
 export interface AppState {

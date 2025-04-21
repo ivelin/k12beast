@@ -1,16 +1,14 @@
-/* src/components/ui/chat-message.tsx
- * Renders a chat message with support for markdown, HTML, MathJax formulas (math/chemical),
- * Chart.js charts, tool invocations, attachments, and reasoning blocks.
- */
+// File path: src/components/ui/chat-message.tsx
+// Renders a chat message with support for markdown, HTML, MathML/MathJax formulas, and static SVG charts using Plotly.
 
 "use client";
 
-import React, { useEffect, useRef, useState } from "react"; // Added useRef for chart refs
+import React, { useEffect, useState, useRef } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "framer-motion";
 import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react";
 import DOMPurify from "dompurify";
-import Chart from "chart.js/auto"; // Added Chart.js import
+import Plotly from "plotly.js-dist";
 import { cn } from "@/utils";
 import {
   Collapsible,
@@ -19,9 +17,10 @@ import {
 } from "@/components/ui/collapsible";
 import { FilePreview } from "@/components/ui/file-preview";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
-import { initializeMathJax, typesetMathJax } from "@/utils/mathjax-config"; // Added MathJax imports
+import { initializeMathJax, typesetMathJax } from "@/utils/mathjax-config";
 import { Message, ChartConfig } from "@/store/types";
 
+// Define Tailwind classes for the chat bubble
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
   {
@@ -102,7 +101,13 @@ export interface MessageElement extends Message {
   toolInvocations?: ToolInvocation[];
   parts?: MessagePart[];
   renderAs?: "markdown" | "html";
-  charts?: ChartConfig[]; // Added to support Chart.js configurations
+  charts?: ChartConfig[];
+}
+
+export interface ChartImage {
+  id: string;
+  svgContent: string;
+  title: string;
 }
 
 export interface ChatMessageProps extends MessageElement {
@@ -122,12 +127,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   toolInvocations,
   parts,
   renderAs = "markdown",
-  charts = [], // Added default empty array for charts
+  charts = [],
 }) => {
   const [domPurify, setDomPurify] = useState<typeof DOMPurify | null>(null);
   const [isDOMPurifyLoaded, setIsDOMPurifyLoaded] = useState(false);
-  const chartRefs = useRef<Map<string, Chart>>(new Map()); // Added to track Chart.js instances
-  const containerRef = useRef<HTMLDivElement>(null); // Added to reference the container for chart rendering
+  const [processedContent, setProcessedContent] = useState<string>(content);
+  const [processedParts, setProcessedParts] = useState<MessagePart[] | undefined>(parts);
+  const [chartImages, setChartImages] = useState<ChartImage[]>([]);
+  const [supportsMathML, setSupportsMathML] = useState<boolean | null>(null);
 
   // Load DOMPurify and initialize MathJax
   useEffect(() => {
@@ -135,47 +142,359 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       setDomPurify(() => module.default);
       setIsDOMPurifyLoaded(true);
     });
-    initializeMathJax(); // Initialize MathJax on mount
+    // Initialize MathJax for fallback
+    initializeMathJax();
   }, []);
 
-  // Typeset MathJax and initialize charts after content updates
+  // Detect MathML support
   useEffect(() => {
-    if (renderAs === "html" && containerRef.current && isDOMPurifyLoaded) {
-      // Typeset MathJax for LaTeX formulas
-      typesetMathJax();
+    const testMathMLSupport = () => {
+      const div = document.createElement("div");
+      div.innerHTML = "<math></math>";
+      document.body.appendChild(div);
+      const hasMathML = div.firstElementChild?.nodeName.toLowerCase() === "math";
+      document.body.removeChild(div);
+      console.log("MathML support detected:", hasMathML);
+      setSupportsMathML(hasMathML);
+      return hasMathML;
+    };
 
-      // Initialize Chart.js charts using configurations from the charts field
-      if (charts.length > 0) {
-        const canvases = containerRef.current.querySelectorAll("canvas");
-        canvases.forEach((canvas) => {
-          const id = canvas.id;
-          if (!id || chartRefs.current.has(id)) return;
+    testMathMLSupport();
+  }, []);
 
-          const chartConfig = charts.find((chart) => chart.id === id);
-          if (chartConfig) {
-            try {
-              const ctx = canvas.getContext("2d");
-              if (ctx) {
-                const chartInstance = new Chart(ctx, chartConfig.config);
-                chartRefs.current.set(id, chartInstance);
-              }
-            } catch (error) {
-              console.error(`Failed to initialize Chart.js for canvas ${id}:`, error);
-              console.debug(`Chart config:`, chartConfig.config);
-            }
-          } else {
-            console.warn(`No Chart.js config found for canvas ${id}`);
-          }
-        });
-      }
+  // Function to map legacy Chart.js config to Plotly config (for transition period)
+  const mapChartJsToPlotlyConfig = (chartConfig: any) => {
+    const chartJsConfig = chartConfig.config;
+
+    // Map chart type
+    let plotlyType: string;
+    switch (chartJsConfig.type) {
+      case "line":
+        plotlyType = "scatter";
+        break;
+      case "bar":
+        plotlyType = "bar";
+        break;
+      case "scatter":
+        plotlyType = "scatter";
+        break;
+      default:
+        console.warn(`Unsupported Chart.js type: ${chartJsConfig.type}. Defaulting to scatter.`);
+        plotlyType = "scatter";
     }
 
-    // Cleanup charts on unmount
-    return () => {
-      chartRefs.current.forEach((chart) => chart.destroy());
-      chartRefs.current.clear();
+    // Map datasets to Plotly traces
+    const data = chartJsConfig.data.datasets.map((dataset: any) => ({
+      x: chartJsConfig.data.labels,
+      y: dataset.data,
+      type: plotlyType,
+      mode: chartJsConfig.type === "line" ? "lines" : undefined,
+      name: dataset.label || "",
+      line: dataset.borderColor ? { color: dataset.borderColor } : undefined,
+      marker: dataset.borderColor ? { color: dataset.borderColor } : undefined,
+      fill: dataset.fill ? "tozeroy" : "none",
+    }));
+
+    // Map layout options
+    const layout: any = {
+      margin: { t: 40, b: 40, l: 40, r: 40 },
+      title: {
+        text: chartJsConfig.options?.plugins?.title?.text || chartConfig.id,
+        font: { size: 16 },
+        x: 0.5,
+        xanchor: "center",
+      },
+      xaxis: {
+        title: chartJsConfig.options?.scales?.x?.title?.text || "",
+      },
+      yaxis: {
+        title: chartJsConfig.options?.scales?.y?.title?.text || "",
+      },
+      showlegend: true,
     };
-  }, [content, renderAs, isDOMPurifyLoaded, charts]); // Added charts as dependency
+
+    return { data, layout };
+  };
+
+  // Function to validate Plotly configuration
+  const validatePlotlyConfig = (config: any): boolean => {
+    if (!config) {
+      console.error("Invalid Plotly config: Config is undefined or null");
+      return false;
+    }
+    if (!config.data) {
+      console.error("Invalid Plotly config: Missing data property", config);
+      return false;
+    }
+    if (!config.layout) {
+      console.error("Invalid Plotly config: Missing layout property", config);
+      return false;
+    }
+    if (!Array.isArray(config.data)) {
+      console.error("Invalid Plotly config: Data is not an array", config.data);
+      return false;
+    }
+    if (config.data.length === 0) {
+      console.error("Invalid Plotly config: Data array is empty", config.data);
+      return false;
+    }
+    for (let i = 0; i < config.data.length; i++) {
+      const trace = config.data[i];
+      if (!trace) {
+        console.error(`Invalid Plotly trace at index ${i}: Trace is undefined or null`, trace);
+        return false;
+      }
+      if (!trace.x) {
+        console.error(`Invalid Plotly trace at index ${i}: Missing x property`, trace);
+        return false;
+      }
+      if (!trace.y) {
+        console.error(`Invalid Plotly trace at index ${i}: Missing y property`, trace);
+        return false;
+      }
+      if (!trace.type) {
+        console.error(`Invalid Plotly trace at index ${i}: Missing type property`, trace);
+        return false;
+      }
+      if (!Array.isArray(trace.x) || trace.x.length === 0) {
+        console.error(`Invalid Plotly trace at index ${i}: x is not a non-empty array`, trace.x);
+        return false;
+      }
+      if (!Array.isArray(trace.y) || trace.y.length === 0) {
+        console.error(`Invalid Plotly trace at index ${i}: y is not a non-empty array`, trace.y);
+        return false;
+      }
+      if (trace.x.length !== trace.y.length) {
+        console.error(`Invalid Plotly trace at index ${i}: x and y arrays have different lengths`, trace);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Function to render a chart to an inline SVG string using Plotly
+  const renderChartToSVG = (chartConfig: ChartConfig): Promise<ChartImage> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        let plotlyData = chartConfig.config.data;
+        let plotlyLayout = chartConfig.config.layout;
+
+        // Validate Plotly configuration
+        if (!validatePlotlyConfig(chartConfig.config)) {
+          console.warn(`Chart ${chartConfig.id} appears to be in Chart.js format. Mapping to Plotly.`);
+          const mappedConfig = mapChartJsToPlotlyConfig(chartConfig);
+          plotlyData = mappedConfig.data;
+          plotlyLayout = mappedConfig.layout;
+        }
+
+        // Create a temporary div to render the chart
+        const tempDiv = document.createElement("div");
+        document.body.appendChild(tempDiv);
+
+        // Render the chart using Plotly without fixed dimensions
+        await Plotly.newPlot(tempDiv, plotlyData, plotlyLayout, { staticPlot: true });
+
+        // Export the chart as SVG (use temporary dimensions for rendering, will be overridden by CSS)
+        const svgContent = await Plotly.toImage(tempDiv, {
+          format: "svg",
+          width: 400, // Temporary width for rendering
+          height: 300, // Temporary height for rendering
+        });
+
+        // Clean up
+        Plotly.purge(tempDiv);
+        document.body.removeChild(tempDiv);
+
+        // Extract the SVG content (remove the data:image/svg+xml;base64, prefix if present)
+        let svgString: string;
+        if (svgContent.startsWith("data:image/svg+xml;base64,")) {
+          const base64Data = svgContent.replace("data:image/svg+xml;base64,", "");
+          svgString = atob(base64Data);
+        } else if (svgContent.startsWith("data:image/svg+xml,")) {
+          // Handle URL-encoded SVG (e.g., data:image/svg+xml,%3Csvg...)
+          const encodedData = svgContent.replace("data:image/svg+xml,", "");
+          svgString = decodeURIComponent(encodedData);
+        } else {
+          svgString = svgContent;
+        }
+
+        // Log the raw SVG string for debugging
+        console.log(`Raw SVG content for chart ${chartConfig.id}:`, svgString);
+
+        // Remove XML declaration if present (e.g., <?xml version="1.0" encoding="UTF-8"?>)
+        svgString = svgString.replace(/<\?xml[^>]*\>/g, "").trim();
+
+        // Ensure the SVG starts with <svg> tag
+        if (!svgString.startsWith("<svg")) {
+          console.error(`Invalid SVG content for chart ${chartConfig.id}: Does not start with <svg>`, svgString);
+          throw new Error(`Invalid SVG content: Does not start with <svg>`);
+        }
+
+        const title = plotlyLayout?.title?.text || chartConfig.id;
+        resolve({ id: chartConfig.id, svgContent: svgString, title });
+      } catch (error) {
+        console.error(`Failed to render chart ${chartConfig.id} to SVG:`, error);
+        const title = chartConfig.config.layout?.title?.text || chartConfig.id;
+        resolve({
+          id: chartConfig.id,
+          svgContent: `<svg width="400" height="300"><text x="10" y="20" font-size="16">Failed to render chart: ${title}</text></svg>`,
+          title,
+        });
+      }
+    });
+  };
+
+  // Function to convert MathML to LaTeX for MathJax rendering
+  const mathMLToLaTeX = (mathElement: Element): string => {
+    // Simple conversion: extract the content and convert common MathML to LaTeX
+    // This is a basic implementation; a more robust solution might use a library like MathJax's internal converters
+    const convertNode = (node: Node): string => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent?.trim() || "";
+      }
+      if (node.nodeName === "mi") {
+        return node.textContent || "";
+      }
+      if (node.nodeName === "mo") {
+        return node.textContent || "";
+      }
+      if (node.nodeName === "mn") {
+        return node.textContent || "";
+      }
+      if (node.nodeName === "mrow") {
+        return Array.from(node.childNodes).map(convertNode).join("");
+      }
+      if (node.nodeName === "msup") {
+        const base = convertNode(node.childNodes[0]);
+        const exponent = convertNode(node.childNodes[1]);
+        return `${base}^{${exponent}}`;
+      }
+      if (node.nodeName === "mfrac") {
+        const numerator = convertNode(node.childNodes[0]);
+        const denominator = convertNode(node.childNodes[1]);
+        return `\\frac{${numerator}}{${denominator}}`;
+      }
+      if (node.nodeName === "mtext") {
+        return `\\text{${node.textContent || ""}}`;
+      }
+      if (node.nodeName === "math") {
+        return Array.from(node.childNodes).map(convertNode).join("");
+      }
+      return "";
+    };
+
+    const latex = convertNode(mathElement);
+    const displayMode = mathElement.getAttribute("display") === "block" ? "display" : "inline";
+    return `<span class="math-tex" data-math-type="${displayMode}">${latex}</span>`;
+  };
+
+  // Function to process MathML elements and apply fallback if needed
+  const processMathMLContent = (html: string): string => {
+    if (supportsMathML === null) {
+      // If MathML support detection isn't complete, return original content
+      return html;
+    }
+
+    if (supportsMathML) {
+      // Browser supports MathML, so we can use it directly
+      return html;
+    }
+
+    // Browser does not support MathML, convert to LaTeX for MathJax
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+    const mathElements = doc.querySelectorAll("math");
+
+    mathElements.forEach((mathElement) => {
+      const latexContent = mathMLToLaTeX(mathElement);
+      const wrapper = doc.createElement("span");
+      wrapper.innerHTML = latexContent;
+      mathElement.parentNode?.replaceChild(wrapper, mathElement);
+    });
+
+    return doc.body.firstChild?.innerHTML || html;
+  };
+
+  // Process charts and append them at the end of the message
+  useEffect(() => {
+    if (renderAs !== "html" || !isDOMPurifyLoaded || supportsMathML === null) {
+      if (renderAs === "html" && isDOMPurifyLoaded) {
+        typesetMathJax().catch((error) =>
+          console.error("Failed to typeset MathJax:", error)
+        );
+      }
+      return;
+    }
+
+    const processCharts = async () => {
+      try {
+        // Initialize processed content and parts
+        let updatedContent = content || "";
+        let updatedParts = parts ? [...parts] : undefined;
+
+        // Process MathML content
+        updatedContent = processMathMLContent(updatedContent);
+
+        // Generate SVG content for all charts if any exist
+        let generatedChartImages: ChartImage[] = [];
+        if (charts.length > 0) {
+          console.log("Processing charts:", JSON.stringify(charts, null, 2));
+          generatedChartImages = await Promise.all(
+            charts.map(async (chartConfig) => {
+              return await renderChartToSVG(chartConfig);
+            })
+          );
+          setChartImages(generatedChartImages);
+        }
+
+        // Remove <div> tags (previously <canvas>) from content and update chart references
+        updatedContent = updatedContent.replace(
+          /<div\s+id="[^"]*"[^>]*><\/div>/gi,
+          ""
+        );
+        updatedContent = updatedContent.replace(
+          /Chart\s+(\w+)/gi,
+          "Chart $1 below"
+        );
+        setProcessedContent(updatedContent);
+
+        // If parts exist, process them as well
+        if (parts) {
+          updatedParts = await Promise.all(
+            parts.map(async (part) => {
+              if (part.type !== "text") return part;
+
+              let partContent = part.text || "";
+              // Process MathML in parts
+              partContent = processMathMLContent(partContent);
+              partContent = partContent.replace(
+                /<div\s+id="[^"]*"[^>]*><\/div>/gi,
+                ""
+              );
+              partContent = partContent.replace(
+                /Chart\s+(\w+)/gi,
+                "Chart $1 below"
+              );
+              return { ...part, text: partContent };
+            })
+          );
+          setProcessedParts(updatedParts);
+        }
+
+        // Typeset MathJax if we had to convert MathML to LaTeX
+        if (!supportsMathML) {
+          await typesetMathJax();
+        }
+      } catch (error) {
+        console.error("Failed to process charts or typeset MathJax:", error);
+        // Ensure state is updated even if an error occurs
+        setProcessedContent(content || "");
+        setProcessedParts(parts ? [...parts] : undefined);
+      }
+    };
+
+    processCharts();
+  }, [content, parts, renderAs, isDOMPurifyLoaded, charts, supportsMathML]);
 
   const isUser = role === "user";
 
@@ -192,14 +511,72 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return domPurify.sanitize(html, {
       ALLOWED_TAGS: [
         "p", "strong", "ul", "li", "br", "span", "div", "h1", "h2", "h3",
-        "h4", "h5", "h6", "a", "img", "table", "tr", "td", "th", "tbody",
-        "thead", "tfoot", "caption", "sup", "sub", "canvas", "b",
+        "h4", "h5", "h6", "a", "svg", "g", "path", "text", "rect", "line",
+        "table", "tr", "td", "th", "tbody", "thead", "tfoot", "caption",
+        "sup", "sub", "b",
+        // MathML tags
+        "math", "mi", "mo", "mn", "mrow", "msup", "mfrac", "mtext",
       ],
       ALLOWED_ATTR: [
         "class", "style", "href", "src", "alt", "id", "width", "height",
-        "aria-label", "data-math-type",
+        "aria-label", "data-math-type", "fill", "stroke", "stroke-width",
+        "transform", "x", "y", "dx", "dy", "font-size", "text-anchor",
+        "font-family", "font-weight", "d", "xmlns",
+        // MathML attributes
+        "display", "mathvariant",
       ],
     });
+  };
+
+  // Component to render SVG content dynamically with responsive sizing
+  const SVGRenderer: React.FC<{ svgContent: string }> = ({ svgContent }) => {
+    const svgRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      if (svgRef.current) {
+        try {
+          // Parse the SVG string into a DOM element
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(svgContent, "image/svg+xml");
+
+          // Check for parsing errors
+          const parseError = svgDoc.querySelector("parsererror");
+          if (parseError) {
+            console.error("SVG parsing error:", parseError.textContent);
+            // Fallback to dangerouslySetInnerHTML
+            svgRef.current.innerHTML = svgContent;
+            return;
+          }
+
+          const svgElement = svgDoc.documentElement;
+
+          // Ensure the SVG element has the correct namespace
+          if (!svgElement.hasAttribute("xmlns")) {
+            svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+          }
+
+          // Remove fixed width and height to allow responsive scaling
+          svgElement.removeAttribute("width");
+          svgElement.removeAttribute("height");
+
+          // Add CSS to make the SVG responsive while preserving aspect ratio
+          svgElement.style.width = "100%";
+          svgElement.style.height = "auto";
+          svgElement.style.maxWidth = "100%";
+          svgElement.style.display = "block";
+
+          // Clear the container and append the SVG element
+          svgRef.current.innerHTML = "";
+          svgRef.current.appendChild(svgElement);
+        } catch (error) {
+          console.error("Failed to parse SVG content:", error);
+          // Fallback to dangerouslySetInnerHTML
+          svgRef.current.innerHTML = svgContent;
+        }
+      }
+    }, [svgContent]);
+
+    return <div ref={svgRef} className="w-full max-w-full" />;
   };
 
   if (isUser) {
@@ -230,20 +607,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     );
   }
 
-  if (parts && parts.length > 0) {
+  if (processedParts && processedParts.length > 0) {
     return (
       <>
-        {parts.map((part, index) => {
+        {processedParts.map((part, index) => {
           if (part.type === "text") {
             return (
               <div
                 className={cn("flex flex-col", isUser ? "items-end" : "items-start")}
                 key={`text-${index}`}
               >
-                <div
-                  ref={containerRef} // Added ref for chart rendering
-                  className={cn(chatBubbleVariants({ isUser, animation }))}
-                >
+                <div className={cn(chatBubbleVariants({ isUser, animation }))}>
                   {renderAs === "html" ? (
                     isDOMPurifyLoaded ? (
                       <div dangerouslySetInnerHTML={{ __html: sanitizeContent(part.text) }} />
@@ -256,6 +630,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                   {actions && (
                     <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
                       {actions}
+                    </div>
+                  )}
+                  {/* Append chart SVGs at the end of the message */}
+                  {chartImages.length > 0 && index === processedParts.length - 1 && (
+                    <div className="mt-2 space-y-2">
+                      {chartImages.map((chart) => (
+                        <div key={chart.id}>
+                          <p className="text-sm font-semibold">{chart.title}</p>
+                          <SVGRenderer svgContent={chart.svgContent} />
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -294,22 +679,30 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-      <div
-        ref={containerRef} // Added ref for chart rendering
-        className={cn(chatBubbleVariants({ isUser, animation }))}
-      >
+      <div className={cn(chatBubbleVariants({ isUser, animation }))} id={role}>
         {renderAs === "html" ? (
           isDOMPurifyLoaded ? (
-            <div dangerouslySetInnerHTML={{ __html: sanitizeContent(content) }} />
+            <div dangerouslySetInnerHTML={{ __html: sanitizeContent(processedContent) }} />
           ) : (
             <div>Loading HTML content...</div>
           )
         ) : (
-          <MarkdownRenderer>{content}</MarkdownRenderer>
+          <MarkdownRenderer>{processedContent}</MarkdownRenderer>
         )}
         {actions && (
           <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
             {actions}
+          </div>
+        )}
+        {/* Append chart SVGs at the end of the message */}
+        {chartImages.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {chartImages.map((chart) => (
+              <div key={chart.id}>
+                <p className="text-sm font-semibold">{chart.title}</p>
+                <SVGRenderer svgContent={chart.svgContent} />
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -432,3 +825,20 @@ function ToolCall({ toolInvocations }: Pick<ChatMessageProps, "toolInvocations">
     </div>
   );
 }
+
+// Memoize ChatMessage to prevent unnecessary re-renders
+export const MemoizedChatMessage = React.memo(ChatMessage, (prevProps, nextProps) => {
+  return (
+    prevProps.content === nextProps.content &&
+    prevProps.role === nextProps.role &&
+    prevProps.renderAs === nextProps.renderAs &&
+    prevProps.charts === nextProps.charts &&
+    prevProps.createdAt?.getTime() === nextProps.createdAt?.getTime() &&
+    prevProps.experimental_attachments === nextProps.experimental_attachments &&
+    prevProps.toolInvocations === nextProps.toolInvocations &&
+    prevProps.parts === nextProps.parts &&
+    prevProps.actions === nextProps.actions &&
+    prevProps.showTimeStamp === nextProps.showTimeStamp &&
+    prevProps.animation === nextProps.animation
+  );
+});

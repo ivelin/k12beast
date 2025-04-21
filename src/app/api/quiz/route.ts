@@ -19,73 +19,52 @@ interface QuizResponse {
   readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
 }
 
-const responseFormat = `Return a JSON object with a new quiz problem related to the same topic as the original k12 input problem prompt by the user. 
-  - The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. 
-  - Provide a brief context or scenario to make the problem engaging. 
-  - Do not repeat problems from the session history. 
-  - Additionally, assess the student's readiness for an end-of-semester test based on their overall performance in the chat history, considering quiz performance (correctness, consistency, and difficulty), 
+const responseFormat = `Return a valid JSON object with a new quiz problem related to the same topic as the original k12 input problem prompt by the user. 
+  Follow these gudelines:
+  1. The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. 
+    - Each option should be labeled with a letter (A, B, C, D) and should be concise.
+  2. Provide a brief context or scenario to make the problem engaging. 
+  3. Do not repeat problems from the session history. 
+  4. Additionally, assess the student's readiness for an end-of-semester test based on their overall performance in the chat history, considering quiz performance (correctness, consistency, and difficulty), 
   engagement with lessons and examples (e.g., fewer example requests might indicate mastery), 
   and inferred skill level and progress (e.g., improvement over time). 
-  - Provide two alternative encouragement messages using emojis, XP points, leveling up, etc.: 
+  5. Provide two alternative encouragement messages using emojis, XP points, leveling up, etc.: 
   one for if the student answers correctly, 
   and another one for if they answer incorrectly. 
-
-  - Structure: 
-    {
-      "problem": "<p>Here's an example problem: You save $100 in a bank account that earns 5% interest per year, compounded annually. The bank uses the formula <span class=\"math-tex\" data-math-type=\"inline\">A = P(1 + r)^n</span> to calculate your balance, where <span class=\"math-tex\" data-math-type=\"inline\">P</span> is the starting amount, <span class=\"math-tex\" data-math-type=\"inline\">r</span> is the interest rate, and <span class=\"math-tex\" data-math-type=\"inline\">n</span> is the number of years. How much money will you have after 2 years? To get a sense of how your savings might grow, take a look at Chart 1, which shows an example of compound interest growth over 3 years for a different amount. Chart 2 shows how compound interest compares to simple interest for that same example, helping you see why compound interest can be more powerful.</p><p><canvas id=\"chart1\"></canvas><br><canvas id=\"chart2\"></canvas></p>", 
-      "solution": [
-          {
-            "title": "Step 1", "content": "Step content with optional MathJax formulas and references to existing charts 1, 2 or even new 3, 4 ..."
-          },
-          {"title": "Step N", "content": "Step content..."}
-          ], 
-      "charts": [
+  6. Structure: 
         {
-          "id": "chart1",
-          "config": {
-            "type": "line",
-            "data": {
-              "labels": ["Year 0", "Year 1", "Year 2"],
-              "datasets": [{
-                "label": "Balance ($)",
-                "data": [100, 105, 110.25],
-                "borderColor": "blue",
-                "fill": false,
-                "tension": 0.1
-              }]
-            },
-            "options": {
-              "plugins": {
-                "title": {
-                  "display": true,
-                  "text": "Chart 1"
-                }
+          "problem": "<p>Here's an example problem:</p><p> ... uses the formula <math>...</math> .... Take a look at Chart 1, which shows... Chart 2 shows ...</p>", 
+          "solution": [
+              {
+                "title": "Step 1", "content": "Step content with optional MathJax formulas and references to existing charts 1, 2 or even new 3, 4 ..."
               },
-              "scales": {
-                "x": { "title": { "display": true, "text": "Time" } },
-                "y": { "title": { "display": true, "text": "Balance ($)" } }
-              }
+              {"title": "Step N", "content": "Step content..."}
+              ], 
+          "charts": [
+            {
+              "id": "chart1",
+              "config": {...}
+            },
+            {
+              "id": "chart2",
+              "config": {}
             }
-          }
-        },
-        {
-          "id": "chart2",
-          "config": {...}
-        }
-      ],
-    "answerFormat": "multiple-choice", 
-    "options": ["option1 with possible reference to charts from the example problem statement", "option2", "option3", "option4"], 
-    "correctAnswer": "correct option", 
-    "difficulty": "easy|medium|hard", 
-    "encouragementIfCorrect": "Gamified message of if correct ", 
-    "encouragementIfIncorrect": "Gamified message if incorrect using emojis, XP points, leveling up, etc.",
-    "readiness": {"confidenceIfCorrect": 0.92, "confidenceIfIncorrect": 0.75}
-    }.
+          ],
+        "answerFormat": "multiple-choice", 
+        "options": ["A: option A with possible formulas and reference to charts from the example problem statement", "B: option B", "C: option C", "D: option D"], 
+        "correctAnswer": "single letter correct option (A, B, C or D)", 
+        "difficulty": "easy|medium|hard", 
+        "encouragementIfCorrect": "Gamified message of if correct ", 
+        "encouragementIfIncorrect": "Gamified message if incorrect using emojis, XP points, leveling up, etc.",
+        "readiness": {"confidenceIfCorrect": 0.92, "confidenceIfIncorrect": 0.75}
+        }.
 
-    - The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence 
-    - that the student would achieve at least a 95% success rate on an end-of-semester test without AI assistance, 
-    depending on whether they answer this quiz correctly or incorrectly. 
-    - Ensure all fields are present, especially the "solution" field with at least two steps.
+  7. The "options" fields must be a single character (A, B, C, D) followed by a colon and the option text.
+  8. The "correctAnswer" field must be a single character (A, B, C, D) indicating the correct option.
+  9. The "difficulty" field should be one of "easy", "medium", or "hard" based on the complexity of the problem.
+  10. The "encouragementIfCorrect" and "encouragementIfIncorrect" fields should be strings that provide positive reinforcement for correct answers and constructive feedback for incorrect answers.
+  11. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 95% success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz correctly or incorrectly. 
+  12. Ensure all fields are present, especially the "solution" field with at least two steps.
   `;
 
 // Default response if the AI fails to generate a valid quiz

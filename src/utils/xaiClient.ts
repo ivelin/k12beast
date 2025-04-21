@@ -4,7 +4,6 @@
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
-import { ChartConfiguration } from "chart.js";
 import { ChartConfig } from "@/store/types";
 const openai = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
@@ -85,27 +84,51 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
         - Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions. 
         - Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history. 
         - Adapt your response based on this chat history—e.g., avoid repeating examples or quiz problems already given (as specified in the chat history), and adjust difficulty based on performance trends. 
-        - If the chat history includes quiz responses, adjust the difficulty: provide more challenging content if the student answered correctly, or simpler content if they answered incorrectly.
+        - If the chat history includes quiz responses, adjust the difficulty: provide more challenging problems if the student answered correctly, or simpler problems if they answered incorrectly.
 
       2. **Response Format**:
-        - Always return a raw JSON object (formatted for JSON.parse()) with the response fields specified in the user prompt.
+        - Always return a raw JSON object as a string strictly formatted for JSON.parse() with the response fields specified in the user prompt.
+        - Do not include any additional text before or after the JSON object.        
         - Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
         - Ensure the response is a single, valid JSON object with no trailing commas or syntax errors.
-        - For text content fields in the JSON response follow these guidelines:
-          - Use safe HTML formatting for text content. No script tags or inline JavaScript.
+        - For text fields in the JSON response follow these guidelines:
+          - Use safe HTML formatting for text content (e.g., <p>, <ul>, <li>, <strong>, <em>). 
+          - No <script> tags or inline JavaScript.
+          - Do not use Markdown formatting (e.g., no \`\`\` or \`**\`).
           - Use emojis as appropriate to enhance engagement.
           - Use charts, graphs, formulas and other visual aids to enhance explanations when appropriate.
-          - For math formulas, chemistry equations, and other scientific notations, use MathML syntax <math>...</math>.
-          - For charts and graphs (e.g., bar charts, line graphs, geometry shapes) use Chart.js compatible code as follows:
-            - Include a <canvas> tag in the HTML content with a unique id (e.g., <canvas id="chart1"></canvas>). 
-            - Do not include <script> tags or inline JavaScript in the HTML. Instead, provide the Chart.js configuration in a separate "charts" field in the outer JSON response structure.
+          - For math formulas, chemistry equations, and other scientific notations, use MathML synthax within <math></math> tags.
+          - For charts and graphs (e.g., bar charts, line graphs, geometry shapes) use Plotly compatible chart config structures as follows:
+            - Do not include <script> tags or inline JavaScript in the HTML. 
+            - Instead, provide the chart configuration in a separate "charts" field in the outer JSON response structure.
             - Ensure all charts labels are in the same language as the problem using plain and safe text format.
-          - Reference charts and diagrams in the response via numeric IDs (e.g., "See Chart 1" or "Refer to Diagram 2") and provide the corresponding <canvas> tag in the HTML content.
+            - Reference charts and diagrams in the response via numeric IDs (e.g., "See Chart 1" or "Refer to Diagram 2") and provide the corresponding name as a title label in the chart config code.
+            - Example Plotly configuration:
+                          {
+                            "id": "chart1",
+                            "config": {
+                              "data": [
+                                {
+                                  "x": ["0s", "1s", "2s", "3s", "4s", "5s"],
+                                  "y": [0, 10, 20, 30, 40, 50],
+                                  "type": "scatter",
+                                  "mode": "lines",
+                                  "name": "Distance (m)",
+                                  "line": { "color": "blue" }
+                                }
+                              ],
+                              "layout": {
+                                "title": { "text": "Chart 1: Distance vs. Time for Constant Speed" },
+                                "xaxis": { "title": "Time (s)" },
+                                "yaxis": { "title": "Distance (m)" }
+                              }
+                            }
+                          }            
           - Do not reference images, charts, diagrams and formulas outside of this immediate prompt and response.
           - Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
 
       3. **School Tests Alignment**:
-        - Align content with standardized school test formats, including technology-enhanced items (e.g., graphs, equations).
+        - Align with standardized school test formats, including technology-enhanced items (e.g., graphs, equations).
         - Use examples and visualizations relevant to grades K-12.
     `;
 
@@ -124,10 +147,12 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     },
     {
       role: "user",
-      content: responseFormat,
+      content: `Verify and ensure that the response content is a string in a valid JSON format starting with { and ending with }. 
+        It must be able to pass JSON.parse() without any errors. 
+        The JSON object must follow strictly the fields in the following guidelines and examples:
+        ${responseFormat}`,
     },
   ];
-
 
 
   if (images && images.length > 0) {
@@ -156,9 +181,10 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
 
       rawContent = response.choices[0].message.content.trim();
       rawContent = sanitizeResponse(rawContent);
+      console.log("xAI API response sanitized content object:", rawContent);
 
       const content: XAIResponse = JSON.parse(rawContent);
-      console.log("xAI API response content object:", content);
+      console.log("xAI API response JSON parsed content object:", content);
 
       return content;
     } catch (error: unknown) {
