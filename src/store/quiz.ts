@@ -3,6 +3,7 @@ import { StateCreator } from "zustand";
 import { toast } from "sonner";
 import { AppState, Quiz, QuizFeedback, Message } from "./types";
 import { formatQuizFeedbackMessage } from "@/utils/quizUtils";
+import { formatQuizProblemMessage } from "@/utils/quizUtils";
 
 export interface QuizState {
   quiz: Quiz | null;
@@ -96,9 +97,10 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch quiz. Please try again.");
       set({ quiz: data, quizAnswer: "", quizFeedback: null, correctAnswer: null }); // Reset correctAnswer
+      const quizHtml = formatQuizProblemMessage(data);
       addMessage({
         role: "assistant",
-        content: `<p><strong>Quiz:</strong></p><p>${data.problem}</p>`,
+        content: quizHtml,
         charts: data.charts,
         renderAs: "html",
       });

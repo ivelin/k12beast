@@ -4,6 +4,7 @@ import { sendXAIRequest } from "@/utils/xaiClient";
 import { handleXAIError } from "@/utils/xaiUtils";
 import supabase from "../../../supabase/serverClient";
 import { ChartConfig } from "@/store/types";
+import { formatQuizProblemMessage } from "@/utils/quizUtils";
 
 // Define the expected response structure from the xAI API
 interface QuizResponse {
@@ -65,6 +66,9 @@ const responseFormat = `Return a valid JSON object with a new quiz problem relat
   10. The "encouragementIfCorrect" and "encouragementIfIncorrect" fields should be strings that provide positive reinforcement for correct answers and constructive feedback for incorrect answers.
   11. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 95% success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz correctly or incorrectly. 
   12. Ensure all fields are present, especially the "solution" field with at least two steps.
+    - The "solution" field must have at least two steps, each with a title and content.
+    - When the solution references charts, it should reference them exaclty as they are referenced in the example problem statement. Not via relative direction like "the chart above" or "the chart below".
+  13. If the AI fails to generate a valid quiz, return a default response with a problem, answerFormat, options, correctAnswer, solution, difficulty, encouragementIfCorrect, encouragementIfIncorrect, and readiness fields.
   `;
 
 // Default response if the AI fails to generate a valid quiz
@@ -190,9 +194,10 @@ export async function POST(req: NextRequest) {
     // Append the user's quiz prompt and the quiz problem in a single update
     // Ensures messages and quizzes remain arrays, tied to the original problem's session
     const userQuizPrompt = { role: "user", content: "Take a Quiz" };
+    const quizProblemStatement: string = formatQuizProblemMessage(content);
     const quizProblem = {
       role: "assistant",
-      content: `<strong>Quiz:</strong><br>${content.problem}`, // Only include the problem text
+      content: quizProblemStatement,
       charts: content.charts || [],
       renderAs: "html",
     };

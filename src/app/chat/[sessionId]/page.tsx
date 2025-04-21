@@ -212,112 +212,110 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col relative">
-      <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 flex flex-col">
-        {/* Cloned From Label */}
-        {store.cloned_from && (
-          <div className="text-sm text-muted-foreground mb-4">
-            <p>
-              This session was cloned from{" "}
-              <Link
-                href={`/public/session/${store.cloned_from}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline hover:text-primary-dark"
-              >
-                a shared session
-              </Link>.
-            </p>
+    <div className="container">
+      {/* Cloned From Label */}
+      {store.cloned_from && (
+        <div className="text-sm text-muted-foreground mb-4">
+          <p>
+            This session was cloned from{" "}
+            <Link
+              href={`/public/session/${store.cloned_from}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline hover:text-primary-dark"
+            >
+              a shared session
+            </Link>.
+          </p>
+        </div>
+      )}
+      <div className="flex justify-end items-center mb-4">
+        <div className="flex space-x-2">
+          <div className="relative group">
+            <Button
+              onClick={handleNewChat}
+              className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
+              aria-label="New chat"
+            >
+              <PenSquare className="h-5 w-5" />
+            </Button>
+            <span className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity sm:hidden">
+              New Chat
+            </span>
+            <span className="hidden sm:block absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              New Chat
+            </span>
           </div>
-        )}
-        <div className="flex justify-end items-center mb-4">
-          <div className="flex space-x-2">
+          {hasSubmittedProblem && !sessionTerminated && (
             <div className="relative group">
               <Button
-                onClick={handleNewChat}
+                onClick={handleShare}
                 className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
-                aria-label="New chat"
+                aria-label="Share session"
               >
-                <PenSquare className="h-5 w-5" />
+                <Share2 className="h-5 w-5" />
               </Button>
               <span className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity sm:hidden">
-                New Chat
+                Share
               </span>
               <span className="hidden sm:block absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                New Chat
+                Share Session
               </span>
             </div>
-            {hasSubmittedProblem && !sessionTerminated && (
-              <div className="relative group">
-                <Button
-                  onClick={handleShare}
-                  className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
-                  aria-label="Share session"
-                >
-                  <Share2 className="h-5 w-5" />
-                </Button>
-                <span className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity sm:hidden">
-                  Share
-                </span>
-                <span className="hidden sm:block absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Share Session
-                </span>
-              </div>
-            )}
-          </div>
+          )}
         </div>
-        <ChatContainer className="flex-1">
-          <ChatMessages className="flex flex-col items-start">
-            <MessageList messages={messages} isTyping={loading} />
-          </ChatMessages>
-          {!loading && step === "problem" && !hasSubmittedProblem && (
-            <PromptSuggestions
-              className="mb-8"
-              label="Try these prompts ✨"
-              append={(message) => append(message, imageUrls)}
-              suggestions={[
-                "Explain step-by-step how to solve this math problem: if x * x + 9 = 25, what is x?",
-                "Problem: Room 1 is at 18'C. Room 2 is at 22'C. Which direction will heat flow?.",
-                "Problem: Simplify 3(4x + 6z). I think the answer is: 12x+19z",
-                "Help me prepare for 6th grade school tests: math, science, ELR."
-              ]}
-            />
-          )}
-          {!loading && (step === "lesson" || step === "examples") && !sessionTerminated && (
-            <PromptSuggestions
-              className="mb-8"
-              label="What would you like to do next?"
-              append={(message) => handleSuggestionAction(message.content)}
-              suggestions={["Request Example", "Take a Quiz"]}
-            />
-          )}
-          {step === "problem" && !hasSubmittedProblem && (
-            <ChatForm
-              className="mt-auto"
-              isPending={loading}
-              handleSubmit={(e) => {
-                e.preventDefault();
-                handleSubmit(localProblem, imageUrls);
-              }}
-            >
-              {({ files, setFiles }) => (
-                <MessageInput
-                  value={localProblem}
-                  onChange={(e) => setLocalProblem(e.target.value)}
-                  allowAttachments={true}
-                  files={localImages}
-                  setFiles={setLocalImages}
-                  isGenerating={loading}
-                  placeholder="Ask k12beast AI..."
-                />
-              )}
-            </ChatForm>
-          )}
-        </ChatContainer>
-        {step === "quizzes" && quiz && !quizFeedback && (
-          <QuizSection onQuizUpdate={() => {}} />
-        )}
       </div>
+      <ChatContainer className="flex-1">
+        <ChatMessages className="flex flex-col items-start">
+          <MessageList messages={messages} isTyping={loading} />
+        </ChatMessages>
+        {!loading && step === "problem" && !hasSubmittedProblem && (
+          <PromptSuggestions
+            className="mb-8"
+            label="Try these prompts ✨"
+            append={(message) => append(message, imageUrls)}
+            suggestions={[
+              "Explain step-by-step how to solve this math problem: if x * x + 9 = 25, what is x?",
+              "Problem: Room 1 is at 18'C. Room 2 is at 22'C. Which direction will heat flow?.",
+              "Problem: Simplify 3(4x + 6z). I think the answer is: 12x+19z",
+              "Help me prepare for 6th grade school tests: math, science, ELR."
+            ]}
+          />
+        )}
+        {!loading && (step === "lesson" || step === "examples") && !sessionTerminated && (
+          <PromptSuggestions
+            className="mb-8"
+            label="What would you like to do next?"
+            append={(message) => handleSuggestionAction(message.content)}
+            suggestions={["Request Example", "Take a Quiz"]}
+          />
+        )}
+        {step === "problem" && !hasSubmittedProblem && (
+          <ChatForm
+            className="mt-auto"
+            isPending={loading}
+            handleSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit(localProblem, imageUrls);
+            }}
+          >
+            {({ files, setFiles }) => (
+              <MessageInput
+                value={localProblem}
+                onChange={(e) => setLocalProblem(e.target.value)}
+                allowAttachments={true}
+                files={localImages}
+                setFiles={setLocalImages}
+                isGenerating={loading}
+                placeholder="Ask k12beast AI..."
+              />
+            )}
+          </ChatForm>
+        )}
+      </ChatContainer>
+      {step === "quizzes" && quiz && !quizFeedback && (
+        <QuizSection onQuizUpdate={() => {}} />
+      )}
 
       <Dialog open={showErrorPopup} onOpenChange={handleClosePopup}>
         <DialogContent aria-describedby="error-description">

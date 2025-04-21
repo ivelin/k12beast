@@ -22,23 +22,27 @@ export function buildSessionMessages(session: Session): MessageElement[] {
   }
 
   // Add the lesson as an assistant message if it exists and isn't already in messages
+  // console.debug("buildSessionMessage: session lesson", session.lesson);
   if (session.lesson && !messages.some(msg => msg.role === "assistant" && msg.content === session.lesson)) {
     let lessonContent = "";
     let lessonCharts = [];
     try {
       const lessonObject = JSON.parse(session.lesson);
-      lessonContent = lessonObject.content;
+      // console.debug("buildSessionMessage: ", {lessonObject});
+      lessonContent = lessonObject.lesson;
       lessonCharts = lessonObject.charts || [];
     } catch (e) {
       console.debug("Failed to parse lesson content as JSON. Falling back to plain text content:", e);
       lessonContent = session.lesson;
     }    
-    messages.push({
+    const lessonMessageData: MessageElement = {
       role: "assistant",
       content: lessonContent,
       charts: lessonCharts,
       renderAs: "html",
-    });
+    }
+    // console.debug("buildSessionMessage: ", {lessonMessageData});
+    messages.push(lessonMessageData);
   }
 
   // Append any existing messages from the session

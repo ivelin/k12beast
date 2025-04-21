@@ -7,7 +7,6 @@ import {
   type MessageElement,
 } from "@/components/ui/chat-message";
 import { TypingIndicator } from "@/components/ui/typing-indicator";
-import { CopyButton } from "@/components/ui/copy-button";
 
 type AdditionalMessageOptions = Omit<ChatMessageProps, keyof MessageElement>;
 
@@ -41,18 +40,13 @@ export function MessageList({
 
         const messageKey = message.id ?? `message-${index}-${message.createdAt?.toISOString() ?? index}`;
 
-        const defaultActions =
-          message.role === "assistant" ? (
-            <CopyButton contentToCopy={message.content} />
-          ) : undefined;
-
         return (
           <div key={messageKey}>
             <ChatMessage
               {...message}
               showTimeStamp={showTimeStamps}
               animation={index === messages.length - 1 ? "scale" : "none"}
-              actions={additionalOptions?.actions ?? defaultActions}
+              actions={additionalOptions?.actions}
               {...additionalOptions}
             />
           </div>

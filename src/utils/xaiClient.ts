@@ -102,7 +102,8 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
             - Do not include <script> tags or inline JavaScript in the HTML. 
             - Instead, provide the chart configuration in a separate "charts" field in the outer JSON response structure.
             - Ensure all charts labels are in the same language as the problem using plain and safe text format.
-            - Reference charts and diagrams in the response via numeric IDs (e.g., "See Chart 1" or "Refer to Diagram 2") and provide the corresponding name as a title label in the chart config code.
+            - Reference charts in the response via unique and sequential numeric IDs (e.g., "See Chart 1") and provide the corresponding name as a title label in the chart config code.
+            - Be careful to use brief chart labels that fit within the chart area. If you must use long labels, consider breaking them into multiple lines.
             - Example Plotly configuration:
                           {
                             "id": "chart1",
@@ -118,7 +119,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                                 }
                               ],
                               "layout": {
-                                "title": { "text": "Chart 1: Distance vs. Time for Constant Speed" },
+                                "title": { "text": "Chart 1:<br>Distance vs. Time for Constant Speed" },
                                 "xaxis": { "title": "Time (s)" },
                                 "yaxis": { "title": "Distance (m)" }
                               }

@@ -74,7 +74,7 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
       )}
       {quiz.answerFormat === "multiple-choice" && quiz.options && quiz.options.length > 0 ? (
         <div className="w-full max-w-md">
-          {quiz.options.map((option: string, index: number) => {
+          {['A', 'B', 'C', 'D'].map((option: string, index: number) => {
             const isUserAnswer = option === answer;
             return (
               <div key={index} className="my-2 flex items-center">

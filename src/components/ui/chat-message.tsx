@@ -88,6 +88,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     initializeMathJax();
   }, []);
 
+  // Clean chart placeholders and references from content
+  const cleanChartContent = (text: string): string => {
+    return text
+      .replace(/<div\s+id="[^"]*"[^>]*><\/div>/gi, "")
+      .replace(/Chart\s+(\w+)/gi, "Chart $1 below");
+  };
+
   // Validate Plotly configuration
   const validatePlotlyConfig = (config: any): boolean => {
     if (!config?.data || !config.layout || !Array.isArray(config.data) || config.data.length === 0) return false;
@@ -165,23 +172,24 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         let updatedParts = parts ? [...parts] : undefined;
 
         let generatedChartImages: ChartImage[] = [];
-        if (charts.length > 0) {
-          console.log("Processing charts:", JSON.stringify(charts, null, 2));
-          generatedChartImages = await Promise.all(charts.map(renderChartToSVG));
-          setChartImages(generatedChartImages);
-        }
+        const hasTextParts = parts?.some(part => part.type === "text");
+        if (charts.length > 0 || hasTextParts) {
+          if (charts.length > 0) {
+            console.log("Processing charts:", JSON.stringify(charts, null, 2));
+            generatedChartImages = await Promise.all(charts.map(renderChartToSVG));
+            setChartImages(generatedChartImages);
+          }
 
-        updatedContent = updatedContent.replace(/<div\s+id="[^"]*"[^>]*><\/div>/gi, "").replace(/Chart\s+(\w+)/gi, "Chart $1 below");
-        setProcessedContent(updatedContent);
+          updatedContent = cleanChartContent(updatedContent);
+          setProcessedContent(updatedContent);
 
-        if (parts) {
-          updatedParts = parts.map((part) => {
-            if (part.type !== "text") return part;
-            let partContent = part.text || "";
-            partContent = partContent.replace(/<div\s+id="[^"]*"[^>]*><\/div>/gi, "").replace(/Chart\s+(\w+)/gi, "Chart $1 below");
-            return { ...part, text: partContent };
-          });
-          setProcessedParts(updatedParts);
+          if (hasTextParts) {
+            updatedParts = parts!.map((part) => {
+              if (part.type !== "text") return part;
+              return { ...part, text: cleanChartContent(part.text || "") };
+            });
+            setProcessedParts(updatedParts);
+          }
         }
 
         await typesetMathJax();
@@ -245,111 +253,95 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return <div ref={svgRef} className="w-full max-w-full" />;
   };
 
-  if (isUser) {
-    return (
-      <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-        {experimental_attachments && (
-          <div className="mb-1 flex flex-wrap gap-2">
-            {experimental_attachments.map((attachment, index) => (
-              <FilePreview key={index} url={attachment.url} name={attachment.name} />
-            ))}
+  // Render message content based on role and parts
+  const renderMessageContent = () => {
+    if (isUser) {
+      return (
+        <>
+          {experimental_attachments && (
+            <div className="mb-1 flex flex-wrap gap-2">
+              {experimental_attachments.map((attachment, index) => (
+                <FilePreview key={index} url={attachment.url} name={attachment.name} />
+              ))}
+            </div>
+          )}
+          <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+            <MarkdownRenderer>{content}</MarkdownRenderer>
           </div>
-        )}
-        <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-          <MarkdownRenderer>{content}</MarkdownRenderer>
-        </div>
-        {showTimeStamp && createdAt && (
-          <time dateTime={createdAt.toISOString()} className={cn("mt-1 block px-1 text-xs opacity-50", animation !== "none" && "duration-500 animate-in fade-in-0")}>
-            {formattedTime}
-          </time>
-        )}
-      </div>
-    );
-  }
+        </>
+      );
+    }
 
-  if (processedParts && processedParts.length > 0) {
-    return (
-      <>
-        {processedParts.map((part, index) => {
-          if (part.type === "text") {
-            return (
-              <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")} key={`text-${index}`}>
-                <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-                  {renderAs === "html" ? (
-                    isDOMPurifyLoaded ? (
-                      <div dangerouslySetInnerHTML={{ __html: sanitizeContent(part.text) }} />
-                    ) : (
-                      <div>Loading HTML content...</div>
-                    )
+    if (processedParts && processedParts.length > 0) {
+      return processedParts.map((part, index) => {
+        if (part.type === "text") {
+          return (
+            <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")} key={`text-${index}`}>
+              <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+                {renderAs === "html" ? (
+                  isDOMPurifyLoaded ? (
+                    <div dangerouslySetInnerHTML={{ __html: sanitizeContent(part.text) }} />
                   ) : (
-                    <MarkdownRenderer>{part.text}</MarkdownRenderer>
-                  )}
-                  {actions && (
-                    <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-                      {actions}
-                    </div>
-                  )}
-                  {chartImages.length > 0 && index === processedParts.length - 1 && (
-                    <div className="mt-2 space-y-2">
-                      {chartImages.map((chart) => (
-                        <div key={chart.id}>
-                          <p className="text-sm font-semibold">{chart.title}</p>
-                          <SVGRenderer svgContent={chart.svgContent} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {showTimeStamp && createdAt && (
-                  <time dateTime={createdAt.toISOString()} className={cn("mt-1 block px-1 text-xs opacity-50", animation !== "none" && "duration-500 animate-in fade-in-0")}>
-                    {formattedTime}
-                  </time>
+                    <div>Loading HTML content...</div>
+                  )
+                ) : (
+                  <MarkdownRenderer>{part.text}</MarkdownRenderer>
+                )}
+                {actions && (
+                  <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+                    {actions}
+                  </div>
                 )}
               </div>
-            );
-          } else if (part.type === "reasoning") {
-            return <ReasoningBlock key={`reasoning-${index}`} part={part} />;
-          } else if (part.type === "tool-invocation") {
-            return <ToolCall key={`tool-${index}`} toolInvocations={[part.toolInvocation]} />;
-          }
-          return null;
-        })}
-      </>
-    );
-  }
+            </div>
+          );
+        } else if (part.type === "reasoning") {
+          return <ReasoningBlock key={`reasoning-${index}`} part={part} />;
+        } else if (part.type === "tool-invocation") {
+          return <ToolCall key={`tool-${index}`} toolInvocations={[part.toolInvocation]} />;
+        }
+        return null;
+      });
+    }
 
-  if (toolInvocations && toolInvocations.length > 0) {
-    return <ToolCall toolInvocations={toolInvocations} />;
-  }
+    if (toolInvocations && toolInvocations.length > 0) {
+      return <ToolCall toolInvocations={toolInvocations} />;
+    }
+
+    return (
+      <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+        <div className={cn(chatBubbleVariants({ isUser, animation }))} id={role}>
+          {renderAs === "html" ? (
+            isDOMPurifyLoaded ? (
+              <div dangerouslySetInnerHTML={{ __html: sanitizeContent(processedContent) }} />
+            ) : (
+              <div>Loading HTML content...</div>
+            )
+          ) : (
+            <MarkdownRenderer>{processedContent}</MarkdownRenderer>
+          )}
+          {actions && (
+            <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+              {actions}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-      <div className={cn(chatBubbleVariants({ isUser, animation }))} id={role}>
-        {renderAs === "html" ? (
-          isDOMPurifyLoaded ? (
-            <div dangerouslySetInnerHTML={{ __html: sanitizeContent(processedContent) }} />
-          ) : (
-            <div>Loading HTML content...</div>
-          )
-        ) : (
-          <MarkdownRenderer>{processedContent}</MarkdownRenderer>
-        )}
-        {actions && (
-          <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-            {actions}
-          </div>
-        )}
-        {chartImages.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {chartImages.map((chart) => (
-              <div key={chart.id}>
-                <p className="text-sm font-semibold">{chart.title}</p>
-                <SVGRenderer svgContent={chart.svgContent} />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {renderMessageContent()}
+      {chartImages.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {chartImages.map((chart) => (
+            <div key={chart.id}>
+              <SVGRenderer svgContent={chart.svgContent} />
+            </div>
+          ))}
+        </div>
+      )}
       {showTimeStamp && createdAt && (
         <time dateTime={createdAt.toISOString()} className={cn("mt-1 block px-1 text-xs opacity-50", animation !== "none" && "duration-500 animate-in fade-in-0")}>
           {formattedTime}
