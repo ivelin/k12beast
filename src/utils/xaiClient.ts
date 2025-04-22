@@ -103,19 +103,18 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
             - "format": "plotly" for Plotly charts or "mermaid" for Mermaid diagrams.
             - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for Mermaid, a string containing Mermaid syntax.
             - brief chart label that fits within the chart area, breaking into multiple lines if needed.
-          - For Mermaid diagrams:
-            - Include a title in the config string that matches the text reference in the HTML content (e.g., '<p>See Diagram 1</p>').
+            - Include a title in the config string that matches the text reference in the HTML content (e.g., 'Figure 1', 'Figure 3').
        - Example Mermaid sequence diagram with title:
          {
            "id": "diagram1",
            "format": "mermaid",
-           "config": "sequenceDiagram\\ntitle Diagram 1: User Login Flow\\nUser->>Server: Login Request\\nServer-->>User: Response"
+           "config": "sequenceDiagram\\ntitle Figure 1: User Login Flow\\nUser->>Server: Login Request\\nServer-->>User: Response"
          }
-       - Example Mermaid flowchart with title node:
+       - Example Mermaid flow chart with title node:
          {
            "id": "diagram2",
            "format": "mermaid",
-           "config": "graph TD\\nTitle[Diagram 2: Process Flow]\\nA-->B"
+           "config": "graph TD\\nTitle[Figure 2: Process Flow]\\nA-->B"
          }
        - Example Plotly chart with title:
          {
@@ -133,14 +132,14 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                }
              ],
              "layout": {
-               "title": { "text": "Chart 3: Distance vs. Time" },
+               "title": { "text": "Figure 3: Distance vs. Time" },
                "xaxis": { "title": "Time (s)" },
                "yaxis": { "title": "Distance (m)" }
              }
            }
          }
         - Use charts/diagrams when relevant (e.g., flowcharts for processes, graphs for data, sequence diagrams for interactions).
-        - Reference charts and diagrams in text via IDs (e.g., "See Chart 1", "Reference Diagram 2").
+        - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
         - Ensure chart and diagram IDs are unique and sequential within the chat session.
         - Do not reference images, charts, or formulas outside this immediate prompt and response.
         - Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).

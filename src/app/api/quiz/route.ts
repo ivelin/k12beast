@@ -34,10 +34,10 @@ const responseFormat = `Return a valid JSON object with a new quiz problem relat
   and another one for if they answer incorrectly. 
   6. Structure: 
         {
-          "problem": "<p>Here's an example problem:</p><p> ... uses the formula <math>...</math> .... Take a look at Chart 1, which shows... Chart 2 shows ...</p>", 
+          "problem": "<p>Here's an example problem:</p><p> ... uses the formula <math>...</math> .... Take a look at Figure 1, which shows... Figure 2 shows ...</p>", 
           "solution": [
               {
-                "title": "Step 1", "content": "Step content with optional MathJax formulas and references to existing charts 1, 2 or even new 3, 4 ..."
+                "title": "Step 1", "content": "Step content with optional MathJax formulas and references to existing figures 1, 2 or even new 3, 4 ..."
               },
               {"title": "Step N", "content": "Step content..."}
               ], 
