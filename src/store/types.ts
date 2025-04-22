@@ -1,41 +1,22 @@
-// src/store/types.ts
+// File path: src/store/types.ts
+// Type definitions for K12Beast state, including sessions, messages, quizzes, and charts.
+
 import { MessageElement } from "@/components/ui/chat-message";
 
 export type Step = "problem" | "lesson" | "examples" | "quizzes" | "end";
 
-export interface Quiz {
-  problem: string;
-  answerFormat: string;
-  options: string[];
-  correctAnswer?: string;
-  difficulty: string;
-  encouragementIfCorrect?: string;
-  encouragementIfIncorrect?: string;
-  readiness?: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
+// Configuration for charts (Mermaid or Plotly) used in messages, quizzes, and sessions
+export interface ChartConfig {
+  id: string;
+  format: "plotly" | "mermaid"; // Chart type: Plotly or Mermaid
+  config: PlotlyConfig | string; // Plotly: data/layout; Mermaid: syntax string
 }
 
-export interface Example {
-  problem: string;
-  solution: { title: string; content: string }[];
+// Plotly-specific configuration
+export interface PlotlyConfig {
+  data: PlotlyData[]; // Plotly traces
+  layout: PlotlyLayout; // Plotly layout options
 }
-
-export interface QuizFeedback {
-  charts: ChartConfig[];
-  isCorrect: boolean;
-  encouragement: string;
-  solution: { title: string; content: string }[] | null;
-  readiness: number;
-  correctAnswer?: string; // Add correctAnswer to QuizFeedback
-}
-export interface Message {
-  id?: string;
-  role: "user" | "assistant" | (string & {});
-  content: string;
-  createdAt?: Date;
-  renderAs?: "markdown" | "html";
-  charts?: ChartConfig[]; // Added to support Chart.js configurations
-}
-
 
 export interface PlotlyData {
   x: (number | string)[];
@@ -58,12 +39,39 @@ export interface PlotlyLayout {
   showlegend?: boolean;
 }
 
-export interface ChartConfig {
-  id: string;
-  config: {
-    data: PlotlyData[];
-    layout: PlotlyLayout;
-  };
+export interface Quiz {
+  problem: string;
+  answerFormat: string;
+  options: string[];
+  correctAnswer?: string;
+  difficulty: string;
+  encouragementIfCorrect?: string;
+  encouragementIfIncorrect?: string;
+  readiness?: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
+  charts?: ChartConfig[]; // Added to support Mermaid/Plotly diagrams
+}
+
+export interface Example {
+  problem: string;
+  solution: { title: string; content: string }[];
+}
+
+export interface QuizFeedback {
+  charts: ChartConfig[];
+  isCorrect: boolean;
+  encouragement: string;
+  solution: { title: string; content: string }[] | null;
+  readiness: number;
+  correctAnswer?: string;
+}
+
+export interface Message {
+  id?: string;
+  role: "user" | "assistant" | (string & {});
+  content: string;
+  createdAt?: Date;
+  renderAs?: "markdown" | "html";
+  charts?: ChartConfig[]; // Supports Mermaid/Plotly diagrams
 }
 
 export interface AppState {
@@ -79,11 +87,10 @@ export interface AppState {
   error: string | null;
   loading: boolean;
   quizAnswer: string;
-  correctAnswer: string | null; // Add correctAnswer to AppState
+  correctAnswer: string | null;
   quizFeedback: QuizFeedback | null;
   messages: Message[];
   cloned_from?: string | null;
-
   hasSubmittedProblem: boolean;
   sessionTerminated: boolean;
   showErrorPopup: boolean;
@@ -99,9 +106,8 @@ export interface AppState {
   reset: () => void;
 }
 
-
-// Define Session type corresponding to session database table
-export type Session = {
+// Session data stored in Supabase
+export interface Session {
   id: string;
   problem?: string;
   images?: string[];
@@ -115,11 +121,12 @@ export type Session = {
   responseFormat?: string;
   messages?: Message[];
   cloned_from?: string | null;
-  // Add other fields as needed based on your API response
-};
+  charts?: ChartConfig[]; // Added to support Mermaid/Plotly diagrams
+}
 
-// Define Session type corresponding to session database table
-export type Lesson = {
+// Lesson data with optional charts
+export interface Lesson {
   lesson: string;
   charts?: ChartConfig[];
-};
+}
+

@@ -220,25 +220,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Return only the quiz question data to the client
+    // Return sanitized quiz data:
     // Excludes correctAnswer, solution, encouragementIfCorrect, encouragementIfIncorrect, and readiness to prevent
     // leaking sensitive information before the student submits their answer
     // These fields are returned only after validation via /api/validate
-    return NextResponse.json(content, { status: 200, headers: { "x-session-id": sessionId }, });
-
-    // return NextResponse.json(
-    //   {
-    //     problem: content.problem,
-    //     charts: content.charts || [],
-    //     answerFormat: content.answerFormat,
-    //     options: content.options,
-    //     difficulty: content.difficulty,
-    //   },
-    //   {
-    //     status: 200,
-    //     headers: { "x-session-id": sessionId },
-    //   }
-    // );
+    
+    return NextResponse.json(
+      {
+        problem: content.problem,
+        charts: content.charts || [],
+        answerFormat: content.answerFormat,
+        options: content.options,
+        difficulty: content.difficulty,
+      },
+      {
+        status: 200,
+        headers: { "x-session-id": sessionId },
+      }
+    );
   } catch (err) {
     return handleXAIError(err);
   }

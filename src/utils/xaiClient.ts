@@ -1,10 +1,10 @@
-/* src/utils/xaiClient.ts
- * Handles requests to xAI API for generating educational content.
- */
+// File path: src/utils/xaiClient.ts
+// Handles requests to xAI API for generating educational content, including Mermaid and Plotly diagrams.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
 import { ChartConfig } from "@/store/types";
+
 const openai = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
   baseURL: "https://api.x.ai/v1",
@@ -16,7 +16,7 @@ interface XAIResponse {
   lesson?: string;
   problem?: string;
   solution?: { title: string; content: string }[];
-  charts?: ChartConfig[]; 
+  charts?: ChartConfig[]; // Updated to use ChartConfig for Mermaid/Plotly
   answerFormat?: string;
   options?: string[];
   correctAnswer?: string;
@@ -25,7 +25,7 @@ interface XAIResponse {
   encouragement?: string | null;
   encouragementIfCorrect?: string;
   encouragementIfIncorrect?: string;
-  }
+}
 
 interface XAIRequestOptions {
   problem?: string;
@@ -76,61 +76,77 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
       : "No chat history available.";
 
   const systemResponse = `You are a K12 tutor. Assist with educational queries related to K12 subjects.
-      Follow these guidelines:
+    Follow these guidelines:
 
-      1. **Content Generation**:
-        - Detect the natural language of the user input problem text and images and respond entirely in the same language.
-        - Respond in a conversational style as if you are speaking directly with a K12 student using emojis.
-        - Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions. 
-        - Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history. 
-        - Adapt your response based on this chat history—e.g., avoid repeating examples or quiz problems already given (as specified in the chat history), and adjust difficulty based on performance trends. 
-        - If the chat history includes quiz responses, adjust the difficulty: provide more challenging problems if the student answered correctly, or simpler problems if they answered incorrectly.
+    1. **Content Generation**:
+      - Detect the natural language of the user input problem text and images and respond entirely in the same language.
+      - Respond in a conversational style as if speaking directly with a K12 student using emojis.
+      - Use the provided chat history to understand the student's progress, including past lessons, examples, quiz results, and interactions.
+      - Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history.
+      - Adapt your response based on this chat history—e.g., avoid repeating examples or quiz problems already given, and adjust difficulty based on performance trends.
+      - If the chat history includes quiz responses, adjust the difficulty: provide more challenging problems if the student answered correctly, or simpler problems if they answered incorrectly.
 
-      2. **Response Format**:
-        - Always return a raw JSON object as a string strictly formatted for JSON.parse() with the response fields specified in the user prompt.
-        - Do not include any additional text before or after the JSON object.        
-        - Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
-        - Ensure the response is a single, valid JSON object with no trailing commas or syntax errors.
-        - For text fields in the JSON response follow these guidelines:
-          - Use safe HTML formatting for text content (e.g., <p>, <ul>, <li>, <strong>, <em>). 
-          - No <script> tags or inline JavaScript.
-          - Do not use Markdown formatting (e.g., no \`\`\` or \`**\`).
-          - Use emojis as appropriate to enhance engagement.
-          - Use charts, graphs, formulas and other visual aids to enhance explanations when appropriate.
-          - For math formulas, chemistry equations, and other scientific notations, use MathML synthax within <math></math> tags.
-          - For charts and graphs (e.g., bar charts, line graphs, geometry shapes) use Plotly compatible chart config structures as follows:
-            - Do not include <script> tags or inline JavaScript in the HTML. 
-            - Instead, provide the chart configuration in a separate "charts" field in the outer JSON response structure.
-            - Ensure all charts labels are in the same language as the problem using plain and safe text format.
-            - Reference charts in the response via unique and sequential numeric IDs (e.g., "See Chart 1") and provide the corresponding name as a title label in the chart config code.
-            - Be careful to use brief chart labels that fit within the chart area. If you must use long labels, consider breaking them into multiple lines.
-            - Example Plotly configuration:
-                          {
-                            "id": "chart1",
-                            "config": {
-                              "data": [
-                                {
-                                  "x": ["0s", "1s", "2s", "3s", "4s", "5s"],
-                                  "y": [0, 10, 20, 30, 40, 50],
-                                  "type": "scatter",
-                                  "mode": "lines",
-                                  "name": "Distance (m)",
-                                  "line": { "color": "blue" }
-                                }
-                              ],
-                              "layout": {
-                                "title": { "text": "Chart 1:<br>Distance vs. Time for Constant Speed" },
-                                "xaxis": { "title": "Time (s)" },
-                                "yaxis": { "title": "Distance (m)" }
-                              }
-                            }
-                          }            
-          - Do not reference images, charts, diagrams and formulas outside of this immediate prompt and response.
-          - Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
-
-      3. **School Tests Alignment**:
-        - Align with standardized school test formats, including technology-enhanced items (e.g., graphs, equations).
-        - Use examples and visualizations relevant to grades K-12.
+    2. **Response Format**:
+      - Always return a raw JSON object as a string strictly formatted for JSON.parse() with the response fields specified in the user prompt.
+      - Do not include any additional text before or after the JSON object.
+      - Do not wrap the JSON in Markdown code blocks (e.g., no \`\`\`json).
+      - Ensure the response is a single, valid JSON object with no trailing commas or syntax errors.
+      - For text fields in the JSON response follow these guidelines:
+        - Use safe HTML formatting for text content (e.g., <p>, <ul>, <li>, <strong>, <em>).
+        - No <script> tags or inline JavaScript.
+        - Do not use Markdown formatting (e.g., no \`\`\` or \`**\`).
+        - Use emojis as appropriate to enhance engagement.
+        - For math formulas, chemistry equations, and other scientific notations, use MathML syntax within <math></math> tags.
+        - Include charts and diagrams in a "charts" array with the following structure:
+          - Each chart has:
+            - "id": Unique string identifier (e.g., "chart1").
+            - "format": "plotly" for Plotly charts or "mermaid" for Mermaid diagrams.
+            - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for Mermaid, a string containing Mermaid syntax.
+            - brief chart label that fits within the chart area, breaking into multiple lines if needed.
+          - For Mermaid diagrams:
+            - Include a title in the config string that matches the text reference in the HTML content (e.g., '<p>See Diagram 1</p>').
+       - Example Mermaid sequence diagram with title:
+         {
+           "id": "diagram1",
+           "format": "mermaid",
+           "config": "sequenceDiagram\\ntitle Diagram 1: User Login Flow\\nUser->>Server: Login Request\\nServer-->>User: Response"
+         }
+       - Example Mermaid flowchart with title node:
+         {
+           "id": "diagram2",
+           "format": "mermaid",
+           "config": "graph TD\\nTitle[Diagram 2: Process Flow]\\nA-->B"
+         }
+       - Example Plotly chart with title:
+         {
+           "id": "chart3",
+           "format": "plotly",
+           "config": {
+             "data": [
+               {
+                 "x": ["0s", "1s", "2s", "3s", "4s", "5s"],
+                 "y": [0, 10, 20, 30, 40, 50],
+                 "type": "scatter",
+                 "mode": "lines",
+                 "name": "Distance (m)",
+                 "line": { "color": "blue" }
+               }
+             ],
+             "layout": {
+               "title": { "text": "Chart 3: Distance vs. Time" },
+               "xaxis": { "title": "Time (s)" },
+               "yaxis": { "title": "Distance (m)" }
+             }
+           }
+         }
+        - Use charts/diagrams when relevant (e.g., flowcharts for processes, graphs for data, sequence diagrams for interactions).
+        - Reference charts and diagrams in text via IDs (e.g., "See Chart 1", "Reference Diagram 2").
+        - Ensure chart and diagram IDs are unique and sequential within the chat session.
+        - Do not reference images, charts, or formulas outside this immediate prompt and response.
+        - Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
+    3. **School Tests Alignment**:
+      - Align with standardized school test formats, including technology-enhanced items (e.g., graphs, equations).
+      - Use examples and visualizations relevant to grades K-12.
     `;
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -148,13 +164,12 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     },
     {
       role: "user",
-      content: `Verify and ensure that the response content is a string in a valid JSON format starting with { and ending with }. 
-        It must be able to pass JSON.parse() without any errors. 
-        The JSON object must follow strictly the fields in the following guidelines and examples:
-        ${responseFormat}`,
+      content: `Verify and ensure that the response content is a string in a valid JSON format starting with { and ending with }.
+      It must be able to pass JSON.parse() without any errors.
+      The JSON object must follow strictly the fields in the following guidelines and examples:
+      ${responseFormat}`,
     },
   ];
-
 
   if (images && images.length > 0) {
     messages.push({

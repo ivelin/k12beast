@@ -96,36 +96,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   // Validate Plotly configuration
-  const validatePlotlyConfig = (config: any): boolean => {
+  const validatePlotlyConfig = (chartData: any): boolean => {
+    const config = chartData.config;
+    if (chartData?.format !== "plotly" || !config) return false;
     if (!config?.data || !config.layout || !Array.isArray(config.data) || config.data.length === 0) return false;
     for (const trace of config.data) {
       if (!trace?.x || !trace.y || !trace.type || !Array.isArray(trace.x) || !Array.isArray(trace.y) || trace.x.length !== trace.y.length || trace.x.length === 0) return false;
     }
     return true;
-  };
-
-  // Map legacy Chart.js config to Plotly config
-  const mapChartJsToPlotlyConfig = (chartConfig: any) => {
-    const chartJsConfig = chartConfig.config;
-    const plotlyType = chartJsConfig.type === "line" ? "scatter" : chartJsConfig.type === "bar" ? "bar" : "scatter";
-    const data = chartJsConfig.data.datasets.map((dataset: any) => ({
-      x: chartJsConfig.data.labels,
-      y: dataset.data,
-      type: plotlyType,
-      mode: chartJsConfig.type === "line" ? "lines" : undefined,
-      name: dataset.label || "",
-      line: dataset.borderColor ? { color: dataset.borderColor } : undefined,
-      marker: dataset.borderColor ? { color: dataset.borderColor } : undefined,
-      fill: dataset.fill ? "tozeroy" : "none",
-    }));
-    const layout: any = {
-      margin: { t: 40, b: 40, l: 40, r: 40 },
-      title: { text: chartJsConfig.options?.plugins?.title?.text || chartConfig.id, font: { size: 16 }, x: 0.5, xanchor: "center" },
-      xaxis: { title: chartJsConfig.options?.scales?.x?.title?.text || "" },
-      yaxis: { title: chartJsConfig.options?.scales?.y?.title?.text || "" },
-      showlegend: true,
-    };
-    return { data, layout };
   };
 
   // Render chart to SVG using Plotly
@@ -134,11 +112,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       try {
         let plotlyData = chartConfig.config.data;
         let plotlyLayout = chartConfig.config.layout;
-        if (!validatePlotlyConfig(chartConfig.config)) {
-          console.warn(`Chart ${chartConfig.id} appears to be in Chart.js format. Mapping to Plotly.`);
-          const mappedConfig = mapChartJsToPlotlyConfig(chartConfig);
-          plotlyData = mappedConfig.data;
-          plotlyLayout = mappedConfig.layout;
+        if (!validatePlotlyConfig(chartConfig)) {
+          console.warn(`Chart ${chartConfig.id} does not appear to be a valid Plotly config.`);
+          plotlyData = [];
+          plotlyLayout = {};
         }
 
         const tempDiv = document.createElement("div");
