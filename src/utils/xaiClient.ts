@@ -1,5 +1,5 @@
 // File path: src/utils/xaiClient.ts
-// Handles requests to xAI API for generating educational content, including Mermaid and Plotly diagrams.
+// Handles requests to xAI API for generating educational content, including React Flow and Plotly diagrams.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
@@ -16,7 +16,7 @@ interface XAIResponse {
   lesson?: string;
   problem?: string;
   solution?: { title: string; content: string }[];
-  charts?: ChartConfig[]; // Updated to use ChartConfig for Mermaid/Plotly
+  charts?: ChartConfig[];
   answerFormat?: string;
   options?: string[];
   correctAnswer?: string;
@@ -65,7 +65,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     chatHistory = [],
   } = options;
 
-  console.log("sendXAIRequest inputs:", { problem, images }); // Log inputs for debugging
+  console.log("sendXAIRequest inputs:", { problem, images });
   validateRequestInputs(problem, images);
 
   const chatHistoryText =
@@ -100,45 +100,47 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
         - Include charts and diagrams in a "charts" array with the following structure:
           - Each chart has:
             - "id": Unique string identifier (e.g., "chart1").
-            - "format": "plotly" for Plotly charts or "mermaid" for Mermaid diagrams.
-            - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for Mermaid, a string containing Mermaid syntax.
-            - brief chart label that fits within the chart area, breaking into multiple lines if needed.
-            - Include a title in the config string that matches the text reference in the HTML content (e.g., 'Figure 1', 'Figure 3').
-       - Example Mermaid sequence diagram with title:
-         {
-           "id": "diagram1",
-           "format": "mermaid",
-           "config": "sequenceDiagram\\ntitle Figure 1: User Login Flow\\nUser->>Server: Login Request\\nServer-->>User: Response"
-         }
-       - Example Mermaid flow chart with title node:
-         {
-           "id": "diagram2",
-           "format": "mermaid",
-           "config": "graph TD\\nTitle[Figure 2: Process Flow]\\nA-->B"
-         }
-       - Example Plotly chart with title:
-         {
-           "id": "chart3",
-           "format": "plotly",
-           "config": {
-             "data": [
-               {
-                 "x": ["0s", "1s", "2s", "3s", "4s", "5s"],
-                 "y": [0, 10, 20, 30, 40, 50],
-                 "type": "scatter",
-                 "mode": "lines",
-                 "name": "Distance (m)",
-                 "line": { "color": "blue" }
-               }
-             ],
-             "layout": {
-               "title": { "text": "Figure 3: Distance vs. Time" },
-               "xaxis": { "title": "Time (s)" },
-               "yaxis": { "title": "Distance (m)" }
-             }
-           }
-         }
+            - "format": "plotly" for Plotly charts or "reactflow" for React Flow diagrams.
+            - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for React Flow, an object with "nodes" (array of nodes) and "edges" (array of edges).
+          - Example React Flow diagram with title:
+              {
+                "id": "diagram1",
+                "format": "reactflow",
+                "config": {
+                  "nodes": [
+                    { "id": "title1", "data": { "label": "Figure 1: Skateboarder Push Off" }, "position": { "x": 100, "y": -50 }, "style": { "fontSize": "16px", "fontWeight": "bold", "textAlign": "center", "width": "200px" } },
+                    { "id": "A", "data": { "label": "Skater Pushes Wall" }, "position": { "x": 0, "y": 0 } },
+                    { "id": "B", "data": { "label": "Wall Pushes Back" }, "position": { "x": 200, "y": 0 } }
+                  ],
+                  "edges": [
+                    { "id": "eA-B", "source": "A", "target": "B", "label": "Force" }
+                  ]
+                }
+              }
+          - Example Plotly chart with title:
+            {
+              "id": "chart3",
+              "format": "plotly",
+              "config": {
+                "data": [
+                  {
+                    "x": ["0s", "1s", "2s", "3s", "4s", "5s"],
+                    "y": [0, 10, 20, 30, 40, 50],
+                    "type": "scatter",
+                    "mode": "lines",
+                    "name": "Distance (m)",
+                    "line": { "color": "blue" }
+                  }
+                ],
+                "layout": {
+                  "title": { "text": "Figure 3: Distance vs. Time" },
+                  "xaxis": { "title": "Time (s)" },
+                  "yaxis": { "title": "Distance (m)" }
+                }
+              }
+            }
         - Use charts/diagrams when relevant (e.g., flowcharts for processes, graphs for data, sequence diagrams for interactions).
+        - For sequence diagrams, use React Flow with vertically aligned nodes to represent actors and edges to represent interactions.
         - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
         - Ensure chart and diagram IDs are unique and sequential within the chat session.
         - Do not reference images, charts, or formulas outside this immediate prompt and response.

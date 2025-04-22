@@ -1,6 +1,6 @@
 // File path: src/utils/sessionUtils.ts
 // Utility functions for session-related logic, shared across components.
-// Updated to use Mermaid 10.9.1 for stability in dynamic rendering.
+// Updated to remove Mermaid script injection (replaced with React Flow) and centralize MathJax script injection.
 
 import { MessageElement } from "@/components/ui/chat-message";
 import { Session } from "@/store/types";
@@ -57,11 +57,9 @@ export function buildSessionMessages(session: Session): MessageElement[] {
   return messages;
 }
 
-// Injects MathJax and Mermaid scripts once per page
+// Injects MathJax script once per page
 export function injectChatScripts() {
-  if (typeof window === "undefined" || window.MathJax || (window as any).mermaid) return;
-
-  // Check if scripts are already injected to avoid duplicates
+  // Check if MathJax script is already injected to avoid duplicates
   if (document.querySelector('script[src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"]')) {
     console.debug("MathJax script already injected, skipping.");
   } else {
@@ -71,26 +69,5 @@ export function injectChatScripts() {
     mathJaxScript.async = true;
     document.head.appendChild(mathJaxScript);
     console.log("MathJax script injected");
-  }
-
-  if (document.querySelector('script[src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"]')) {
-    console.debug("Mermaid script already injected, skipping.");
-  } else {
-    // Inject Mermaid script (downgraded to version 10.9.1 for stability)
-    const mermaidScript = document.createElement("script");
-    mermaidScript.src = "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js";
-    mermaidScript.async = true;
-    mermaidScript.onload = () => {
-      // Initialize Mermaid with configuration
-      (window as any).mermaid.initialize({
-        startOnLoad: false, // Manual rendering for static SVGs
-        theme: "dark",
-        securityLevel: "loose",
-        maxTextSize: 50000,
-      });
-      console.log("Mermaid script loaded and initialized in sessionUtils");
-    };
-    mermaidScript.onerror = () => console.error("Failed to load Mermaid script in sessionUtils");
-    document.head.appendChild(mermaidScript);
   }
 }

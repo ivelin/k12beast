@@ -21,6 +21,7 @@
     "@radix-ui/react-slot": "^1.1.2",
     "@supabase/supabase-js": "^2.49.4",
     "@vercel/speed-insights": "^1.2.0",
+    "@xyflow/react": "^12.6.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "dompurify": "^3.2.5",

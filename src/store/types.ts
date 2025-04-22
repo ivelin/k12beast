@@ -1,15 +1,16 @@
 // File path: src/store/types.ts
 // Type definitions for K12Beast state, including sessions, messages, quizzes, and charts.
+// Updated to support React Flow configurations instead of Mermaid.
 
 import { MessageElement } from "@/components/ui/chat-message";
 
 export type Step = "problem" | "lesson" | "examples" | "quizzes" | "end";
 
-// Configuration for charts (Mermaid or Plotly) used in messages, quizzes, and sessions
+// Configuration for charts (React Flow or Plotly) used in messages, quizzes, and sessions
 export interface ChartConfig {
   id: string;
-  format: "plotly" | "mermaid"; // Chart type: Plotly or Mermaid
-  config: PlotlyConfig | string; // Plotly: data/layout; Mermaid: syntax string
+  format: "plotly" | "reactflow"; // Chart type: Plotly or React Flow
+  config: PlotlyConfig | ReactFlowConfig; // Plotly: data/layout; React Flow: nodes/edges
 }
 
 // Plotly-specific configuration
@@ -39,6 +40,26 @@ export interface PlotlyLayout {
   showlegend?: boolean;
 }
 
+// React Flow-specific configuration
+export interface ReactFlowConfig {
+  nodes: ReactFlowNode[];
+  edges: ReactFlowEdge[];
+}
+
+export interface ReactFlowNode {
+  id: string;
+  data: { label: string };
+  position: { x: number; y: number };
+  style?: { [key: string]: string }; // Optional style for nodes (e.g., title node styling)
+}
+
+export interface ReactFlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+}
+
 export interface Quiz {
   problem: string;
   answerFormat: string;
@@ -48,7 +69,7 @@ export interface Quiz {
   encouragementIfCorrect?: string;
   encouragementIfIncorrect?: string;
   readiness?: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
-  charts?: ChartConfig[]; // Added to support Mermaid/Plotly diagrams
+  charts?: ChartConfig[]; // Supports React Flow/Plotly diagrams
 }
 
 export interface Example {
@@ -71,7 +92,7 @@ export interface Message {
   content: string;
   createdAt?: Date;
   renderAs?: "markdown" | "html";
-  charts?: ChartConfig[]; // Supports Mermaid/Plotly diagrams
+  charts?: ChartConfig[]; // Supports React Flow/Plotly diagrams
 }
 
 export interface AppState {
@@ -121,7 +142,7 @@ export interface Session {
   responseFormat?: string;
   messages?: Message[];
   cloned_from?: string | null;
-  charts?: ChartConfig[]; // Added to support Mermaid/Plotly diagrams
+  charts?: ChartConfig[]; // Supports React Flow/Plotly diagrams
 }
 
 // Lesson data with optional charts
@@ -129,4 +150,3 @@ export interface Lesson {
   lesson: string;
   charts?: ChartConfig[];
 }
-

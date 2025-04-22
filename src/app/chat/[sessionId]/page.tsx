@@ -1,6 +1,6 @@
 // File path: src/app/chat/[sessionId]/page.tsx
 // Renders the live chat page for both new and existing sessions, ensuring consistent message rendering.
-// Updated to inject MathJax and Mermaid scripts once per page using sessionUtils.
+// Updated to inject MathJax scripts once per page using sessionUtils.
 
 "use client";
 
@@ -53,7 +53,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   const [shareableLink, setShareableLink] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
 
-  // Inject MathJax and Mermaid scripts once per page
+  // Inject MathJax scripts once per page
   useEffect(() => {
     injectChatScripts();
   }, []);

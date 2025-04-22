@@ -1,7 +1,7 @@
 // File path: src/components/ui/chat-message.tsx
 // Renders a chat message with support for markdown, HTML, MathML, static SVG charts using Plotly,
-// and Mermaid charts using a dedicated component for robust rendering.
-// Updated to ensure Mermaid 10.9.1 is initialized before rendering.
+// and flowcharts using React Flow for robust rendering.
+// Updated to render React Flow diagrams directly from xAI API configurations.
 
 "use client";
 
@@ -15,8 +15,10 @@ import { cn } from "@/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { FilePreview } from "@/components/ui/file-preview";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
-import { initializeMathJax, typesetMathJax } from "@/utils/mathjax-config";
+import { typesetMathJax } from "@/utils/mathjax-config";
 import { Message, ChartConfig } from "@/store/types";
+import { ReactFlow, Background, Controls, Node, Edge } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
@@ -72,39 +74,60 @@ export interface ChatMessageProps extends MessageElement {
   actions?: React.ReactNode;
 }
 
-// Dedicated component for rendering Mermaid diagrams
-const MermaidDiagram = ({ chartConfig, id }: { chartConfig: string; id: string }) => {
-  const ref = useRef<HTMLDivElement>(null);
+// Dedicated component for rendering flowcharts using React Flow
+const ReactFlowDiagram = ({ chartConfig, id }: { chartConfig: any; id: string }) => {
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Ensure client-side rendering
-    if (typeof window === "undefined" || !ref.current) return;
-
-    // Wait for Mermaid to be initialized
-    const waitForMermaid = () => {
-      if ((window as any).mermaid && (window as any).mermaid.render) {
-        try {
-          (window as any).mermaid.render(ref.current!.id, chartConfig, (svgCode: string) => {
-            if (ref.current) {
-              ref.current.innerHTML = svgCode;
-            }
-          });
-        } catch (err) {
-          setError("Failed to render Mermaid diagram");
-          console.error(`Mermaid render error for chart ${id}:`, err);
-        }
-      } else {
-        setTimeout(waitForMermaid, 100);
+    try {
+      // Validate the chartConfig structure
+      if (!chartConfig || !chartConfig.nodes || !chartConfig.edges) {
+        throw new Error("Invalid React Flow configuration: Missing nodes or edges");
       }
-    };
 
-    waitForMermaid();
+      // Use the nodes and edges directly from the xAI API response
+      const configNodes: Node[] = chartConfig.nodes.map((node: any) => ({
+        id: node.id,
+        data: { label: node.data.label },
+        position: node.position,
+        style: node.style || { background: "#fff", border: "1px solid #000", padding: 10, borderRadius: 5 },
+      }));
+
+      const configEdges: Edge[] = chartConfig.edges.map((edge: any) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: edge.label,
+        style: { stroke: "#000" },
+        animated: true,
+      }));
+
+      setNodes(configNodes);
+      setEdges(configEdges);
+      setError(null);
+    } catch (err) {
+      setError("Failed to render React Flow diagram: Invalid configuration");
+      console.error(`React Flow render error for chart ${id}:`, err);
+    }
   }, [chartConfig, id]);
 
   return (
-    <div id={`mermaid-${id}`} ref={ref} className="mermaid w-full max-w-full">
-      {error && <p className="text-red-500">{error}</p>}
+    <div className="w-full max-w-full h-[400px]">
+      {error ? (
+        <p className="text-red-500">{error}</p>
+      ) : (
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          fitView
+          style={{ background: "#f8f8f8" }}
+        >
+          <Background />
+          <Controls />
+        </ReactFlow>
+      )}
     </div>
   );
 };
@@ -125,9 +148,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       setDomPurify(() => module.default);
       setIsDOMPurifyLoaded(true);
     });
-
-    // Initialize MathJax for rendering equations
-    initializeMathJax();
   }, []);
 
   // Clean chart placeholders and references from content
@@ -153,8 +173,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return new Promise(async (resolve) => {
       try {
         console.log(`Attempting to render Plotly chart ${chartConfig.id}`);
-        let plotlyData = chartConfig.config.data;
-        let plotlyLayout = chartConfig.config.layout;
+        let plotlyData = (chartConfig.config as any).data;
+        let plotlyLayout = (chartConfig.config as any).layout;
         if (!validatePlotlyConfig(chartConfig)) {
           console.warn(`Chart ${chartConfig.id} does not appear to be a valid Plotly config.`);
           plotlyData = [];
@@ -184,13 +204,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         resolve({ id: `plotly-${chartConfig.id}`, svgContent: svgString, title });
       } catch (error) {
         console.error(`Failed to render Plotly chart ${chartConfig.id}:`, error);
-        const title = chartConfig.config.layout?.title?.text || chartConfig.id;
+        const title = (chartConfig.config as any).layout?.title?.text || chartConfig.id;
         resolve({ id: `plotly-${chartConfig.id}`, svgContent: `<svg width="400" height="300"><text x="10" y="20" font-size="16">Failed to render Plotly chart: ${title}</text></svg>`, title });
       }
     });
   };
 
-  // Process charts (Plotly only, Mermaid handled in render)
+  // Process charts (Plotly only, React Flow handled in render)
   useEffect(() => {
     if (renderAs !== "html" || !isDOMPurifyLoaded) return;
 
@@ -366,8 +386,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           <div className="mt-2 space-y-2">
             {charts.map((chart) => (
               <div key={chart.id}>
-                {chart.format === "mermaid" ? (
-                  <MermaidDiagram chartConfig={chart.config} id={chart.id} />
+                {chart.format === "reactflow" ? (
+                  <ReactFlowDiagram chartConfig={chart.config} id={chart.id} />
                 ) : (
                   chartImages.find(img => img.id === `plotly-${chart.id}`) ? (
                     <SVGRenderer svgContent={chartImages.find(img => img.id === `plotly-${chart.id}`)!.svgContent} chartId={chart.id} />
