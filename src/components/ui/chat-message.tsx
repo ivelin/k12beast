@@ -1,7 +1,7 @@
 // File path: src/components/ui/chat-message.tsx
 // Renders a chat message with support for markdown, HTML, MathML, static SVG charts using Plotly,
 // and Mermaid charts using a dedicated component for robust rendering.
-// Updated to use MermaidDiagram component for dynamic Mermaid chart embedding.
+// Updated to ensure Mermaid 10.9.1 is initialized before rendering.
 
 "use client";
 
@@ -82,7 +82,7 @@ const MermaidDiagram = ({ chartConfig, id }: { chartConfig: string; id: string }
     if (typeof window === "undefined" || !ref.current) return;
 
     // Wait for Mermaid to be initialized
-    const waitForMermaid = async () => {
+    const waitForMermaid = () => {
       if ((window as any).mermaid && (window as any).mermaid.render) {
         try {
           (window as any).mermaid.render(ref.current!.id, chartConfig, (svgCode: string) => {
@@ -126,7 +126,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       setIsDOMPurifyLoaded(true);
     });
 
-    // No script injection here; handled by sessionUtils
+    // Initialize MathJax for rendering equations
     initializeMathJax();
   }, []);
 

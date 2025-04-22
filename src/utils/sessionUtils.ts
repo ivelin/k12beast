@@ -1,6 +1,6 @@
 // File path: src/utils/sessionUtils.ts
 // Utility functions for session-related logic, shared across components.
-// Updated to include script injection for MathJax and Mermaid, ensuring single injection per page.
+// Updated to use Mermaid 10.9.1 for stability in dynamic rendering.
 
 import { MessageElement } from "@/components/ui/chat-message";
 import { Session } from "@/store/types";
@@ -59,6 +59,8 @@ export function buildSessionMessages(session: Session): MessageElement[] {
 
 // Injects MathJax and Mermaid scripts once per page
 export function injectChatScripts() {
+  if (typeof window === "undefined" || window.MathJax || (window as any).mermaid) return;
+
   // Check if scripts are already injected to avoid duplicates
   if (document.querySelector('script[src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"]')) {
     console.debug("MathJax script already injected, skipping.");
@@ -71,12 +73,12 @@ export function injectChatScripts() {
     console.log("MathJax script injected");
   }
 
-  if (document.querySelector('script[src="https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js"]')) {
+  if (document.querySelector('script[src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"]')) {
     console.debug("Mermaid script already injected, skipping.");
   } else {
-    // Inject Mermaid script (updated to version 11.6.0)
+    // Inject Mermaid script (downgraded to version 10.9.1 for stability)
     const mermaidScript = document.createElement("script");
-    mermaidScript.src = "https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js";
+    mermaidScript.src = "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js";
     mermaidScript.async = true;
     mermaidScript.onload = () => {
       // Initialize Mermaid with configuration
