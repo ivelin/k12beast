@@ -1,5 +1,6 @@
 // File path: src/utils/sessionUtils.ts
-// Utility functions for session-related logic, shared across components
+// Utility functions for session-related logic, shared across components.
+// Updated to include script injection for MathJax and Mermaid, ensuring single injection per page.
 
 import { MessageElement } from "@/components/ui/chat-message";
 import { Session } from "@/store/types";
@@ -22,13 +23,11 @@ export function buildSessionMessages(session: Session): MessageElement[] {
   }
 
   // Add the lesson as an assistant message if it exists and isn't already in messages
-  // console.debug("buildSessionMessage: session lesson", session.lesson);
   if (session.lesson && !messages.some(msg => msg.role === "assistant" && msg.content === session.lesson)) {
     let lessonContent = "";
     let lessonCharts = [];
     try {
       const lessonObject = JSON.parse(session.lesson);
-      // console.debug("buildSessionMessage: ", {lessonObject});
       lessonContent = lessonObject.lesson;
       lessonCharts = lessonObject.charts || [];
     } catch (e) {
@@ -40,8 +39,7 @@ export function buildSessionMessages(session: Session): MessageElement[] {
       content: lessonContent,
       charts: lessonCharts,
       renderAs: "html",
-    }
-    // console.debug("buildSessionMessage: ", {lessonMessageData});
+    };
     messages.push(lessonMessageData);
   }
 
@@ -57,4 +55,40 @@ export function buildSessionMessages(session: Session): MessageElement[] {
   }
 
   return messages;
+}
+
+// Injects MathJax and Mermaid scripts once per page
+export function injectChatScripts() {
+  // Check if scripts are already injected to avoid duplicates
+  if (document.querySelector('script[src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"]')) {
+    console.debug("MathJax script already injected, skipping.");
+  } else {
+    // Inject MathJax script
+    const mathJaxScript = document.createElement("script");
+    mathJaxScript.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js";
+    mathJaxScript.async = true;
+    document.head.appendChild(mathJaxScript);
+    console.log("MathJax script injected");
+  }
+
+  if (document.querySelector('script[src="https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js"]')) {
+    console.debug("Mermaid script already injected, skipping.");
+  } else {
+    // Inject Mermaid script (updated to version 11.6.0)
+    const mermaidScript = document.createElement("script");
+    mermaidScript.src = "https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js";
+    mermaidScript.async = true;
+    mermaidScript.onload = () => {
+      // Initialize Mermaid with configuration
+      (window as any).mermaid.initialize({
+        startOnLoad: false, // Manual rendering for static SVGs
+        theme: "dark",
+        securityLevel: "loose",
+        maxTextSize: 50000,
+      });
+      console.log("Mermaid script loaded and initialized in sessionUtils");
+    };
+    mermaidScript.onerror = () => console.error("Failed to load Mermaid script in sessionUtils");
+    document.head.appendChild(mermaidScript);
+  }
 }

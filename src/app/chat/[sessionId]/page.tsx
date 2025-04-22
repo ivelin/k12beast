@@ -1,5 +1,6 @@
 // File path: src/app/chat/[sessionId]/page.tsx
-// Renders the live chat page for both new and existing sessions, ensuring consistent message rendering
+// Renders the live chat page for both new and existing sessions, ensuring consistent message rendering.
+// Updated to inject MathJax and Mermaid scripts once per page using sessionUtils.
 
 "use client";
 
@@ -15,10 +16,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import useAppStore from "@/store";
 import { Message, Quiz, Session } from "@/store/types";
-
 import QuizSection from "../QuizSection";
 import React from "react";
-import { buildSessionMessages } from "@/utils/sessionUtils"; // Import the shared utility
+import { buildSessionMessages, injectChatScripts } from "@/utils/sessionUtils"; // Import the shared utility
 
 export default function ChatPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = React.use(params);
@@ -52,6 +52,11 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareableLink, setShareableLink] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  // Inject MathJax and Mermaid scripts once per page
+  useEffect(() => {
+    injectChatScripts();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();

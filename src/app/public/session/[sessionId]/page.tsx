@@ -1,9 +1,10 @@
 // File path: src/app/public/session/[sessionId]/page.tsx
-// Renders a public session page with client-side data fetching and Supabase auth
+// Renders a public session page with client-side data fetching and Supabase auth.
+// Updated to inject MathJax and Mermaid scripts once per page using sessionUtils.
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { use } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -13,7 +14,7 @@ import { ChatMessages } from "@/components/ui/chat";
 import { MessageList } from "@/components/ui/message-list";
 import ClientCloneButton from "./ClientCloneButton";
 import FormattedTimestamp from "@/components/ui/formatted-timestamp";
-import { buildSessionMessages } from "@/utils/sessionUtils"; // Import the shared utility
+import { injectChatScripts, buildSessionMessages } from "@/utils/sessionUtils";
 
 // Define interfaces for TypeScript type safety
 interface Message {
@@ -38,11 +39,16 @@ interface PublicSessionPageProps {
 
 export default function PublicSessionPage({ params }: PublicSessionPageProps) {
   const { sessionId } = use(params);
-
   const [session, setSession] = useState<Session | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const chatRef = useRef<HTMLDivElement>(null);
+
+  // Inject MathJax and Mermaid scripts once per page
+  useEffect(() => {
+    injectChatScripts();
+  }, []);
 
   // Fetch session data and auth status client-side
   useEffect(() => {
@@ -81,7 +87,6 @@ export default function PublicSessionPage({ params }: PublicSessionPageProps) {
     fetchData();
   }, [sessionId]);
 
-  // Use the shared utility to build messages
   const messages = session ? buildSessionMessages(session) : [];
 
   if (loading) {
@@ -141,7 +146,7 @@ export default function PublicSessionPage({ params }: PublicSessionPageProps) {
           </p>
         </div>
       )}
-      <ChatMessages className="flex flex-col items-start">
+      <ChatMessages className="flex flex-col items-start" ref={chatRef}>
         <MessageList messages={messages} />
       </ChatMessages>
     </div>

@@ -1,6 +1,7 @@
 // File path: src/components/ui/chat-message.tsx
 // Renders a chat message with support for markdown, HTML, MathML, static SVG charts using Plotly,
-// and Mermaid charts rendered via CDN, synchronized with MathJax rendering.
+// and Mermaid charts using a dedicated component for robust rendering.
+// Updated to use MermaidDiagram component for dynamic Mermaid chart embedding.
 
 "use client";
 
@@ -71,6 +72,43 @@ export interface ChatMessageProps extends MessageElement {
   actions?: React.ReactNode;
 }
 
+// Dedicated component for rendering Mermaid diagrams
+const MermaidDiagram = ({ chartConfig, id }: { chartConfig: string; id: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Ensure client-side rendering
+    if (typeof window === "undefined" || !ref.current) return;
+
+    // Wait for Mermaid to be initialized
+    const waitForMermaid = async () => {
+      if ((window as any).mermaid && (window as any).mermaid.render) {
+        try {
+          (window as any).mermaid.render(ref.current!.id, chartConfig, (svgCode: string) => {
+            if (ref.current) {
+              ref.current.innerHTML = svgCode;
+            }
+          });
+        } catch (err) {
+          setError("Failed to render Mermaid diagram");
+          console.error(`Mermaid render error for chart ${id}:`, err);
+        }
+      } else {
+        setTimeout(waitForMermaid, 100);
+      }
+    };
+
+    waitForMermaid();
+  }, [chartConfig, id]);
+
+  return (
+    <div id={`mermaid-${id}`} ref={ref} className="mermaid w-full max-w-full">
+      {error && <p className="text-red-500">{error}</p>}
+    </div>
+  );
+};
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({
   role, content, createdAt, showTimeStamp = false, animation = "scale", actions,
   experimental_attachments, toolInvocations, parts, renderAs = "markdown", charts = [],
@@ -87,29 +125,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       setDomPurify(() => module.default);
       setIsDOMPurifyLoaded(true);
     });
+
+    // No script injection here; handled by sessionUtils
     initializeMathJax();
-  }, []);
-
-  // Initialize Mermaid
-  useEffect(() => {
-    // Load Mermaid from CDN
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/mermaid@10/dist/mermaid.min.js";
-    script.async = true;
-    script.onload = () => {
-      // Initialize Mermaid with basic configuration
-      (window as any).mermaid.initialize({
-        startOnLoad: false, // We'll manually trigger rendering
-        theme: "dark",
-        securityLevel: "loose", // Allow HTML in diagrams
-      });
-    };
-    script.onerror = () => console.error("Failed to load Mermaid script");
-    document.head.appendChild(script);
-
-    return () => {
-      document.head.removeChild(script);
-    };
   }, []);
 
   // Clean chart placeholders and references from content
@@ -130,10 +148,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return true;
   };
 
-  // Render Plotly chart to SVG
+  // Render Plotly chart to SVG with additional logging
   const renderPlotlyChartToSVG = (chartConfig: ChartConfig): Promise<ChartImage> => {
     return new Promise(async (resolve) => {
       try {
+        console.log(`Attempting to render Plotly chart ${chartConfig.id}`);
         let plotlyData = chartConfig.config.data;
         let plotlyLayout = chartConfig.config.layout;
         if (!validatePlotlyConfig(chartConfig)) {
@@ -144,10 +163,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
         const tempDiv = document.createElement("div");
         document.body.appendChild(tempDiv);
-        await Plotly.newPlot(tempDiv, plotlyData, plotlyLayout, { staticPlot: true });
+        console.log(`Created tempDiv for Plotly chart ${chartConfig.id}`);
+
+        const plotResult = await Plotly.newPlot(tempDiv, plotlyData, plotlyLayout, { staticPlot: true });
+        console.log(`Plotly.newPlot result for chart ${chartConfig.id}:`, plotResult);
+
         const svgContent = await Plotly.toImage(tempDiv, { format: "svg", width: 400, height: 300 });
+        console.log(`Plotly.toImage result for chart ${chartConfig.id}:`, svgContent);
+
         Plotly.purge(tempDiv);
         document.body.removeChild(tempDiv);
+        console.log(`Cleaned up tempDiv for Plotly chart ${chartConfig.id}`);
 
         let svgString = svgContent.startsWith("data:image/svg+xml;base64,") ? atob(svgContent.replace("data:image/svg+xml;base64,", ""))
           : svgContent.startsWith("data:image/svg+xml,") ? decodeURIComponent(svgContent.replace("data:image/svg+xml,", "")) : svgContent;
@@ -159,31 +185,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       } catch (error) {
         console.error(`Failed to render Plotly chart ${chartConfig.id}:`, error);
         const title = chartConfig.config.layout?.title?.text || chartConfig.id;
-        resolve({ id: `plotly-${chartConfig.id}`, svgContent: `<svg width="400" height="300"><text x="10" y="20" font-size="16">Failed to render chart: ${title}</text></svg>`, title });
+        resolve({ id: `plotly-${chartConfig.id}`, svgContent: `<svg width="400" height="300"><text x="10" y="20" font-size="16">Failed to render Plotly chart: ${title}</text></svg>`, title });
       }
     });
   };
 
-  // Render Mermaid chart by inserting figure tag
-  const renderMermaidChart = (chartConfig: ChartConfig): ChartImage => {
-    try {
-      if (chartConfig.format !== "mermaid" || typeof chartConfig.config !== "string") {
-        throw new Error("Invalid Mermaid chart configuration");
-      }
-      // Create a figure tag with Mermaid configuration
-      const figureTag = `<figure class="mermaid" data-mermaid-id="${chartConfig.id}">${chartConfig.config}</figure>`;
-      return { id: `mermaid-${chartConfig.id}`, svgContent: figureTag, title: chartConfig.id };
-    } catch (error) {
-      console.error(`Failed to prepare Mermaid chart ${chartConfig.id}:`, error);
-      return {
-        id: `mermaid-${chartConfig.id}`,
-        svgContent: `<svg width="400" height="300"><text x="10" y="20" font-size="16">Failed to render Mermaid chart: ${chartConfig.id}</text></svg>`,
-        title: chartConfig.id
-      };
-    }
-  };
-
-  // Process and render charts (Plotly and Mermaid)
+  // Process charts (Plotly only, Mermaid handled in render)
   useEffect(() => {
     if (renderAs !== "html" || !isDOMPurifyLoaded) return;
 
@@ -197,9 +204,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         if (charts.length > 0 || hasTextParts) {
           if (charts.length > 0) {
             console.log("Processing charts:", JSON.stringify(charts, null, 2));
-            // Process Plotly and Mermaid charts
             generatedChartImages = await Promise.all(
-              charts.map(chart => chart.format === "plotly" ? renderPlotlyChartToSVG(chart) : renderMermaidChart(chart))
+              charts.filter(chart => chart.format === "plotly").map(chart => renderPlotlyChartToSVG(chart))
             );
             setChartImages(generatedChartImages);
           }
@@ -216,22 +222,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           }
         }
 
-        // Render Mermaid charts and MathJax in the same lifecycle
-        if (messageRef.current && generatedChartImages.some(chart => chart.id.startsWith("mermaid-"))) {
-          // Ensure Mermaid is loaded
-          if ((window as any).mermaid) {
-            (window as any).mermaid.run({
-              querySelector: '.mermaid',
-              postRenderCallback: (id: string) => {
-                console.log(`Mermaid chart ${id} rendered`);
-              }
-            });
-          }
-        }
-
         await typesetMathJax();
       } catch (error) {
-        console.error("Failed to process charts or typeset MathML/Mermaid:", error);
+        console.error("Failed to process charts or typeset MathML:", error);
         setProcessedContent(content || "");
         setProcessedParts(parts ? [...parts] : undefined);
       }
@@ -252,61 +245,46 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       ALLOWED_TAGS: [
         "p", "strong", "ul", "li", "br", "span", "div", "h1", "h2", "h3", "h4", "h5", "h6", "a", "svg", "g", "path", "text", "rect", "line",
         "table", "tr", "td", "th", "tbody", "thead", "tfoot", "caption", "sup", "sub", "b", "math", "mi", "mo", "mn", "mrow", "msup", "mfrac", "mtext",
-        "figure" // Added for Mermaid charts
+        "figure"
       ],
       ALLOWED_ATTR: [
         "class", "style", "href", "src", "alt", "id", "width", "height", "aria-label", "fill", "stroke", "stroke-width", "transform", "x", "y",
         "dx", "dy", "font-size", "text-anchor", "font-family", "font-weight", "d", "xmlns", "display", "mathvariant",
-        "data-mermaid-id" // Added for Mermaid chart identification
+        "data-mermaid-id", "data-processed"
       ],
     });
   };
 
-  const SVGRenderer: React.FC<{ svgContent: string }> = ({ svgContent }) => {
+  const SVGRenderer: React.FC<{ svgContent: string; chartId: string }> = ({ svgContent, chartId }) => {
     const svgRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
       if (svgRef.current) {
         try {
-          // Handle Mermaid figure tags separately
-          if (svgContent.startsWith("<figure")) {
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(svgContent, "image/svg+xml");
+          const parseError = svgDoc.querySelector("parsererror");
+          if (parseError) {
+            console.error("SVG parsing error for chart", chartId, ":", parseError.textContent);
             svgRef.current.innerHTML = svgContent;
-            // Trigger Mermaid rendering if not already done
-            if ((window as any).mermaid) {
-              (window as any).mermaid.run({
-                querySelector: '.mermaid',
-                postRenderCallback: (id: string) => {
-                  console.log(`Mermaid chart ${id} re-rendered in SVGRenderer`);
-                }
-              });
-            }
-          } else {
-            // Handle Plotly SVG content
-            const parser = new DOMParser();
-            const svgDoc = parser.parseFromString(svgContent, "image/svg+xml");
-            const parseError = svgDoc.querySelector("parsererror");
-            if (parseError) {
-              console.error("SVG parsing error:", parseError.textContent);
-              svgRef.current.innerHTML = svgContent;
-              return;
-            }
-            const svgElement = svgDoc.documentElement;
-            if (!svgElement.hasAttribute("xmlns")) svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-            svgElement.removeAttribute("width");
-            svgElement.removeAttribute("height");
-            svgElement.style.width = "100%";
-            svgElement.style.height = "auto";
-            svgElement.style.maxWidth = "100%";
-            svgElement.style.display = "block";
-            svgRef.current.innerHTML = "";
-            svgRef.current.appendChild(svgElement);
+            return;
           }
+          const svgElement = svgDoc.documentElement;
+          if (!svgElement.hasAttribute("xmlns")) svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+          svgElement.removeAttribute("width");
+          svgElement.removeAttribute("height");
+          svgElement.style.width = "100%";
+          svgElement.style.height = "auto";
+          svgElement.style.maxWidth = "100%";
+          svgElement.style.display = "block";
+          svgRef.current.innerHTML = "";
+          svgRef.current.appendChild(svgElement);
         } catch (error) {
-          console.error("Failed to parse SVG/Mermaid content:", error);
+          console.error("Failed to parse SVG content for chart", chartId, ":", error);
           svgRef.current.innerHTML = svgContent;
         }
       }
-    }, [svgContent]);
+    }, [svgContent, chartId]);
 
     return <div ref={svgRef} className="w-full max-w-full" />;
   };
@@ -384,6 +362,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             </div>
           )}
         </div>
+        {charts.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {charts.map((chart) => (
+              <div key={chart.id}>
+                {chart.format === "mermaid" ? (
+                  <MermaidDiagram chartConfig={chart.config} id={chart.id} />
+                ) : (
+                  chartImages.find(img => img.id === `plotly-${chart.id}`) ? (
+                    <SVGRenderer svgContent={chartImages.find(img => img.id === `plotly-${chart.id}`)!.svgContent} chartId={chart.id} />
+                  ) : (
+                    <p className="text-red-500">Plotly chart failed to render: {chart.id}</p>
+                  )
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -391,15 +386,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   return (
     <div ref={messageRef} className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       {renderMessageContent()}
-      {chartImages.length > 0 && (
-        <div className="mt-2 space-y-2">
-          {chartImages.map((chart) => (
-            <div key={chart.id}>
-              <SVGRenderer svgContent={chart.svgContent} />
-            </div>
-          ))}
-        </div>
-      )}
       {showTimeStamp && createdAt && (
         <time dateTime={createdAt.toISOString()} className={cn("mt-1 block px-1 text-xs opacity-50", animation !== "none" && "duration-500 animate-in fade-in-0")}>
           {formattedTime}
