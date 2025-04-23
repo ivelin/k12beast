@@ -1,5 +1,6 @@
 // File path: src/utils/xaiClient.ts
 // Handles requests to xAI API for generating educational content, including React Flow and Plotly diagrams.
+// Updated to ensure all flow charts use vertically oriented nodes and edges for better alignment in a vertically scrolling chat interface.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
@@ -98,22 +99,28 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
         - Use emojis as appropriate to enhance engagement.
         - For math formulas, chemistry equations, and other scientific notations, use MathML syntax within <math></math> tags.
         - Include charts and diagrams in a "charts" array with the following structure:
+          - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
           - Each chart has:
             - "id": Unique string identifier (e.g., "chart1").
             - "format": "plotly" for Plotly charts or "reactflow" for React Flow diagrams.
             - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for React Flow, an object with "nodes" (array of nodes) and "edges" (array of edges).
-          - Example React Flow diagram with title:
+          - For all React Flow diagrams (including flowcharts and sequence diagrams), keep it simple and use vertically aligned nodes to represent steps or actors, and edges to represent transitions or interactions.
+          - Example React Flow diagram with title (vertical orientation):
               {
                 "id": "diagram1",
                 "format": "reactflow",
+                "title": "Figure 1: Making a PB&J Sandwich",
                 "config": {
                   "nodes": [
-                    { "id": "title1", "data": { "label": "Figure 1: Skateboarder Push Off" }, "position": { "x": 100, "y": -50 }, "style": { "fontSize": "16px", "fontWeight": "bold", "textAlign": "center", "width": "200px" } },
-                    { "id": "A", "data": { "label": "Skater Pushes Wall" }, "position": { "x": 0, "y": 0 } },
-                    { "id": "B", "data": { "label": "Wall Pushes Back" }, "position": { "x": 200, "y": 0 } }
+                    { "id": "A", "data": { "label": "Get Bread" }, "position": { "x": 0, "y": 0 } },
+                    { "id": "B", "data": { "label": "Spread Peanut Butter" }, "position": { "x": 0, "y": 100 } },
+                    { "id": "C", "data": { "label": "Spread Jelly" }, "position": { "x": 0, "y": 200 } },
+                    { "id": "D", "data": { "label": "Combine Slices" }, "position": { "x": 0, "y": 300 } }
                   ],
                   "edges": [
-                    { "id": "eA-B", "source": "A", "target": "B", "label": "Force" }
+                    { "id": "eA-B", "source": "A", "target": "B", "label": "Step 1" },
+                    { "id": "eB-C", "source": "B", "target": "C", "label": "Step 2" },
+                    { "id": "eC-D", "source": "C", "target": "D", "label": "Step 3" }
                   ]
                 }
               }
@@ -121,6 +128,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
             {
               "id": "chart3",
               "format": "plotly",
+              "title": "Figure 3: Distance vs. Time",
               "config": {
                 "data": [
                   {
@@ -133,14 +141,12 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                   }
                 ],
                 "layout": {
-                  "title": { "text": "Figure 3: Distance vs. Time" },
                   "xaxis": { "title": "Time (s)" },
                   "yaxis": { "title": "Distance (m)" }
                 }
               }
             }
         - Use charts/diagrams when relevant (e.g., flowcharts for processes, graphs for data, sequence diagrams for interactions).
-        - For sequence diagrams, use React Flow with vertically aligned nodes to represent actors and edges to represent interactions.
         - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
         - Ensure chart and diagram IDs are unique and sequential within the chat session.
         - Do not reference images, charts, or formulas outside this immediate prompt and response.

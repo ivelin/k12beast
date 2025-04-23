@@ -64,7 +64,7 @@ const responseFormat = `Return a valid JSON object with a new quiz problem relat
   8. The "correctAnswer" field must be a single character (A, B, C, D) indicating the correct option.
   9. The "difficulty" field should be one of "easy", "medium", or "hard" based on the complexity of the problem.
   10. The "encouragementIfCorrect" and "encouragementIfIncorrect" fields should be strings that provide positive reinforcement for correct answers and constructive feedback for incorrect answers.
-  11. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 95% success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz correctly or incorrectly. 
+  11. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 99% success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz correctly or incorrectly. 
   12. Ensure all fields are present, especially the "solution" field with at least two steps.
     - The "solution" field must have at least two steps, each with a title and content.
     - When the solution references charts, it should reference them exaclty as they are referenced in the example problem statement. Not via relative direction like "the chart above" or "the chart below".

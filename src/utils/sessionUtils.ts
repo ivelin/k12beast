@@ -1,6 +1,5 @@
 // File path: src/utils/sessionUtils.ts
 // Utility functions for session-related logic, shared across components.
-// Updated to remove Mermaid script injection (replaced with React Flow) and centralize MathJax script injection.
 
 import { MessageElement } from "@/components/ui/chat-message";
 import { Session } from "@/store/types";

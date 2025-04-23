@@ -1,7 +1,12 @@
 // File path: src/components/ui/chat-message.tsx
 // Renders a chat message with support for markdown, HTML, MathML, static SVG charts using Plotly,
 // and flowcharts using React Flow for robust rendering.
-// Updated to render React Flow diagrams directly from xAI API configurations.
+// Updated to use the extracted ReactFlowDiagram component for modularity.
+// Improved chart layout to stack diagrams vertically and match the width of the text content.
+// Uses new title field from chart config and renders titles in a figcaption within a figure element.
+// Ensured charts fully utilize the message area width with updated CSS.
+// Fixed typo: experimental_assignments -> experimental_attachments.
+// Extracted Plotly chart rendering into PlotlyChart component.
 
 "use client";
 
@@ -10,15 +15,14 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "framer-motion";
 import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react";
 import DOMPurify from "dompurify";
-import Plotly from "plotly.js-dist";
 import { cn } from "@/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { FilePreview } from "@/components/ui/file-preview";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { typesetMathJax } from "@/utils/mathjax-config";
 import { Message, ChartConfig } from "@/store/types";
-import { ReactFlow, Background, Controls, Node, Edge } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+import ReactFlowDiagram from "./react-flow-diagram";
+import PlotlyChart from "./plotly-chart";
 
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
@@ -66,71 +70,11 @@ export interface MessageElement extends Message {
   charts?: ChartConfig[];
 }
 
-export interface ChartImage { id: string; svgContent: string; title: string; }
-
 export interface ChatMessageProps extends MessageElement {
   showTimeStamp?: boolean;
   animation?: Animation;
   actions?: React.ReactNode;
 }
-
-// Dedicated component for rendering flowcharts using React Flow
-const ReactFlowDiagram = ({ chartConfig, id }: { chartConfig: any; id: string }) => {
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      // Validate the chartConfig structure
-      if (!chartConfig || !chartConfig.nodes || !chartConfig.edges) {
-        throw new Error("Invalid React Flow configuration: Missing nodes or edges");
-      }
-
-      // Use the nodes and edges directly from the xAI API response
-      const configNodes: Node[] = chartConfig.nodes.map((node: any) => ({
-        id: node.id,
-        data: { label: node.data.label },
-        position: node.position,
-        style: node.style || { background: "#fff", border: "1px solid #000", padding: 10, borderRadius: 5 },
-      }));
-
-      const configEdges: Edge[] = chartConfig.edges.map((edge: any) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        label: edge.label,
-        style: { stroke: "#000" },
-        animated: true,
-      }));
-
-      setNodes(configNodes);
-      setEdges(configEdges);
-      setError(null);
-    } catch (err) {
-      setError("Failed to render React Flow diagram: Invalid configuration");
-      console.error(`React Flow render error for chart ${id}:`, err);
-    }
-  }, [chartConfig, id]);
-
-  return (
-    <div className="w-full max-w-full h-[400px]">
-      {error ? (
-        <p className="text-red-500">{error}</p>
-      ) : (
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          fitView
-          style={{ background: "#f8f8f8" }}
-        >
-          <Background />
-          <Controls />
-        </ReactFlow>
-      )}
-    </div>
-  );
-};
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
   role, content, createdAt, showTimeStamp = false, animation = "scale", actions,
@@ -140,8 +84,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   const [isDOMPurifyLoaded, setIsDOMPurifyLoaded] = useState(false);
   const [processedContent, setProcessedContent] = useState<string>(content);
   const [processedParts, setProcessedParts] = useState<MessagePart[] | undefined>(parts);
-  const [chartImages, setChartImages] = useState<ChartImage[]>([]);
   const messageRef = useRef<HTMLDivElement>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     import("dompurify").then((module) => {
@@ -150,6 +94,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     });
   }, []);
 
+  // Debug container widths
+  useEffect(() => {
+    if (messageRef.current && chartContainerRef.current) {
+      console.log(`Message container width: ${messageRef.current.getBoundingClientRect().width}`);
+      console.log(`Chart container width: ${chartContainerRef.current.getBoundingClientRect().width}`);
+    }
+  }, [charts]);
+
   // Clean chart placeholders and references from content
   const cleanChartContent = (text: string): string => {
     return text
@@ -157,79 +109,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       .replace(/Chart\s+(\w+)/gi, "Chart $1 below");
   };
 
-  // Validate Plotly configuration
-  const validatePlotlyConfig = (chartData: any): boolean => {
-    const config = chartData.config;
-    if (chartData?.format !== "plotly" || !config) return false;
-    if (!config?.data || !config.layout || !Array.isArray(config.data) || config.data.length === 0) return false;
-    for (const trace of config.data) {
-      if (!trace?.x || !trace.y || !trace.type || !Array.isArray(trace.x) || !Array.isArray(trace.y) || trace.x.length !== trace.y.length || trace.x.length === 0) return false;
-    }
-    return true;
-  };
-
-  // Render Plotly chart to SVG with additional logging
-  const renderPlotlyChartToSVG = (chartConfig: ChartConfig): Promise<ChartImage> => {
-    return new Promise(async (resolve) => {
-      try {
-        console.log(`Attempting to render Plotly chart ${chartConfig.id}`);
-        let plotlyData = (chartConfig.config as any).data;
-        let plotlyLayout = (chartConfig.config as any).layout;
-        if (!validatePlotlyConfig(chartConfig)) {
-          console.warn(`Chart ${chartConfig.id} does not appear to be a valid Plotly config.`);
-          plotlyData = [];
-          plotlyLayout = {};
-        }
-
-        const tempDiv = document.createElement("div");
-        document.body.appendChild(tempDiv);
-        console.log(`Created tempDiv for Plotly chart ${chartConfig.id}`);
-
-        const plotResult = await Plotly.newPlot(tempDiv, plotlyData, plotlyLayout, { staticPlot: true });
-        console.log(`Plotly.newPlot result for chart ${chartConfig.id}:`, plotResult);
-
-        const svgContent = await Plotly.toImage(tempDiv, { format: "svg", width: 400, height: 300 });
-        console.log(`Plotly.toImage result for chart ${chartConfig.id}:`, svgContent);
-
-        Plotly.purge(tempDiv);
-        document.body.removeChild(tempDiv);
-        console.log(`Cleaned up tempDiv for Plotly chart ${chartConfig.id}`);
-
-        let svgString = svgContent.startsWith("data:image/svg+xml;base64,") ? atob(svgContent.replace("data:image/svg+xml;base64,", ""))
-          : svgContent.startsWith("data:image/svg+xml,") ? decodeURIComponent(svgContent.replace("data:image/svg+xml,", "")) : svgContent;
-        svgString = svgString.replace(/<\?xml[^>]*\>/g, "").trim();
-        if (!svgString.startsWith("<svg")) throw new Error("Invalid SVG content");
-
-        const title = plotlyLayout?.title?.text || chartConfig.id;
-        resolve({ id: `plotly-${chartConfig.id}`, svgContent: svgString, title });
-      } catch (error) {
-        console.error(`Failed to render Plotly chart ${chartConfig.id}:`, error);
-        const title = (chartConfig.config as any).layout?.title?.text || chartConfig.id;
-        resolve({ id: `plotly-${chartConfig.id}`, svgContent: `<svg width="400" height="300"><text x="10" y="20" font-size="16">Failed to render Plotly chart: ${title}</text></svg>`, title });
-      }
-    });
-  };
-
-  // Process charts (Plotly only, React Flow handled in render)
+  // Process content and parts
   useEffect(() => {
-    if (renderAs !== "html" || !isDOMPurifyLoaded) return;
+    if (renderAs !== "html" || !isDOMPurifyLoaded || !messageRef.current) return;
 
     const processContent = async () => {
       try {
         let updatedContent = content || "";
         let updatedParts = parts ? [...parts] : undefined;
 
-        let generatedChartImages: ChartImage[] = [];
         const hasTextParts = parts?.some(part => part.type === "text");
         if (charts.length > 0 || hasTextParts) {
-          if (charts.length > 0) {
-            console.log("Processing charts:", JSON.stringify(charts, null, 2));
-            generatedChartImages = await Promise.all(
-              charts.filter(chart => chart.format === "plotly").map(chart => renderPlotlyChartToSVG(chart))
-            );
-            setChartImages(generatedChartImages);
-          }
-
           updatedContent = cleanChartContent(updatedContent);
           setProcessedContent(updatedContent);
 
@@ -244,7 +134,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
         await typesetMathJax();
       } catch (error) {
-        console.error("Failed to process charts or typeset MathML:", error);
+        console.error("Failed to process content or typeset MathML:", error);
         setProcessedContent(content || "");
         setProcessedParts(parts ? [...parts] : undefined);
       }
@@ -265,48 +155,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       ALLOWED_TAGS: [
         "p", "strong", "ul", "li", "br", "span", "div", "h1", "h2", "h3", "h4", "h5", "h6", "a", "svg", "g", "path", "text", "rect", "line",
         "table", "tr", "td", "th", "tbody", "thead", "tfoot", "caption", "sup", "sub", "b", "math", "mi", "mo", "mn", "mrow", "msup", "mfrac", "mtext",
-        "figure"
+        "figure", "figcaption"
       ],
       ALLOWED_ATTR: [
-        "class", "style", "href", "src", "alt", "id", "width", "height", "aria-label", "fill", "stroke", "stroke-width", "transform", "x", "y",
+        "class", "style", "href", "src", "alt", "id", "width", "height", "aria-label", "aria-labelledby", "fill", "stroke", "stroke-width", "transform", "x", "y",
         "dx", "dy", "font-size", "text-anchor", "font-family", "font-weight", "d", "xmlns", "display", "mathvariant",
         "data-mermaid-id", "data-processed"
       ],
     });
-  };
-
-  const SVGRenderer: React.FC<{ svgContent: string; chartId: string }> = ({ svgContent, chartId }) => {
-    const svgRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      if (svgRef.current) {
-        try {
-          const parser = new DOMParser();
-          const svgDoc = parser.parseFromString(svgContent, "image/svg+xml");
-          const parseError = svgDoc.querySelector("parsererror");
-          if (parseError) {
-            console.error("SVG parsing error for chart", chartId, ":", parseError.textContent);
-            svgRef.current.innerHTML = svgContent;
-            return;
-          }
-          const svgElement = svgDoc.documentElement;
-          if (!svgElement.hasAttribute("xmlns")) svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-          svgElement.removeAttribute("width");
-          svgElement.removeAttribute("height");
-          svgElement.style.width = "100%";
-          svgElement.style.height = "auto";
-          svgElement.style.maxWidth = "100%";
-          svgElement.style.display = "block";
-          svgRef.current.innerHTML = "";
-          svgRef.current.appendChild(svgElement);
-        } catch (error) {
-          console.error("Failed to parse SVG content for chart", chartId, ":", error);
-          svgRef.current.innerHTML = svgContent;
-        }
-      }
-    }, [svgContent, chartId]);
-
-    return <div ref={svgRef} className="w-full max-w-full" />;
   };
 
   // Render message content based on role and parts
@@ -383,19 +239,22 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           )}
         </div>
         {charts.length > 0 && (
-          <div className="mt-2 space-y-2">
+          <div ref={chartContainerRef} className="mt-2 space-y-4 w-full">
             {charts.map((chart) => (
-              <div key={chart.id}>
+              <figure key={chart.id} id={`figure-${chart.id}`} className="w-full sm:max-w-[70%] mx-auto">
+                {chart.title && (
+                  <figcaption id={`caption-${chart.id}`} className="text-center text-lg font-bold text-foreground mb-2">
+                    {chart.title}
+                  </figcaption>
+                )}
                 {chart.format === "reactflow" ? (
                   <ReactFlowDiagram chartConfig={chart.config} id={chart.id} />
+                ) : chart.format === "plotly" ? (
+                  <PlotlyChart chartConfig={chart} id={chart.id} containerWidth={messageRef.current?.getBoundingClientRect().width || 300} />
                 ) : (
-                  chartImages.find(img => img.id === `plotly-${chart.id}`) ? (
-                    <SVGRenderer svgContent={chartImages.find(img => img.id === `plotly-${chart.id}`)!.svgContent} chartId={chart.id} />
-                  ) : (
-                    <p className="text-red-500">Plotly chart failed to render: {chart.id}</p>
-                  )
+                  <p className="text-red-500">Unsupported chart format: {chart.id}</p>
                 )}
-              </div>
+              </figure>
             ))}
           </div>
         )}

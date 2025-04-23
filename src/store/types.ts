@@ -1,6 +1,5 @@
 // File path: src/store/types.ts
 // Type definitions for K12Beast state, including sessions, messages, quizzes, and charts.
-// Updated to support React Flow configurations instead of Mermaid.
 
 import { MessageElement } from "@/components/ui/chat-message";
 

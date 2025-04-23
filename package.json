@@ -24,6 +24,7 @@
     "@xyflow/react": "^12.6.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "dagre": "^0.8.5",
     "dompurify": "^3.2.5",
     "dotenv": "^16.4.5",
     "framer-motion": "^11.18.2",
