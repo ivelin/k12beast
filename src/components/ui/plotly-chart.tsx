@@ -1,7 +1,8 @@
 // File path: src/components/ui/plotly-chart.tsx
 // Dedicated component for rendering Plotly charts, extracted from chat-message.tsx.
 // Handles Plotly chart rendering to SVG with dynamic sizing and improved readability for mobile.
-// Increased font sizes and base rendering size on mobile to match message text size and improve visibility.
+// Increased font sizes significantly to counteract scaling effects on mobile.
+// Added JavaScript to enforce minimum font size on SVG text elements.
 
 "use client";
 
@@ -48,10 +49,10 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
         // Enhance layout for better readability
         plotlyLayout = {
           ...plotlyLayout,
-          font: { size: isMobile ? 32 : 16 }, // Larger font on mobile to match message text
-          xaxis: { ...plotlyLayout.xaxis, tickfont: { size: isMobile ? 28 : 14 } },
-          yaxis: { ...plotlyLayout.yaxis, tickfont: { size: isMobile ? 28 : 14 } },
-          margin: { l: 60, r: 20, t: 20, b: 60 }, // Increased margins for mobile
+          font: { size: isMobile ? 48 : 16 }, // Significantly larger font on mobile to counteract scaling
+          xaxis: { ...plotlyLayout.xaxis, tickfont: { size: isMobile ? 44 : 14 } },
+          yaxis: { ...plotlyLayout.yaxis, tickfont: { size: isMobile ? 44 : 14 } },
+          margin: { l: 80, r: 20, t: 20, b: 80 }, // Increased margins for mobile
         };
 
         const tempDiv = document.createElement("div");
@@ -60,13 +61,13 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
 
         // Calculate the height to maintain aspect ratio (default 800x600, aspect ratio 4:3)
         const aspectRatio = 3 / 4;
-        const baseWidth = isMobile ? 1400 : 800; // Larger base width on mobile
+        const baseWidth = isMobile ? 1000 : 800; // Reduced base width further to minimize scaling
         const baseHeight = baseWidth * aspectRatio;
 
         const plotResult = await Plotly.newPlot(tempDiv, plotlyData, plotlyLayout, { staticPlot: true });
         console.log(`Plotly.newPlot result for chart ${id}:`, plotResult);
 
-        const svgContent = await Plotly.toImage(tempDiv, { format: "svg", width: baseWidth, height: baseHeight });
+        let svgContent = await Plotly.toImage(tempDiv, { format: "svg", width: baseWidth, height: baseHeight });
         console.log(`Plotly.toImage result for chart ${id}:`, svgContent);
 
         Plotly.purge(tempDiv);
@@ -77,6 +78,20 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
           : svgContent.startsWith("data:image/svg+xml,") ? decodeURIComponent(svgContent.replace("data:image/svg+xml,", "")) : svgContent;
         svgString = svgString.replace(/<\?xml[^>]*\>/g, "").trim();
         if (!svgString.startsWith("<svg")) throw new Error("Invalid SVG content");
+
+        // Enforce minimum font size on all text elements in the SVG
+        if (isMobile) {
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
+          const textElements = svgDoc.getElementsByTagName("text");
+          for (let i = 0; i < textElements.length; i++) {
+            const fontSize = parseFloat(textElements[i].getAttribute("font-size") || "0");
+            if (fontSize < 16) {
+              textElements[i].setAttribute("font-size", "16");
+            }
+          }
+          svgString = new XMLSerializer().serializeToString(svgDoc.documentElement);
+        }
 
         setSvgContent(svgString);
         setError(null);
@@ -108,6 +123,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
         svgElement.style.height = "auto";
         svgElement.style.maxWidth = "100%";
         svgElement.style.display = "block";
+        svgElement.style.minHeight = containerWidth < 640 ? "450px" : "auto"; // Ensure minimum height on mobile
         svgElement.setAttribute("aria-labelledby", `caption-${id}`);
         svgRef.current.innerHTML = "";
         svgRef.current.appendChild(svgElement);
@@ -116,7 +132,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
         svgRef.current.innerHTML = svgContent;
       }
     }
-  }, [svgContent, id]);
+  }, [svgContent, id, containerWidth]);
 
   return (
     <div className="w-full sm:max-w-[70%] min-w-[300px]">

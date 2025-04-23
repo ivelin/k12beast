@@ -21,7 +21,7 @@ const responseFormat = `Return a JSON object with the tutoring lesson based on t
   5. Structure for K12-related problems: 
       {
         "isK12": true,
-        "lesson": "<p>Looks like...</p><p>To help, see Chart 1 to visualize, and refer to Chart 2 to... The formula is <math>...</math>...</p><p>If you feel comfortable with this...</p>",
+        "lesson": "<p>Looks like...</p><p>To help, see Figure 1 to visualize, and refer to Figure 2 to... The formula is <math>...</math>...</p><p>If you feel comfortable with this...</p>",
         "charts": [
           {
             "id": "chart1",

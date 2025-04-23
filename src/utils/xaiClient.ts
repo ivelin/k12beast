@@ -98,6 +98,11 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
         - Do not use Markdown formatting (e.g., no \`\`\` or \`**\`).
         - Use emojis as appropriate to enhance engagement.
         - For math formulas, chemistry equations, and other scientific notations, use MathML syntax within <math></math> tags.
+          - MathML Syntax Guidelines:
+                - Always use proper strictly standard compliant MathML elements for mathematical operations.
+                - For fractions (division), use <mfrac> to represent the numerator and denominator, e.g., <math><mfrac><mi>x</mi><mn>2</mn></mfrac></math> for \( \frac{x}{2} \).
+                - Do not use text nodes like '/' or '*' directly between elements to represent operations; instead, use <mfrac> for division, <mo>×</mo> for multiplication, <msup> for exponents, etc.
+                - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" errors).        
         - Include charts and diagrams in a "charts" array with the following structure:
           - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
           - Each chart has:
