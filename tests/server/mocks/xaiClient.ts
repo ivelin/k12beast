@@ -4,8 +4,8 @@
 export const sendXAIRequest = jest.fn().mockImplementation((options) => {
   console.log("xAI request responseFormat:", options.responseFormat); // Debug log
 
-  // Handle example problem requests
-  if (options.responseFormat.includes("example problem")) {
+  // Handle /api/examples requests
+  if (options.responseFormat.includes("Return a JSON object with a new example problem")) {
     if (options.testFailure) {
       return Promise.reject(new Error("xAI API failed"));
     }
@@ -15,8 +15,8 @@ export const sendXAIRequest = jest.fn().mockImplementation((options) => {
     });
   }
 
-  // Handle quiz problem requests
-  if (options.responseFormat.includes("quiz problem")) {
+  // Handle /api/quiz requests
+  if (options.responseFormat.includes("Return a valid JSON object with a new quiz problem")) {
     return Promise.resolve({
       problem: "<p>Solve this math problem: What is 3 + 3? Use the formula <math>3 + 3 = ?</math>. Take a look at Figure 1, which shows the addition process.</p>",
       solution: [
@@ -43,10 +43,19 @@ export const sendXAIRequest = jest.fn().mockImplementation((options) => {
     });
   }
 
-  // Default lesson response
+  // Handle /api/tutor requests (default lesson response)
+  if (options.responseFormat.includes("Return a JSON object with the tutoring lesson")) {
+    return Promise.resolve({
+      isK12: true,
+      lesson: "<p>The answer to your question is simple: 4!</p>",
+    });
+  }
+
+  // Fallback for unrecognized response formats
+  console.warn("Unrecognized responseFormat:", options.responseFormat);
   return Promise.resolve({
     isK12: true,
-    lesson: "<p>The answer to your question is simple: 4!</p>",
+    lesson: "<p>Default response for unrecognized format.</p>",
   });
 });
 

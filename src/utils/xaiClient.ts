@@ -105,6 +105,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                 - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" errors).        
         - Include charts and diagrams in a "charts" array with the following structure:
           - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
+          - Text labels and titles should be in plain text, concise and readable on small screens without any formatting (no HTML, no Markdown in chart and diagram labels).
           - Each chart has:
             - "id": Unique string identifier (e.g., "chart1").
             - "format": "plotly" for Plotly charts or "reactflow" for React Flow diagrams.

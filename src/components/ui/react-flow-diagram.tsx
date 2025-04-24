@@ -180,7 +180,7 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
             edges={edges}
             fitView
             fitViewOptions={{ padding: 0.02, minZoom: 0.3, maxZoom: 1.2 }} // Allow smaller zoom to fit all nodes
-            colorMode="dark"
+            colorMode="system"
             style={{ width: "100%", height: "100%" }}
             panOnDrag={false}
             zoomOnScroll={false}

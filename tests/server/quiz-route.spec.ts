@@ -1,12 +1,8 @@
 // File path: tests/server/quiz-route.spec.ts
-// Tests the quiz API route to ensure quiz generation and session updates
-
 import { NextRequest } from "next/server";
 
-// Mock xaiClient
 jest.mock("../../src/utils/xaiClient", () => jest.requireActual("./mocks/xaiClient"));
 
-// Mock Supabase
 jest.mock("../../src/supabase/serverClient", () => ({
   from: jest.fn().mockReturnThis(),
   select: jest.fn().mockReturnThis(),
@@ -27,7 +23,6 @@ jest.mock("../../src/supabase/serverClient", () => ({
   update: jest.fn().mockReturnThis(),
 }));
 
-// Dynamically import the route
 let POST: any;
 beforeAll(async () => {
   const module = await import("../../src/app/api/quiz/route");
@@ -42,7 +37,7 @@ describe("POST /api/quiz", () => {
   it("should return a quiz and update the session", async () => {
     const mockRequest = {
       headers: new Headers({ "x-session-id": "mock-session-id" }),
-      json: jest.fn().mockResolvedValue({ problem: "What is 2 + 2?", images: [] }),
+      json: jest.fn().mockResolvedValue({ responseFormat: "quiz problem"}),
     } as unknown as NextRequest;
 
     const response = await POST(mockRequest);

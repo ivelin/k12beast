@@ -13,7 +13,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Session } from "@/store/types";
 import { buildSessionMessages, injectChatScripts } from "@/utils/sessionUtils";
+import ClientCloneButton from "./ClientCloneButton";
 import React from "react";
+import supabase from '@/supabase/browserClient';
 
 export default function PublicSessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = React.use(params);
@@ -24,6 +26,7 @@ export default function PublicSessionPage({ params }: { params: Promise<{ sessio
   const [error, setError] = useState<string | null>(null);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const [clonedFrom, setClonedFrom] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   // Inject MathJax scripts once per page
   useEffect(() => {
@@ -54,6 +57,15 @@ export default function PublicSessionPage({ params }: { params: Promise<{ sessio
         setMessages(updatedMessages);
         setClonedFrom(fetchedSession.cloned_from || null);
         setShareableLink(`${window.location.origin}/public/session/${sessionId}`);
+
+        // Check auth status using Supabase client
+        const { data: authSessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.error("Supabase auth error:", sessionError.message);
+          setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(!!authSessionData.session);
+        }        
       } catch (err) {
         if (err.name !== "AbortError") {
           setError(err.message || "Error loading session");
@@ -133,23 +145,37 @@ export default function PublicSessionPage({ params }: { params: Promise<{ sessio
           </p>
         </div>
       )}
-      <div className="flex justify-end items-center mb-4">
-        <div className="flex space-x-2">
-          <div className="relative group">
-            <Button
-              onClick={handleShare}
-              className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
-              aria-label="Share session"
-            >
-              <Share2 className="h-5 w-5" />
-            </Button>
-            <span className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity sm:hidden">
-              Share
-            </span>
-            <span className="hidden sm:block absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              Share Session
-            </span>
+      <div className="flex justify-end items-center mb-4 space-x-2">
+        {isAuthenticated ? (
+          <ClientCloneButton sessionId={sessionId} />
+        ) : (
+          <div className="text-sm text-muted-foreground mb-4">
+            <p>
+              <Link
+                href={`/public/login?redirectTo=${encodeURIComponent(`/public/session/${sessionId}`)}`}
+                className="text-primary underline hover:text-primary-dark"
+              >
+                Log in
+              </Link>{" "}
+              to clone this session and continue working on it.
+            </p>
           </div>
+        )}        
+        <div className="relative group">
+          <Button
+            onClick={handleShare}
+            className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90"
+            aria-label="Share session"
+          >
+            <Share2 className="h-5 w-5" />
+            Share
+          </Button>
+          <span className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity sm:hidden">
+            Share
+          </span>
+          <span className="hidden sm:block absolute top-12 left-1/2 transform -translate-x-1/2 bg-background text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            Share Session
+          </span>
         </div>
       </div>
       <ChatContainer className="flex-1">
