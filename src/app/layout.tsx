@@ -1,6 +1,6 @@
 // File path: src/app/layout.tsx
 // Root layout for K12Beast, including navigation with Feedback and Open Source links on home page
-// Updated to redact sensitive information in logs to prevent exposure
+// Updated to redact sensitive information in logs
 
 "use client";
 
@@ -227,8 +227,8 @@ export default function RootLayout({
                   </Link>
                   <Link
                     href="/history"
-                    className={`hover:underline text-sm sm:text-base ${pathname === "/history" ? "text-muted-foreground cursor-default" : ""}`}
-                    onClick={(e) => pathname === "/history" && e.preventDefault()}
+                    className={`hover:underline text-sm sm:text-base ${pathname === "history" ? "text-muted-foreground cursor-default" : ""}`}
+                    onClick={(e) => pathname === "history" && e.preventDefault()}
                   >
                     History
                   </Link>
@@ -257,12 +257,12 @@ export default function RootLayout({
           <main className="p-4">{children}</main>
           {sessionExpired && <SessionExpiredModal onLogin={handleLoginRedirect} />}
           <Toaster
-            position="top-center" // Position toasts in the top-right corner
-            duration={2000} // Default duration of 2 seconds
-            closeButton={false} // Add a close button to toasts
+            position="top-center"
+            duration={2000}
+            closeButton={false}
             toastOptions={{
               style: {
-                zIndex: 1000, // Ensure toasts appear above other elements
+                zIndex: 1000,
               },
             }}
           />

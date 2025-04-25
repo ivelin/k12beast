@@ -1,21 +1,22 @@
 // File path: src/app/public/session/[sessionId]/page.tsx
 // Renders a public view of a shared session, displaying messages and diagrams.
+// Refactored to inline ChatHeader and ChatContent logic, keeping only ErrorDialogs and ShareDialog as shared components.
 
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Share2 } from "lucide-react";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import supabase from '@/supabase/browserClient';
+import { Session } from "@/store/types";
 import { ChatContainer, ChatMessages } from "@/components/ui/chat";
 import { MessageList } from "@/components/ui/message-list";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Session } from "@/store/types";
 import { buildSessionMessages, injectChatScripts } from "@/utils/sessionUtils";
 import ClientCloneButton from "./ClientCloneButton";
 import React from "react";
-import supabase from '@/supabase/browserClient';
+import { ErrorDialogs } from "@/components/ui/ErrorDialogs";
+import { ShareDialog } from "@/components/ui/ShareDialog";
 
 export default function PublicSessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = React.use(params);
@@ -183,34 +184,18 @@ export default function PublicSessionPage({ params }: { params: Promise<{ sessio
           <MessageList messages={messages} isTyping={false} />
         </ChatMessages>
       </ChatContainer>
-
-      <Dialog open={showErrorPopup} onOpenChange={handleClosePopup}>
-        <DialogContent aria-describedby="error-description">
-          <DialogHeader>
-            <DialogTitle>Oops!</DialogTitle>
-          </DialogHeader>
-          <p id="error-description">{error}</p>
-          <DialogFooter>
-            <Button onClick={handleClosePopup}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
-        <DialogContent aria-describedby="share-description">
-          <DialogHeader>
-            <DialogTitle>Share This Session</DialogTitle>
-          </DialogHeader>
-          <p id="share-description">Copy this link to share the session:</p>
-          <input
-            type="text"
-            value={shareableLink || ""}
-            readOnly
-            className="w-full p-2 border rounded"
-          />
-          <Button onClick={handleCopyLink}>Copy Link</Button>
-        </DialogContent>
-      </Dialog>
+      <ErrorDialogs
+        showErrorPopup={showErrorPopup}
+        errorType="simple"
+        error={error}
+        onClosePopup={handleClosePopup}
+      />
+      <ShareDialog
+        isOpen={isShareModalOpen}
+        shareableLink={shareableLink}
+        onOpenChange={setIsShareModalOpen}
+        onCopyLink={handleCopyLink}
+      />
     </div>
   );
 }

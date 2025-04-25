@@ -1,4 +1,7 @@
-// src/store/session.ts
+// File path: src/store/session.ts
+// Updated to support manual retry of the last failed prompt operation with error type differentiation
+// Added debug log to verify state update for 401 errors
+
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
 import { AppState, Step, Example, Message, Lesson } from "./types";
@@ -12,17 +15,21 @@ export interface SessionState {
   lesson: string | null;
   examples: Example | null;
   error: string | null;
+  errorType: "retryable" | "nonRetryable" | null;
   loading: boolean;
   messages: Message[];
   hasSubmittedProblem: boolean;
   sessionTerminated: boolean;
   showErrorPopup: boolean;
+  lastFailedProblem: string | null;
+  lastFailedImages: File[];
   set: (updates: Partial<SessionState>) => void;
   setStep: (step: Step) => void;
-  setError: (error: string | null) => void;
+  setError: (error: string | null, errorType?: "retryable" | "nonRetryable") => void;
   addMessage: (message: Message) => void;
   handleSubmit: (problem: string, imageUrls: string[], images: File[]) => Promise<void>;
   append: (message: Message, imageUrls: string[], images: File[]) => Promise<void>;
+  retry: () => Promise<void>;
   reset: () => void;
 }
 
@@ -35,33 +42,56 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
   lesson: null,
   examples: null,
   error: null,
+  errorType: null,
   loading: false,
   messages: [],
   hasSubmittedProblem: false,
   sessionTerminated: false,
   showErrorPopup: false,
+  lastFailedProblem: null,
+  lastFailedImages: [],
   set: (updates) => set(updates),
   setStep: (step) => set({ step }),
-  setError: (error) => set({ error }),
+  setError: (error, errorType) => set({ error, errorType }),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
   handleSubmit: async (problem, imageUrls, images) => {
     const { sessionId, addMessage, loading } = get();
     if (loading) return;
-    set({ loading: true, problem, imageUrls, hasSubmittedProblem: true, error: null, showErrorPopup: false });
+    set({ 
+      loading: true, 
+      problem, 
+      imageUrls, 
+      hasSubmittedProblem: true, 
+      error: null, 
+      errorType: null,
+      showErrorPopup: false,
+      lastFailedProblem: problem,
+      lastFailedImages: images,
+    });
     try {
       let uploadedImageUrls: string[] = [];
       if (images.length > 0) {
-        const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+        const token = document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("supabase-auth-token="))
+          ?.split("=")[1];
         if (!token) throw new Error("Failed to upload images: Authentication required.");
         const headers: HeadersInit = { Authorization: `Bearer ${token}` };
         const formData = new FormData();
         images.forEach((image) => formData.append("files", image));
-        const uploadResponse = await fetch("/api/upload-image", { method: "POST", headers, body: formData });
+        const uploadResponse = await fetch("/api/upload-image", { 
+          method: "POST", 
+          headers, 
+          body: formData 
+        });
         if (!uploadResponse.ok) {
           const errorData = (await uploadResponse.json()) as { error: string };
           throw new Error(errorData.error || "Failed to upload images");
         }
-        const uploadResult = (await uploadResponse.json()) as { success: boolean; files: { name: string; url: string }[] };
+        const uploadResult = (await uploadResponse.json()) as { 
+          success: boolean; 
+          files: { name: string; url: string }[] 
+        };
         uploadedImageUrls = uploadResult.files.map((file) => file.url);
         set({ imageUrls: uploadedImageUrls });
       }
@@ -74,7 +104,10 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
           url: uploadedImageUrls[idx],
         })),
       });
-      const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
       if (!token) throw new Error("Failed to submit problem: Authentication required.");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -89,8 +122,10 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       if (!res.ok) {
         const data = await res.json();
         if (data.terminateSession) {
+          console.log("Session termination triggered, setting error state");
           set({
             error: data.error || "An error occurred",
+            errorType: "nonRetryable",
             sessionTerminated: true,
             showErrorPopup: true,
             sessionId: null,
@@ -107,7 +142,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         }
         throw new Error(data.error || "Failed to submit problem");
       }
-      const lessonContent = await res.json() as Lesson;
+      const lessonContent = (await res.json()) as Lesson;
       set({
         sessionId: res.headers.get("x-session-id") || sessionId,
         lesson: lessonContent.lesson,
@@ -115,6 +150,8 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         step: "lesson",
         sessionTerminated: false,
         showErrorPopup: false,
+        lastFailedProblem: null,
+        lastFailedImages: [],
       });
       addMessage({ 
         role: "assistant", 
@@ -125,19 +162,14 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while starting your lesson. Let's try again!";
       console.error("Error in handleSubmit:", err);
+      const errorType = err instanceof Error && (err.message.includes("Failed to fetch") || err.message.includes("network")) 
+        ? "retryable" 
+        : "nonRetryable";
       set({
         error: errorMsg,
+        errorType,
         showErrorPopup: true,
-        sessionTerminated: true,
-        sessionId: null,
-        step: "problem",
-        lesson: null,
-        examples: null,
-        messages: [],
-        hasSubmittedProblem: false,
-        problem: "",
-        imageUrls: [],
-        images: [],
+        sessionTerminated: errorType === "nonRetryable",
       });
     } finally {
       set({ loading: false });
@@ -147,6 +179,12 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
     const { handleSubmit, loading, sessionTerminated } = get();
     if (loading || sessionTerminated) return;
     await handleSubmit(msg.content, imageUrls, images);
+  },
+  retry: async () => {
+    const { lastFailedProblem, lastFailedImages, errorType, handleSubmit } = get();
+    if (lastFailedProblem === null || errorType !== "retryable") return;
+    set({ error: null, errorType: null, showErrorPopup: false });
+    await handleSubmit(lastFailedProblem, [], lastFailedImages);
   },
   reset: () =>
     set({
@@ -158,10 +196,13 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       lesson: null,
       examples: null,
       error: null,
+      errorType: null,
       loading: false,
       messages: [],
       hasSubmittedProblem: false,
       sessionTerminated: false,
       showErrorPopup: false,
+      lastFailedProblem: null,
+      lastFailedImages: [],
     }),
 });

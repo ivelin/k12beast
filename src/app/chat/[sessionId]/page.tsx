@@ -1,6 +1,6 @@
 // File path: src/app/chat/[sessionId]/page.tsx
 // Renders the live chat page for both new and existing sessions, ensuring consistent message rendering.
-// Updated to inject MathJax scripts once per page using sessionUtils.
+// Refactored to inline ChatHeader and ChatContent logic, keeping only ErrorDialogs and ShareDialog as shared components.
 
 "use client";
 
@@ -12,13 +12,14 @@ import { ChatContainer, ChatMessages, ChatForm } from "@/components/ui/chat";
 import { MessageList } from "@/components/ui/message-list";
 import { MessageInput } from "@/components/ui/message-input";
 import { PromptSuggestions } from "@/components/ui/prompt-suggestions";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import useAppStore from "@/store";
 import { Message, Quiz, Session } from "@/store/types";
 import QuizSection from "../QuizSection";
 import React from "react";
-import { buildSessionMessages, injectChatScripts } from "@/utils/sessionUtils"; // Import the shared utility
+import { buildSessionMessages, injectChatScripts } from "@/utils/sessionUtils";
+import { ErrorDialogs } from "@/components/ui/ErrorDialogs";
+import { ShareDialog } from "@/components/ui/ShareDialog";
 
 export default function ChatPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = React.use(params);
@@ -34,8 +35,10 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     hasSubmittedProblem,
     sessionId: storeSessionId,
     error,
+    errorType,
     sessionTerminated,
     showErrorPopup,
+    cloned_from,
     setStep,
     handleExamplesRequest,
     handleQuizSubmit,
@@ -43,6 +46,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     handleSubmit: storeHandleSubmit,
     append: storeAppend,
     addMessage,
+    retry,
     reset,
     set,
   } = store;
@@ -61,7 +65,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   useEffect(() => {
     const controller = new AbortController();
     async function loadSession() {
-      set({ error: null, showErrorPopup: false });
+      set({ error: null, errorType: null, showErrorPopup: false });
 
       if (sessionId === "new") {
         reset();
@@ -111,6 +115,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           sessionTerminated: false,
           showErrorPopup: false,
           error: null,
+          errorType: null,
           cloned_from: fetchedSession.cloned_from || null,
         });
         setLocalProblem(fetchedSession.problem || "");
@@ -121,7 +126,11 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         }
       } catch (err) {
         if (err.name !== "AbortError") {
-          set({ error: err.message || "Error loading session", showErrorPopup: true });
+          set({ 
+            error: err.message || "Error loading session", 
+            errorType: "retryable",
+            showErrorPopup: true 
+          });
         }
       } finally {
         setIsLoadingSession(false);
@@ -140,6 +149,13 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
       setShareableLink(null);
     }
   }, [storeSessionId]);
+
+  // Debug log to verify error state
+  useEffect(() => {
+    if (showErrorPopup) {
+      console.log("Error dialog should be visible:", { error, errorType, showErrorPopup });
+    }
+  }, [showErrorPopup, error, errorType]);
 
   const handleSuggestionAction = (action: string) => {
     switch (action) {
@@ -207,9 +223,12 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     window.location.href = "/chat/new";
   };
 
+  const handleRetry = async () => {
+    await retry(); // Trigger retry of the last failed operation
+  };
+
   const handleClosePopup = () => {
-    set({ showErrorPopup: false, error: null });
-    window.location.href = "/public/login";
+    set({ showErrorPopup: false, error: null, errorType: null });
   };
 
   if (isLoadingSession) {
@@ -218,13 +237,13 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
 
   return (
     <div className="container">
-      {/* Cloned From Label */}
-      {store.cloned_from && (
+      {/* Chat Header */}
+      {cloned_from && (
         <div className="text-sm text-muted-foreground mb-4">
           <p>
             This session was cloned from{" "}
             <Link
-              href={`/public/session/${store.cloned_from}`}
+              href={`/public/session/${cloned_from}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary underline hover:text-primary-dark"
@@ -270,6 +289,8 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           )}
         </div>
       </div>
+
+      {/* Chat Content */}
       <ChatContainer className="flex-1">
         <ChatMessages className="flex flex-col items-start">
           <MessageList messages={messages} isTyping={loading} />
@@ -322,33 +343,20 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         <QuizSection onQuizUpdate={() => {}} />
       )}
 
-      <Dialog open={showErrorPopup} onOpenChange={handleClosePopup}>
-        <DialogContent aria-describedby="error-description">
-          <DialogHeader>
-            <DialogTitle>Oops!</DialogTitle>
-          </DialogHeader>
-          <p id="error-description">{error}</p>
-          <DialogFooter>
-            <Button onClick={handleClosePopup}>Start New Chat</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
-        <DialogContent aria-describedby="share-description">
-          <DialogHeader>
-            <DialogTitle>Share Your Session</DialogTitle>
-          </DialogHeader>
-          <p id="share-description">Copy this link to share your session:</p>
-          <input
-            type="text"
-            value={shareableLink || ""}
-            readOnly
-            className="w-full p-2 border rounded"
-          />
-          <Button onClick={handleCopyLink}>Copy Link</Button>
-        </DialogContent>
-      </Dialog>
+      <ErrorDialogs
+        showErrorPopup={showErrorPopup}
+        errorType={errorType}
+        error={error}
+        onRetry={handleRetry}
+        onNewChat={handleNewChat}
+        onClosePopup={handleClosePopup}
+      />
+      <ShareDialog
+        isOpen={isShareModalOpen}
+        shareableLink={shareableLink}
+        onOpenChange={setIsShareModalOpen}
+        onCopyLink={handleCopyLink}
+      />
     </div>
   );
 }

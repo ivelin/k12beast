@@ -87,7 +87,7 @@ const ImageFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
           <DialogContent className="p-0 max-w-3xl">
             <DialogTitle className="sr-only">Image Preview</DialogTitle>
             <DialogDescription className="sr-only">
-              Preview of the uploaded image. Click \"View Full Size\" to see the original image in a new tab.
+              Preview of the uploaded image. Click &quot;View Full Size&quot; to see the original image in a new tab.
             </DialogDescription>
             <div className="relative">
               <Image
