@@ -1,5 +1,6 @@
 // File path: src/app/layout.tsx
 // Root layout for K12Beast, including navigation with Feedback and Open Source links on home page
+// Updated to redact sensitive information in logs to prevent exposure
 
 "use client";
 
@@ -54,6 +55,28 @@ export default function RootLayout({
   const pathname = usePathname();
   const reset = useAppStore((state) => state.reset);
 
+  // Utility function to redact sensitive information from session object
+  const redactSession = (session: any) => {
+    if (!session) return null;
+    return {
+      ...session,
+      access_token: '[REDACTED]',
+      refresh_token: '[REDACTED]',
+      user: session.user
+        ? {
+            ...session.user,
+            email: '[REDACTED]',
+            user_metadata: session.user.user_metadata
+              ? {
+                  ...session.user.user_metadata,
+                  email: '[REDACTED]',
+                }
+              : null,
+          }
+        : null,
+    };
+  };
+
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -74,7 +97,8 @@ export default function RootLayout({
     checkSession();
 
     const handleAuthStateChange = (event: string, session: any) => {
-      console.log("Auth state change - event:", event, "session:", session);
+      const redactedSession = redactSession(session);
+      console.log("Auth state change - event:", event, "session:", redactedSession);
       const isSessionValid = !!session?.user;
       setIsLoggedIn(isSessionValid);
       setIsAuthChecked(true);

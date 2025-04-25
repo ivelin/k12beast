@@ -42,6 +42,32 @@ test.describe('History Page', () => {
       });
     });
 
+    // Inject a script to mock date formatting for consistency
+    await page.addInitScript(() => {
+      // Override Date.toLocaleDateString to return a consistent format (M/D/YYYY)
+      const originalToLocaleDateString = Date.prototype.toLocaleDateString;
+      Date.prototype.toLocaleDateString = function (...args) {
+        const date = new Date(this);
+        const month = date.getUTCMonth() + 1; // No leading zero
+        const day = date.getUTCDate(); // No leading zero
+        const year = date.getUTCFullYear();
+        return `${month}/${day}/${year}`; // Format as M/D/YYYY (e.g., "4/10/2025")
+      };
+
+      // Override Date.toLocaleString to include time in a consistent format
+      const originalToLocaleString = Date.prototype.toLocaleString;
+      Date.prototype.toLocaleString = function (...args) {
+        const date = new Date(this);
+        const month = date.getUTCMonth() + 1;
+        const day = date.getUTCDate();
+        const year = date.getUTCFullYear();
+        const hours = date.getUTCHours() % 12 || 12; // Convert to 12-hour format
+        const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+        const period = date.getUTCHours() >= 12 ? 'PM' : 'AM';
+        return `${month}/${day}/${year}, ${hours}:${minutes} ${period}`; // Format as M/D/YYYY, H:MM AM/PM (e.g., "4/10/2025, 7:01 AM")
+      };
+    });
+
     // Verify we are on /chat/new after login
     await expect(page).toHaveURL(/\/chat\/new/, { timeout: 30000 });
 
@@ -65,6 +91,7 @@ test.describe('History Page', () => {
 
     // Assert: Session appears in history
     await expect(page.getByText('What is 2 + 2?')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('Last Updated: 4/10/2025')).toBeVisible({ timeout: 30000 });
+    // Match the mocked date format with time (M/D/YYYY, H:MM AM/PM)
+    await expect(page.getByText(/Last Updated: 4\/10\/2025, 7:01 AM/)).toBeVisible({ timeout: 30000 });
   });
 });

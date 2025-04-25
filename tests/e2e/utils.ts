@@ -15,14 +15,6 @@ export async function loginUser(page: Page, context: BrowserContext) {
     throw new Error('TEST_USER_PASSWORD environment variable is not set. Please provide the password for the test user in .env.local.');
   }
 
-  // Log network requests for debugging
-  // page.on('request', request => {
-  //   console.log('>>', request.method(), request.url());
-  // });
-  // page.on('response', response => {
-  //   console.log('<<', response.status(), response.url());
-  // });
-
   // Check if already logged in (redirected to /chat/new)
   await page.goto("http://localhost:3000/public/login", { timeout: 30000 });
   const currentUrl = page.url();
@@ -46,10 +38,10 @@ export async function loginUser(page: Page, context: BrowserContext) {
   await emailInput.fill(testUserEmail);
   await passwordInput.fill(testUserPassword);
 
-  // Log the form state before submission
+  // Log the form state before submission, redacting sensitive information
   console.log("Form state before submission:", {
-    email: await emailInput.inputValue(),
-    password: await passwordInput.inputValue(),
+    email: "[REDACTED]", // Redact email to avoid exposure in logs
+    password: "[REDACTED]", // Redact password to avoid exposure in logs
   });
 
   // Submit the login form
@@ -67,9 +59,9 @@ export async function loginUser(page: Page, context: BrowserContext) {
       throw new Error(`Login failed: ${errorMessage}. Please check TEST_USER_EMAIL and TEST_USER_PASSWORD in .env.local.`);
     }
 
-    // Log additional context for debugging
+    // Log additional context for debugging without sensitive information
     console.log('Current URL after login attempt:', page.url());
-    console.log('Cookies after login attempt:', await context.cookies());
+    console.log('Cookies after login attempt (count):', (await context.cookies()).length);
     console.log('Page content after login attempt:', await page.content().catch(e => `Failed to get page content: ${e.message}`));
     throw new Error(`Failed to redirect to /chat/new/: ${error.message}`);
   }
@@ -80,5 +72,4 @@ export async function loginUser(page: Page, context: BrowserContext) {
   if (!authTokenCookie) {
     throw new Error("Supabase auth token cookie not set after login");
   }
-  // console.log("Auth token cookie after login:", authTokenCookie);
 }
