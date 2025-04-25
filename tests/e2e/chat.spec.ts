@@ -23,6 +23,7 @@ test.describe('Chat Page - Request Example', () => {
     });
 
     // Verify we are on /chat/new after login
+    console.log("page URL:", await page.url());
     await expect(page).toHaveURL(/\/chat\/new/, { timeout: 30000 });
 
     // Verify chat input is visible

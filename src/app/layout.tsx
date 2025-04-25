@@ -1,4 +1,4 @@
-// src/app/layout.tsx
+// File path: src/app/layout.tsx
 // Root layout for K12Beast, including navigation with Feedback and Open Source links on home page
 
 "use client";
@@ -123,18 +123,14 @@ export default function RootLayout({
     setIsLoggingIn(true);
     try {
       if (isLoggedIn) {
-        await supabase.auth.signOut();
-        document.cookie =
-          "supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-        setIsLoggedIn(false);
-        setSessionExpired(false); // Reset session expired state on logout
-        router.push("/");
+        // Redirect to the /logout page instead of handling logout here
+        router.push("/logout");
       } else {
         router.push("/public/login");
       }
     } catch (error) {
       console.error("Auth error:", error);
-      alert(isLoggedIn ? "Failed to logout. Please try again." : "Failed to initiate login. Please try again.");
+      alert(isLoggedIn ? "Failed to initiate logout. Please try again." : "Failed to initiate login. Please try again.");
     } finally {
       setIsLoggingIn(false);
     }

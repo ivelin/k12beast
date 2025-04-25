@@ -1,21 +1,31 @@
-// tests/e2e/history-page.spec.ts
-import { test, expect } from '@playwright/test';
+// File path: tests/e2e/history-page.spec.ts
+// Tests the history page functionality for authenticated users
+
+import { test, expect } from './fixtures'; // Import extended test with login fixture
 
 test.describe('History Page', () => {
-  test('should display a session in history after creating it', async ({ page }) => {
+  test('should display a session in history after creating it', async ({ page, login }) => {
+    // Log in the user using the fixture
+    await login();
+
     // Mock the /api/tutor endpoint
-    await page.route('**/api/tutor', (route) => {
-      route.fulfill({
+    await page.route('**/api/tutor', async (route) => {
+      console.log('Mocking API request for /api/tutor');
+      return route.fulfill({
         status: 200,
-        contentType: 'text/plain',
+        contentType: 'application/json',
         headers: { 'x-session-id': 'mock-session-id' },
-        body: '<p>The answer to your question is simple: 4!</p>',
+        body: JSON.stringify({
+          lesson: '<p>The answer to your question is simple: 4!</p>',
+          isK12: true,
+        }),
       });
     });
 
     // Mock the /api/history endpoint
-    await page.route('**/api/history**', (route) => {
-      route.fulfill({
+    await page.route('**/api/history**', async (route) => {
+      console.log('Mocking API request for /api/history');
+      return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
@@ -32,24 +42,29 @@ test.describe('History Page', () => {
       });
     });
 
-    // Arrange: Log in
-    await page.goto('/public/login');
-    await page.fill('input[type="email"]', 'testuser@example.com');
-    await page.fill('input[type="password"]', 'password123');
-    await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/chat/);
+    // Verify we are on /chat/new after login
+    await expect(page).toHaveURL(/\/chat\/new/, { timeout: 30000 });
 
     // Act: Create a new chat session
     await page.fill('textarea[placeholder="Ask k12beast AI..."]', 'What is 2 + 2?');
     await page.click('button[aria-label="Send message"]');
-    await expect(page.locator('text=What is 2 + 2?')).toBeVisible();
-    await expect(page.locator('text=The answer to your question is simple: 4!')).toBeVisible();
+
+    // Check for error dialog
+    const errorDialog = page.getByText('Unexpected token');
+    await expect(errorDialog).not.toBeVisible({ timeout: 5000 }).catch(() => {
+      console.log('Error dialog detected: Unexpected token');
+      throw new Error('Failed to process chat message due to invalid JSON response');
+    });
+
+    // Verify user message and assistant response
+    await expect(page.getByText('What is 2 + 2?')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('The answer to your question is simple: 4!')).toBeVisible({ timeout: 30000 });
 
     // Act: Navigate to history page
     await page.click('a[href="/history"]');
 
     // Assert: Session appears in history
-    await expect(page.locator('text=What is 2 + 2?')).toBeVisible();
-    await expect(page.locator('text=Last Updated: 4/10/2025')).toBeVisible();
+    await expect(page.getByText('What is 2 + 2?')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Last Updated: 4/10/2025')).toBeVisible({ timeout: 30000 });
   });
 });

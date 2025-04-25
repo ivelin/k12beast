@@ -1,18 +1,28 @@
-// tests/e2e/quiz-flow.spec.ts
-import { test, expect } from "@playwright/test";
+// File path: tests/e2e/quiz-flow.spec.ts
+// Tests the end-to-end quiz flow for authenticated users
+
+import { test, expect } from "./fixtures";
 
 test.describe("Quiz Flow E2E Test", () => {
-  test("should complete quiz flow", async ({ page }) => {
+  test("should complete quiz flow", async ({ page, login }) => {
+    // Log in the user using the fixture
+    await login();
+
     // Mock APIs
-    await page.route("**/api/tutor", (route) =>
+    await page.route("**/api/tutor", (route) => {
+      console.log("Mocking /api/tutor");
       route.fulfill({
         status: 200,
-        contentType: "text/plain",
+        contentType: "application/json",
         headers: { "x-session-id": "mock-session-id" },
-        body: "<p>Lesson: Adding numbers.</p>",
-      })
-    );
-    await page.route("**/api/quiz", (route) =>
+        body: JSON.stringify({
+          lesson: "<p>Lesson: Adding numbers.</p>",
+          isK12: true,
+        }),
+      });
+    });
+    await page.route("**/api/quiz", (route) => {
+      console.log("Mocking /api/quiz");
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -20,12 +30,13 @@ test.describe("Quiz Flow E2E Test", () => {
         body: JSON.stringify({
           problem: "What is 2 + 3?",
           answerFormat: "multiple-choice",
-          options: ["3", "4", "5", "6"],
+          options: ["A: 3", "B: 4", "C: 5", "D: 6"],
           difficulty: "easy",
         }),
-      })
-    );
-    await page.route("**/api/validate", (route) =>
+      });
+    });
+    await page.route("**/api/validate", (route) => {
+      console.log("Mocking /api/validate with readiness: 0.92");
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -38,25 +49,66 @@ test.describe("Quiz Flow E2E Test", () => {
           ],
           readiness: 0.92,
         }),
-      })
-    );
+      });
+    });
 
     // Start chat
     await page.goto("/chat/new");
+    await page.waitForURL(/\/chat\/new/, { timeout: 30000 });
+    await page.waitForSelector('textarea[placeholder="Ask k12beast AI..."]', { timeout: 30000 });
 
     // Submit problem (critical user flow)
     await page.fill('textarea[placeholder="Ask k12beast AI..."]', "Help me with 2+3");
     await page.click('button[aria-label="Send message"]');
 
+    // Check for error dialog
+    const errorDialog = page.getByText('Unexpected token');
+    await expect(errorDialog).not.toBeVisible({ timeout: 5000 }).catch(() => {
+      console.log('Error dialog detected: Unexpected token');
+      throw new Error('Failed to process chat message due to invalid JSON response');
+    });
+
+    // Verify assistant response
+    await expect(page.getByText("Lesson: Adding numbers.")).toBeVisible({ timeout: 30000 });
+
     // Request quiz (critical user flow)
-    await page.click('button:has-text("Take a Quiz")');
-    await expect(page.locator("text=What is 2 + 3?")).toBeVisible({ timeout: 5000 });
+    await page.click('button:has-text("Take a Quiz")', { timeout: 30000 });
+    await expect(page.getByText("What is 2 + 3?")).toBeVisible({ timeout: 30000 });
+
+    // Debug: Log available quiz options
+    console.log("Available quiz options:");
+    const options = await page.locator('label').allTextContents();
+    console.log(options);
 
     // Submit correct answer (critical user flow)
-    await page.click('label:has-text("5")');
-    await page.click('button:has-text("Submit Quiz")');
+    // Locate the option "5" and determine its index in the options list
+    const optionElements = page.locator('ul li');
+    const optionCount = await optionElements.count();
+    let optionIndex = -1;
+    for (let i = 0; i < optionCount; i++) {
+      const optionText = await optionElements.nth(i).textContent();
+      if (optionText.includes("C")) {
+        optionIndex = i;
+        break;
+      }
+    }
+    if (optionIndex === -1) {
+      throw new Error("Option 'C' (for answer 5) not found in quiz options");
+    }
+
+    // Map the index to the corresponding radio button (A=0, B=1, C=2, etc.)
+    const radioButton = page.locator(`input[type="radio"][value="${String.fromCharCode(65 + optionIndex)}"]`);
+    await expect(radioButton).toBeVisible({ timeout: 30000 });
+    await radioButton.click({ timeout: 30000 });
+
+    // Verify "Submit Quiz" button is enabled
+    const submitButton = page.locator('button:has-text("Submit Quiz")');
+    await expect(submitButton).toBeEnabled({ timeout: 30000 });
+
+    // Submit the quiz
+    await submitButton.click({ timeout: 30000 });
 
     // Verify quiz feedback (critical user-facing check)
-    await expect(page.locator("text=Well done! You nailed it!")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Well done! You nailed it!")).toBeVisible({ timeout: 30000 });
   });
 });
