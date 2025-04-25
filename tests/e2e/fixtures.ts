@@ -66,3 +66,5 @@ export const test = base.extend<{
     await use(logoutFn);
   },
 });
+
+export { expect } from "@playwright/test";
