@@ -2,6 +2,8 @@
 // Manages session-related state and actions for K12Beast, including problem submission and retries
 // Updated to use sessionError and message bubbles for consistent error handling
 // Added dispatch of supabase:auth event on session termination
+// Updated to treat all 400+ and 500+ errors as retryable, except specific non-retryable cases
+// Updated to treat "Failed to fetch" errors as retryable for timeouts
 
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
@@ -165,20 +167,31 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       });
     } catch (err: unknown) {
       let errorMsg: string;
+      let isRetryable = false;
       if (err instanceof Error) {
-        if (err.message.includes("NetworkError")) {
-          errorMsg = "Oops! We couldn't reach the server. Please check your internet connection and try again in a few moments.";
+        // Treat all 400+ and 500+ errors, NetworkError, and "Failed to fetch" as retryable, except specific non-retryable cases
+        if (
+          (err.message.includes("NetworkError") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.match(/^(4|5)\d{2}/) ||
+            err.message.includes("Service Unavailable") ||
+            err.message.includes("Too Many Requests")) &&
+          !err.message.includes("K12-related")
+        ) {
+          errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
+          isRetryable = true;
         } else {
-          errorMsg = err.message; // Keep specific error messages for non-network errors
+          errorMsg = err.message; // Keep specific error messages for non-retryable errors
         }
       } else {
-        errorMsg = "Oops! Something went wrong while starting your lesson. Please try again in a few moments.";
+        errorMsg = "Oops! Something went wrong while starting your lesson. Please try again in a few moments. If the issue persists, start a new chat.";
+        isRetryable = true;
       }
       console.error("Error in handleSubmit:", err);
-      const isRetryable = err instanceof Error && err.message.includes("NetworkError");
       set({
-        sessionError: isRetryable ? errorMsg : null, // Set sessionError only for retryable errors
-        sessionTerminated: !isRetryable,
+        sessionError: isRetryable ? errorMsg : null, // Set sessionError for retryable errors
+        sessionTerminated: !isRetryable, // Terminate session only for non-retryable errors
+        hasSubmittedProblem: !isRetryable, // Keep hasSubmittedProblem false for retryable errors to show input
       });
       addMessage({
         role: "assistant",

@@ -1,6 +1,7 @@
 // File path: src/store/quiz.ts
 // Manages quiz-related state and actions for K12Beast, including example and quiz requests
 // Updated to delay step change until quiz data is loaded
+// Updated to handle network errors consistently with session.ts
 
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
@@ -83,10 +84,27 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         throw err;
       }
     } catch (err: unknown) {
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : "Oops! Something went wrong while fetching an example. Please try again in a few moments.";
+      let errorMsg: string;
+      let isRetryable = false;
+      if (err instanceof Error) {
+        // Treat all 400+ and 500+ errors, NetworkError, and "Failed to fetch" as retryable, except specific non-retryable cases
+        if (
+          (err.message.includes("NetworkError") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.match(/^(4|5)\d{2}/) ||
+            err.message.includes("Service Unavailable") ||
+            err.message.includes("Too Many Requests")) &&
+          !err.message.includes("K12-related")
+        ) {
+          errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
+          isRetryable = true;
+        } else {
+          errorMsg = err.message; // Keep specific error messages for non-retryable errors
+        }
+      } else {
+        errorMsg = "Oops! Something went wrong while fetching an example. Please try again in a few moments. If the issue persists, start a new chat.";
+        isRetryable = true;
+      }
       console.error("Error in handleExamplesRequest:", err);
       addMessage({
         role: "assistant",
@@ -131,14 +149,25 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
       });
     } catch (err: unknown) {
       let errorMsg: string;
+      let isRetryable = false;
       if (err instanceof Error) {
-        if (err.message.includes("NetworkError")) {
-          errorMsg = "Oops! We couldn't reach the server. Please check your internet connection and try again in a few moments.";
+        // Treat all 400+ and 500+ errors, NetworkError, and "Failed to fetch" as retryable, except specific non-retryable cases
+        if (
+          (err.message.includes("NetworkError") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.match(/^(4|5)\d{2}/) ||
+            err.message.includes("Service Unavailable") ||
+            err.message.includes("Too Many Requests")) &&
+          !err.message.includes("K12-related")
+        ) {
+          errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
+          isRetryable = true;
         } else {
-          errorMsg = err.message;
+          errorMsg = err.message; // Keep specific error messages for non-retryable errors
         }
       } else {
-        errorMsg = "Oops! Something went wrong while fetching a quiz. Please try again in a few moments.";
+        errorMsg = "Oops! Something went wrong while fetching a quiz. Please try again in a few moments. If the issue persists, start a new chat.";
+        isRetryable = true;
       }
       console.error("Error in handleQuizSubmit:", err);
       addMessage({
@@ -192,22 +221,33 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
       });
     } catch (err: unknown) {
       let errorMsg: string;
+      let isRetryable = false;
       if (err instanceof Error) {
-        if (err.message.includes("NetworkError")) {
-          errorMsg = "Oops! We couldn't reach the server. Please check your internet connection and try again in a few moments.";
+        // Treat all 400+ and 500+ errors, NetworkError, and "Failed to fetch" as retryable, except specific non-retryable cases
+        if (
+          (err.message.includes("NetworkError") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.match(/^(4|5)\d{2}/) ||
+            err.message.includes("Service Unavailable") ||
+            err.message.includes("Too Many Requests")) &&
+          !err.message.includes("K12-related")
+        ) {
+          errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
+          isRetryable = true;
         } else {
-          errorMsg = err.message;
+          errorMsg = err.message; // Keep specific error messages for non-retryable errors
         }
       } else {
-        errorMsg = "Oops! Something went wrong while validating your quiz answer. Please try again in a few moments.";
+        errorMsg = "Oops! Something went wrong while validating your answer. Please try again in a few moments. If the issue persists, start a new chat.";
+        isRetryable = true;
       }
       console.error("Error in handleValidate:", err);
+      set({ validationError: errorMsg });
       addMessage({
         role: "assistant",
         content: errorMsg,
         renderAs: "markdown",
       });
-      set({ validationError: errorMsg });
     } finally {
       set({ loading: false });
     }
