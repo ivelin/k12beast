@@ -1,6 +1,6 @@
 // File path: src/app/chat/QuizSection.tsx
 // Displays the quiz UI for K12Beast, allowing users to answer multiple-choice questions
-// Updated to remove duplicate error message display; relies on message bubble for errors
+// Updated to remove onQuizUpdate and associated useEffect to prevent infinite loop
 
 "use client";
 
@@ -8,13 +8,7 @@ import { useEffect, useState } from "react";
 import useAppStore from "@/store";
 import { Quiz } from "@/store/types";
 
-// Define the type for the onQuizUpdate prop
-interface QuizUpdate {
-  type: string;
-  content: string;
-}
-
-export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: QuizUpdate) => void }) {
+export default function QuizSection() {
   const {
     step,
     sessionId,
@@ -25,7 +19,7 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
     quizAnswer,
     quizFeedback,
     loading,
-    validationError, // Still access validationError, but not displayed
+    validationError,
   } = useAppStore();
 
   const [hasFetchedQuiz, setHasFetchedQuiz] = useState(false);
@@ -40,28 +34,19 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
     }
   }, [step, quiz, hasFetchedQuiz, handleQuizSubmit]);
 
-  useEffect(() => {
-    if (quiz) {
-      console.log("QuizSection: Quiz object loaded:", quiz);
-      onQuizUpdate({ type: "quiz", content: quiz.problem });
-    } else {
-      console.warn("QuizSection: No quiz object available");
-    }
-  }, [quiz, onQuizUpdate]);
+  // Removed useEffect for onQuizUpdate, as quiz message is handled in handleQuizSubmit
 
   const handleSubmitAnswer = async () => {
-    if (!quiz) return; // Additional runtime check for safety
-    await handleValidate(answer, quiz); // Let handleValidate manage errors
+    if (!quiz) return;
+    await handleValidate(answer, quiz);
     const updatedFeedback = useAppStore.getState().quizFeedback;
     if (updatedFeedback) {
-      setStep("lesson"); // Transition to lesson step to show feedback in chat
+      setStep("lesson");
     } else {
       console.error("No feedback received after validation");
-      // Error is already handled by handleValidate via message bubble
     }
   };
 
-  // Hide the QuizSection if step is not "quizzes" or if quizFeedback is present
   if (step !== "quizzes" || !quiz) return null;
 
   return (

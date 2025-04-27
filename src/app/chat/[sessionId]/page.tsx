@@ -1,6 +1,6 @@
 // File path: src/app/chat/[sessionId]/page.tsx
-// Renders the live chat page for both new and existing sessions, ensuring consistent message rendering.
-// Updated to fix "set is not a function" error by accessing set dynamically in async operations.
+// Renders the live chat page for both new and existing sessions, ensuring consistent message rendering
+// Updated to remove duplicate validationError display; relies on message bubble for errors
 
 "use client";
 
@@ -14,11 +14,10 @@ import { MessageInput } from "@/components/ui/message-input";
 import { PromptSuggestions } from "@/components/ui/prompt-suggestions";
 import { Button } from "@/components/ui/button";
 import useAppStore from "@/store";
-import { Message, Quiz, Session } from "@/store/types";
+import { Message, Session } from "@/store/types";
 import QuizSection from "../QuizSection";
 import React from "react";
 import { buildSessionMessages, injectChatScripts } from "@/utils/sessionUtils";
-import { ErrorDialogs } from "@/components/ui/ErrorDialogs";
 import { ShareDialog } from "@/components/ui/ShareDialog";
 
 export default function ChatPage({ params }: { params: Promise<{ sessionId: string }> }) {
@@ -33,10 +32,9 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     quizFeedback,
     hasSubmittedProblem,
     sessionId: storeSessionId,
-    error,
-    errorType,
+    sessionError,
+    validationError, // Still access validationError, but not displayed
     sessionTerminated,
-    showErrorPopup,
     cloned_from,
     setStep,
     handleExamplesRequest,
@@ -61,13 +59,12 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   }, []);
 
   useEffect(() => {
-    let isMounted = true; // Track if component is mounted
+    let isMounted = true;
     const controller = new AbortController();
 
     async function loadSession() {
-      // Reset state synchronously before async operation
       if (!isMounted) return;
-      useAppStore.setState({ error: null, errorType: null, showErrorPopup: false });
+      useAppStore.setState({ sessionError: null });
 
       if (sessionId === "new") {
         if (!isMounted) return;
@@ -81,7 +78,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
       try {
         const token = document.cookie
           .split("; ")
-          .find(row => row.startsWith("supabase-auth-token="))
+          .find((row) => row.startsWith("supabase-auth-token="))
           ?.split("=")[1];
 
         const headers: HeadersInit = {
@@ -107,7 +104,6 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
 
         const updatedMessages = buildSessionMessages(fetchedSession);
 
-        // Update state after async operation completes
         if (!isMounted) return;
         useAppStore.setState({
           sessionId: fetchedSession.id,
@@ -115,27 +111,20 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           imageUrls: fetchedSession.images || [],
           messages: updatedMessages,
           hasSubmittedProblem: true,
-          step: updatedMessages.some(msg => msg.role === "assistant") ? "lesson" : "problem",
+          step: updatedMessages.some((msg) => msg.role === "assistant") ? "lesson" : "problem",
           sessionTerminated: false,
-          showErrorPopup: false,
-          error: null,
-          errorType: null,
+          sessionError: null,
           cloned_from: fetchedSession.cloned_from || null,
         });
         setLocalProblem(fetchedSession.problem || "");
         setLocalImages([]);
 
-        if (!updatedMessages.some(msg => msg.role === "assistant") && fetchedSession.problem) {
+        if (!updatedMessages.some((msg) => msg.role === "assistant") && fetchedSession.problem) {
           await storeHandleSubmit(fetchedSession.problem, fetchedSession.images || [], []);
         }
       } catch (err) {
         if (err.name !== "AbortError" && isMounted) {
-          // Update error state after async failure
-          useAppStore.setState({
-            error: err.message || "Error loading session",
-            errorType: "retryable",
-            showErrorPopup: true,
-          });
+          console.error("Error loading session:", err);
         }
       } finally {
         if (isMounted) {
@@ -147,10 +136,10 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     loadSession();
 
     return () => {
-      isMounted = false; // Mark component as unmounted
+      isMounted = false;
       controller.abort();
     };
-  }, [sessionId, reset, storeHandleSubmit]); // Removed set from dependencies
+  }, [sessionId, reset, storeHandleSubmit]);
 
   useEffect(() => {
     if (storeSessionId) {
@@ -160,13 +149,6 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
       setShareableLink(null);
     }
   }, [storeSessionId]);
-
-  // Debug log to verify error state
-  useEffect(() => {
-    if (showErrorPopup) {
-      console.log("Error dialog should be visible:", { error, errorType, showErrorPopup });
-    }
-  }, [showErrorPopup, error, errorType]);
 
   const handleSuggestionAction = (action: string) => {
     switch (action) {
@@ -219,10 +201,12 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   };
 
   const handleSubmit = async (problem: string, imageUrls: string[]) => {
+    if (step === "quizzes") return;
     await storeHandleSubmit(problem, imageUrls, localImages);
   };
 
   const append = async (message: Message, imageUrls: string[]) => {
+    if (step === "quizzes") return;
     await storeAppend(message, imageUrls, localImages);
   };
 
@@ -232,14 +216,6 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     setLocalImages([]);
     setStep("problem");
     window.location.href = "/chat/new";
-  };
-
-  const handleRetry = async () => {
-    await retry(); // Trigger retry of the last failed operation
-  };
-
-  const handleClosePopup = () => {
-    useAppStore.setState({ showErrorPopup: false, error: null, errorType: null });
   };
 
   if (isLoadingSession) {
@@ -306,6 +282,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         <ChatMessages className="flex flex-col items-start">
           <MessageList messages={messages} isTyping={loading} />
         </ChatMessages>
+
         {!loading && step === "problem" && !hasSubmittedProblem && (
           <PromptSuggestions
             className="mb-8"
@@ -315,8 +292,9 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
               "Explain step-by-step how to solve this math problem: if x * x + 9 = 25, what is x?",
               "Problem: Room 1 is at 18'C. Room 2 is at 22'C. Which direction will heat flow?.",
               "Problem: Simplify 3(4x + 6z). I think the answer is: 12x+19z",
-              "Help me prepare for 6th grade school tests: math, science, ELR."
+              "Help me prepare for 6th grade school tests: math, science, ELR.",
             ]}
+            disabled={loading || step === "quizzes"}
           />
         )}
         {!loading && (step === "lesson" || step === "examples") && !sessionTerminated && (
@@ -325,6 +303,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
             label="What would you like to do next?"
             append={(message) => handleSuggestionAction(message.content)}
             suggestions={["Request Example", "Take a Quiz"]}
+            disabled={loading || step === "quizzes"}
           />
         )}
         {step === "problem" && !hasSubmittedProblem && (
@@ -343,25 +322,14 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
                 allowAttachments={true}
                 files={localImages}
                 setFiles={setLocalImages}
-                isGenerating={loading}
+                isGenerating={loading || step === "quizzes"}
                 placeholder="Ask k12beast AI..."
               />
             )}
           </ChatForm>
         )}
       </ChatContainer>
-      {step === "quizzes" && quiz && !quizFeedback && (
-        <QuizSection onQuizUpdate={() => {}} />
-      )}
-
-      <ErrorDialogs
-        showErrorPopup={showErrorPopup}
-        errorType={errorType}
-        error={error}
-        onRetry={handleRetry}
-        onNewChat={handleNewChat}
-        onClosePopup={handleClosePopup}
-      />
+      {step === "quizzes" && quiz && !quizFeedback && <QuizSection />}
       <ShareDialog
         isOpen={isShareModalOpen}
         shareableLink={shareableLink}
