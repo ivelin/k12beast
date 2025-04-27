@@ -1,8 +1,9 @@
 // File path: src/middleware.ts
 // Middleware to handle authentication and public route access for K12Beast
-// Uses /api/auth/user for token validation and treats /api/auth/* as public
+// Updated to validate tokens directly with Supabase client for debugging project mismatch
 
 import { NextResponse, NextRequest } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { v4 as uuidv4 } from "uuid";
 
 const recentRequests = new Set<string>();
@@ -35,8 +36,8 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Allow all /public/* and /api/auth/* routes to bypass auth
-  if (pathname.startsWith("/public") || pathname.startsWith("/api/auth")) {
+  // Allow all /public/* routes to bypass auth
+  if (pathname.startsWith("/public")) {
     console.log(`Middleware [${requestId}]: Allowing public access to ${pathname}`);
     const response = NextResponse.next();
     response.headers.set("x-request-id", requestId);
@@ -52,6 +53,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const cookies = request.headers.get("cookie") || "";
+  console.log(`Middleware [${requestId}]: Raw cookie header - ${cookies}`);
   let token = getCookie("supabase-auth-token", cookies);
   console.log(`Middleware [${requestId}]: Token from cookie - ${token ? token.slice(0, 20) + '...' : 'none'}`);
 
@@ -66,14 +68,23 @@ export async function middleware(request: NextRequest) {
   let user = null;
   if (token) {
     try {
-      // Validate token via /api/auth/user
-      const res = await fetch(`${request.nextUrl.origin}/api/auth/user`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      console.log(`Middleware [${requestId}]: Auth API response - status: ${res.status}`);
-      user = res.ok ? await res.json() : null;
-      if (!res.ok) {
-        console.log(`Middleware [${requestId}]: Auth API error - body: ${await res.text()}`);
+      // Initialize Supabase client directly
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      console.log(`Middleware [${requestId}]: Supabase URL - ${process.env.NEXT_PUBLIC_SUPABASE_URL}`);
+      console.log(`Middleware [${requestId}]: Service role key - ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set (last 5 chars: ' + process.env.SUPABASE_SERVICE_ROLE_KEY.slice(-5) + ')' : 'missing'}`);
+
+      // Validate token with Supabase
+      const { data: { user: fetchedUser }, error } = await supabase.auth.getUser(token);
+      console.log(`Middleware [${requestId}]: Supabase getUser response - user: ${fetchedUser ? fetchedUser.id : 'none'}, error: ${error ? error.message : 'none'}, error_status: ${error ? error.status : 'none'}`);
+
+      if (error || !fetchedUser) {
+        console.log(`Middleware [${requestId}]: Invalid or expired token, error details: ${error?.message || 'No user found'}`);
+      } else {
+        user = fetchedUser;
+        console.log(`Middleware [${requestId}]: User fetched - ${user.email || 'no email'}`);
       }
     } catch (error) {
       console.error(`Middleware [${requestId}]: Auth fetch error - ${error instanceof Error ? error.message : String(error)}`);
@@ -114,5 +125,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/chat/:path*", "/history", "/session/:path*", "/public/:path*", "/api/auth/:path*", "/api/upload-image", "/logout"],
+  matcher: ["/", "/chat/:path*", "/history", "/session/:path*", "/public/:path*", "/api/upload-image", "/logout"],
 };
