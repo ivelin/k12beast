@@ -1,6 +1,6 @@
 // File path: src/app/api/auth/user/route.ts
 // API route to fetch user details from Supabase using an auth token
-// Updated to log detailed Supabase errors and verify project URL for token validation
+// Aligned with middleware Supabase configuration for consistent token validation
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -26,16 +26,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Log Supabase configuration (redacted for safety)
+    // Log Supabase configuration for debugging
     console.log(`API [${requestId}]: Supabase URL - ${process.env.NEXT_PUBLIC_SUPABASE_URL}`);
-    console.log(`API [${requestId}]: Service role key - ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set (last 5 chars: ' + process.env.SUPABASE_SERVICE_ROLE_KEY.slice(-5) + ')' : 'missing'}`);
 
     // Validate token with Supabase
     const { data: { user }, error } = await supabase.auth.getUser(token);
-    console.log(`API [${requestId}]: Supabase getUser response - user: ${user ? user.id : 'none'}, error: ${error ? error.message : 'none'}, error_status: ${error ? error.status : 'none'}`);
+    console.log(`API [${requestId}]: Supabase getUser response - user: ${user ? user.id : 'none'}, error: ${error ? error.message : 'none'}`);
 
     if (error || !user) {
-      console.log(`API [${requestId}]: Invalid or expired token, error details: ${error?.message || 'No user found'}`);
+      console.log(`API [${requestId}]: Invalid or expired token, error: ${error?.message || 'No user found'}`);
       return NextResponse.json(
         { error: error?.message || "Invalid or expired token" },
         { status: 401 }
@@ -46,11 +45,11 @@ export async function GET(request: NextRequest) {
     console.log(`API [${requestId}]: User fetched - ${user.email || 'no email'}`);
     return NextResponse.json(user, { status: 200 });
   } catch (err) {
-    // Enhanced error handling with detailed logging
+    // Handle unexpected errors
     const error = err instanceof Error ? err : new Error(String(err));
-    console.error(`API [${requestId}]: Error fetching user - ${error.message}, stack: ${error.stack}`);
+    console.error(`API [${requestId}]: Error fetching user - ${error.message}`);
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
