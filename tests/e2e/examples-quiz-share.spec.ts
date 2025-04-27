@@ -7,9 +7,12 @@ test.describe("Examples and Quiz Flow E2E Test", () => {
     await page.route("**/api/tutor", (route) =>
       route.fulfill({
         status: 200,
-        contentType: "text/plain",
+        contentType: "application/json",
         headers: { "x-session-id": "mock-session-id" },
-        body: "<p>Lesson: Adding numbers.</p>",
+        body: JSON.stringify({
+          lesson: "<p>Lesson: Adding numbers. 2 + 3 = <math><mn>5</mn></math>.</p>",
+          isK12: true,
+        }),
       })
     );
     await page.route("**/api/examples", (route) =>
@@ -33,7 +36,7 @@ test.describe("Examples and Quiz Flow E2E Test", () => {
         body: JSON.stringify({
           problem: "What is 2 + 3?",
           answerFormat: "multiple-choice",
-          options: ["3", "4", "5", "6"],
+          options: ["A: 3", "B: 4", "C: 5", "D: 6"],
           difficulty: "easy",
         }),
       })
@@ -73,7 +76,7 @@ test.describe("Examples and Quiz Flow E2E Test", () => {
     await expect(page.locator("text=What is 2 + 3?")).toBeVisible({ timeout: 5000 });
 
     // Submit correct answer
-    await page.click('label:has-text("5")');
+    await page.click('label:has-text("C")');
     await page.click('button:has-text("Submit Quiz")');
 
     // Verify quiz feedback

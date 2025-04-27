@@ -1,7 +1,13 @@
-// src/store/session.ts
+// File path: src/store/session.ts
+// Manages session-related state and actions for K12Beast, including problem submission and retries
+// Updated to use sessionError and message bubbles for consistent error handling
+// Added dispatch of supabase:auth event on session termination
+// Updated to treat all 400+ and 500+ errors as retryable, except specific non-retryable cases
+// Updated to treat "Failed to fetch" errors as retryable for timeouts
+
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
-import { AppState, Step, Example, Message } from "./types";
+import { AppState, Step, Example, Message, Lesson } from "./types";
 
 export interface SessionState {
   step: Step;
@@ -11,18 +17,19 @@ export interface SessionState {
   imageUrls: string[];
   lesson: string | null;
   examples: Example | null;
-  error: string | null;
+  sessionError: string | null; // Tracks session-related errors for UI display
   loading: boolean;
   messages: Message[];
   hasSubmittedProblem: boolean;
   sessionTerminated: boolean;
-  showErrorPopup: boolean;
+  lastFailedProblem: string | null;
+  lastFailedImages: File[];
   set: (updates: Partial<SessionState>) => void;
   setStep: (step: Step) => void;
-  setError: (error: string | null) => void;
   addMessage: (message: Message) => void;
   handleSubmit: (problem: string, imageUrls: string[], images: File[]) => Promise<void>;
   append: (message: Message, imageUrls: string[], images: File[]) => Promise<void>;
+  retry: () => Promise<void>;
   reset: () => void;
 }
 
@@ -34,34 +41,52 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
   imageUrls: [],
   lesson: null,
   examples: null,
-  error: null,
+  sessionError: null, // Initialize session error
   loading: false,
   messages: [],
   hasSubmittedProblem: false,
   sessionTerminated: false,
-  showErrorPopup: false,
+  lastFailedProblem: null,
+  lastFailedImages: [],
   set: (updates) => set(updates),
   setStep: (step) => set({ step }),
-  setError: (error) => set({ error }),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
   handleSubmit: async (problem, imageUrls, images) => {
     const { sessionId, addMessage, loading } = get();
     if (loading) return;
-    set({ loading: true, problem, imageUrls, hasSubmittedProblem: true, error: null, showErrorPopup: false });
+    set({
+      loading: true,
+      problem,
+      imageUrls,
+      hasSubmittedProblem: true,
+      sessionError: null, // Clear previous session error
+      lastFailedProblem: problem,
+      lastFailedImages: images,
+    });
     try {
       let uploadedImageUrls: string[] = [];
       if (images.length > 0) {
-        const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+        const token = document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("supabase-auth-token="))
+          ?.split("=")[1];
         if (!token) throw new Error("Failed to upload images: Authentication required.");
         const headers: HeadersInit = { Authorization: `Bearer ${token}` };
         const formData = new FormData();
         images.forEach((image) => formData.append("files", image));
-        const uploadResponse = await fetch("/api/upload-image", { method: "POST", headers, body: formData });
+        const uploadResponse = await fetch("/api/upload-image", {
+          method: "POST",
+          headers,
+          body: formData,
+        });
         if (!uploadResponse.ok) {
           const errorData = (await uploadResponse.json()) as { error: string };
           throw new Error(errorData.error || "Failed to upload images");
         }
-        const uploadResult = (await uploadResponse.json()) as { success: boolean; files: { name: string; url: string }[] };
+        const uploadResult = (await uploadResponse.json()) as {
+          success: boolean;
+          files: { name: string; url: string }[];
+        };
         uploadedImageUrls = uploadResult.files.map((file) => file.url);
         set({ imageUrls: uploadedImageUrls });
       }
@@ -74,7 +99,10 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
           url: uploadedImageUrls[idx],
         })),
       });
-      const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
       if (!token) throw new Error("Failed to submit problem: Authentication required.");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -89,10 +117,10 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       if (!res.ok) {
         const data = await res.json();
         if (data.terminateSession) {
+          console.log("Session termination triggered, resetting state");
           set({
-            error: data.error || "An error occurred",
+            sessionError: data.error || "An error occurred. Session terminated.",
             sessionTerminated: true,
-            showErrorPopup: true,
             sessionId: null,
             step: "problem",
             lesson: null,
@@ -102,36 +130,73 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
             problem: "",
             imageUrls: [],
             images: [],
+            lastFailedProblem: null,
+            lastFailedImages: [],
           });
+          addMessage({
+            role: "assistant",
+            content: data.error || "An error occurred. Session terminated.",
+            renderAs: "markdown",
+          });
+          // Dispatch a supabase:auth event to trigger session expiration in layout.tsx
+          window.dispatchEvent(
+            new CustomEvent("supabase:auth", {
+              detail: { event: "SIGNED_OUT", session: null },
+            })
+          );
           return;
         }
         throw new Error(data.error || "Failed to submit problem");
       }
-      const lessonContent = await res.text();
+      const lessonContent = (await res.json()) as Lesson;
       set({
         sessionId: res.headers.get("x-session-id") || sessionId,
-        lesson: lessonContent,
+        lesson: lessonContent.lesson,
+        charts: lessonContent.charts,
         step: "lesson",
         sessionTerminated: false,
-        showErrorPopup: false,
+        sessionError: null, // Clear session error on success
+        lastFailedProblem: null,
+        lastFailedImages: [],
       });
-      addMessage({ role: "assistant", content: lessonContent, renderAs: "html" });
+      addMessage({
+        role: "assistant",
+        content: lessonContent.lesson,
+        charts: lessonContent.charts,
+        renderAs: "html",
+      });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while starting your lesson. Let's try again!";
+      let errorMsg: string;
+      let isRetryable = false;
+      if (err instanceof Error) {
+        // Treat all 400+ and 500+ errors, NetworkError, and "Failed to fetch" as retryable, except specific non-retryable cases
+        if (
+          (err.message.includes("NetworkError") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.match(/^(4|5)\d{2}/) ||
+            err.message.includes("Service Unavailable") ||
+            err.message.includes("Too Many Requests")) &&
+          !err.message.includes("K12-related")
+        ) {
+          errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
+          isRetryable = true;
+        } else {
+          errorMsg = err.message; // Keep specific error messages for non-retryable errors
+        }
+      } else {
+        errorMsg = "Oops! Something went wrong while starting your lesson. Please try again in a few moments. If the issue persists, start a new chat.";
+        isRetryable = true;
+      }
       console.error("Error in handleSubmit:", err);
       set({
-        error: errorMsg,
-        showErrorPopup: true,
-        sessionTerminated: true,
-        sessionId: null,
-        step: "problem",
-        lesson: null,
-        examples: null,
-        messages: [],
-        hasSubmittedProblem: false,
-        problem: "",
-        imageUrls: [],
-        images: [],
+        sessionError: isRetryable ? errorMsg : null, // Set sessionError for retryable errors
+        sessionTerminated: !isRetryable, // Terminate session only for non-retryable errors
+        hasSubmittedProblem: !isRetryable, // Keep hasSubmittedProblem false for retryable errors to show input
+      });
+      addMessage({
+        role: "assistant",
+        content: errorMsg,
+        renderAs: "markdown",
       });
     } finally {
       set({ loading: false });
@@ -142,6 +207,12 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
     if (loading || sessionTerminated) return;
     await handleSubmit(msg.content, imageUrls, images);
   },
+  retry: async () => {
+    const { lastFailedProblem, lastFailedImages, sessionError, handleSubmit } = get();
+    if (lastFailedProblem === null || !sessionError) return; // Retry only if there's a sessionError (retryable)
+    set({ sessionError: null });
+    await handleSubmit(lastFailedProblem, [], lastFailedImages);
+  },
   reset: () =>
     set({
       step: "problem",
@@ -151,11 +222,12 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       imageUrls: [],
       lesson: null,
       examples: null,
-      error: null,
+      sessionError: null,
       loading: false,
       messages: [],
       hasSubmittedProblem: false,
       sessionTerminated: false,
-      showErrorPopup: false,
+      lastFailedProblem: null,
+      lastFailedImages: [],
     }),
 });

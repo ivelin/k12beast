@@ -34,7 +34,12 @@ export default function ClientCloneButton({ sessionId }: { sessionId: string }) 
   };
 
   return (
-    <Button onClick={handleCloneSession} className="mb-4" disabled={isCloning}>
+    <Button 
+      onClick={handleCloneSession} 
+      className="bg-muted text-foreground rounded-md p-3 shadow-lg hover:bg-muted/90" 
+      disabled={isCloning}
+      aria-label="Clone session"
+    >
       <Copy className="mr-2 h-4 w-4" />
       Clone
     </Button>

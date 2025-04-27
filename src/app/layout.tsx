@@ -1,5 +1,6 @@
-// src/app/layout.tsx
+// File path: src/app/layout.tsx
 // Root layout for K12Beast, including navigation with Feedback and Open Source links on home page
+// Updated to redact sensitive information in logs and use ErrorDialogs for session expiration
 
 "use client";
 
@@ -14,22 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useRouter, usePathname } from "next/navigation";
 import supabase from "@/supabase/browserClient";
 import useAppStore from "@/store";
-
-// Modal component for session expiration
-const SessionExpiredModal = ({ onLogin }: { onLogin: () => void }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
-      <h2 className="text-xl font-semibold mb-4">Session Expired</h2>
-      <p className="mb-4">Your session has expired. Please log back in to continue.</p>
-      <button
-        onClick={onLogin}
-        className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-      >
-        Log In
-      </button>
-    </div>
-  </div>
-);
+import { ErrorDialogs } from "@/components/ui/ErrorDialogs";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,6 +40,28 @@ export default function RootLayout({
   const pathname = usePathname();
   const reset = useAppStore((state) => state.reset);
 
+  // Utility function to redact sensitive information from session object
+  const redactSession = (session: any) => {
+    if (!session) return null;
+    return {
+      ...session,
+      access_token: '[REDACTED]',
+      refresh_token: '[REDACTED]',
+      user: session.user
+        ? {
+            ...session.user,
+            email: '[REDACTED]',
+            user_metadata: session.user.user_metadata
+              ? {
+                  ...session.user.user_metadata,
+                  email: '[REDACTED]',
+                }
+              : null,
+          }
+        : null,
+    };
+  };
+
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -74,7 +82,8 @@ export default function RootLayout({
     checkSession();
 
     const handleAuthStateChange = (event: string, session: any) => {
-      console.log("Auth state change - event:", event, "session:", session);
+      const redactedSession = redactSession(session);
+      console.log("Auth state change - event:", event, "session:", redactedSession);
       const isSessionValid = !!session?.user;
       setIsLoggedIn(isSessionValid);
       setIsAuthChecked(true);
@@ -123,18 +132,14 @@ export default function RootLayout({
     setIsLoggingIn(true);
     try {
       if (isLoggedIn) {
-        await supabase.auth.signOut();
-        document.cookie =
-          "supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-        setIsLoggedIn(false);
-        setSessionExpired(false); // Reset session expired state on logout
-        router.push("/");
+        // Redirect to the /logout page instead of handling logout here
+        router.push("/logout");
       } else {
         router.push("/public/login");
       }
     } catch (error) {
       console.error("Auth error:", error);
-      alert(isLoggedIn ? "Failed to logout. Please try again." : "Failed to initiate login. Please try again.");
+      alert(isLoggedIn ? "Failed to initiate logout. Please try again." : "Failed to initiate login. Please try again.");
     } finally {
       setIsLoggingIn(false);
     }
@@ -207,8 +212,8 @@ export default function RootLayout({
                   </Link>
                   <Link
                     href="/history"
-                    className={`hover:underline text-sm sm:text-base ${pathname === "/history" ? "text-muted-foreground cursor-default" : ""}`}
-                    onClick={(e) => pathname === "/history" && e.preventDefault()}
+                    className={`hover:underline text-sm sm:text-base ${pathname === "history" ? "text-muted-foreground cursor-default" : ""}`}
+                    onClick={(e) => pathname === "history" && e.preventDefault()}
                   >
                     History
                   </Link>
@@ -235,14 +240,20 @@ export default function RootLayout({
             </div>
           </nav>
           <main className="p-4">{children}</main>
-          {sessionExpired && <SessionExpiredModal onLogin={handleLoginRedirect} />}
+          {/* Use ErrorDialogs for session expiration with sessionExpired type */}
+          <ErrorDialogs
+            showErrorPopup={sessionExpired}
+            errorType="sessionExpired"
+            error="Your session has expired. Please log back in to continue."
+            onClosePopup={handleLoginRedirect}
+          />
           <Toaster
-            position="top-center" // Position toasts in the top-right corner
-            duration={2000} // Default duration of 2 seconds
-            closeButton={false} // Add a close button to toasts
+            position="top-center"
+            duration={2000}
+            closeButton={false}
             toastOptions={{
               style: {
-                zIndex: 1000, // Ensure toasts appear above other elements
+                zIndex: 1000,
               },
             }}
           />

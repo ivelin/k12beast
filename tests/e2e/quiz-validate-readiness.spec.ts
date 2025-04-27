@@ -8,9 +8,12 @@ test.describe("Quiz Validation Readiness Feedback", () => {
     await page.route("**/api/tutor", (route) => {
       route.fulfill({
         status: 200,
-        contentType: "text/plain",
+        contentType: "application/json",
         headers: { "x-session-id": "mock-session-id" },
-        body: "<p>Lesson: Adding numbers combines their values.</p>",
+        body: JSON.stringify({
+          lesson: "<p>Lesson: Adding numbers combines their values.</p>",
+          isK12: true,
+        }),        
       });
     });
 
@@ -23,9 +26,9 @@ test.describe("Quiz Validation Readiness Feedback", () => {
         body: JSON.stringify({
           problem: "What is 2 + 3?",
           answerFormat: "multiple-choice",
-          options: ["3", "4", "5", "6"],
+          options: ["A: 3", "B: 4", "C: 5", "D: 6"],
           difficulty: "easy",
-          correctAnswer: "5",
+          correctAnswer: "C",
         }),
       });
     });
@@ -61,7 +64,7 @@ test.describe("Quiz Validation Readiness Feedback", () => {
               { title: "Step 2", content: "The total is 5." },
             ],
             readiness,
-            correctAnswer: "5",
+            correctAnswer: "C",
           }),
         });
       } else {
@@ -72,8 +75,8 @@ test.describe("Quiz Validation Readiness Feedback", () => {
 
   test("should display readiness progress bar at 15% with red color", async ({ page }) => {
     await setupChatAndQuiz(page);
-    await mockValidateRoute(page, "4", 0.15, false); // Incorrect answer, 15% readiness
-    await page.click('label:has-text("4")');
+    await mockValidateRoute(page, "B", 0.15, false); // Incorrect answer, 15% readiness
+    await page.click('label:has-text("B")');
     await page.click('button:has-text("Submit Quiz")');
     await expect(page.locator("text=Good effort! Let's try another one.")).toBeVisible({ timeout: 5000 });
     await expect(page.locator("text=Test Readiness:")).toBeVisible();
@@ -90,8 +93,8 @@ test.describe("Quiz Validation Readiness Feedback", () => {
 
   test("should display readiness progress bar at 45% with orange color", async ({ page }) => {
     await setupChatAndQuiz(page);
-    await mockValidateRoute(page, "4", 0.45, false); // Incorrect answer, 45% readiness
-    await page.click('label:has-text("4")');
+    await mockValidateRoute(page, "B", 0.45, false); // Incorrect answer, 45% readiness
+    await page.click('label:has-text("B")');
     await page.click('button:has-text("Submit Quiz")');
     await expect(page.locator("text=Good effort! Let's try another one.")).toBeVisible({ timeout: 5000 });
     await expect(page.locator("text=Test Readiness:")).toBeVisible();
@@ -108,8 +111,8 @@ test.describe("Quiz Validation Readiness Feedback", () => {
 
   test("should display readiness progress bar at 65% with yellow color", async ({ page }) => {
     await setupChatAndQuiz(page);
-    await mockValidateRoute(page, "4", 0.65, false); // Incorrect answer, 65% readiness
-    await page.click('label:has-text("4")');
+    await mockValidateRoute(page, "B", 0.65, false); // Incorrect answer, 65% readiness
+    await page.click('label:has-text("B")');
     await page.click('button:has-text("Submit Quiz")');
     await expect(page.locator("text=Good effort! Let's try another one.")).toBeVisible({ timeout: 5000 });
     await expect(page.locator("text=Test Readiness:")).toBeVisible();
@@ -126,8 +129,8 @@ test.describe("Quiz Validation Readiness Feedback", () => {
 
   test("should display readiness progress bar at 85% with yellow-green color", async ({ page }) => {
     await setupChatAndQuiz(page);
-    await mockValidateRoute(page, "5", 0.85, true); // Correct answer, 85% readiness
-    await page.click('label:has-text("5")');
+    await mockValidateRoute(page, "C", 0.85, true); // Correct answer, 85% readiness
+    await page.click('label:has-text("C")');
     await page.click('button:has-text("Submit Quiz")');
     await expect(page.locator("text=Well done! You nailed it!")).toBeVisible({ timeout: 5000 });
     await expect(page.locator("text=Test Readiness:")).toBeVisible();
@@ -144,8 +147,8 @@ test.describe("Quiz Validation Readiness Feedback", () => {
 
   test("should display readiness progress bar at 92% with green color", async ({ page }) => {
     await setupChatAndQuiz(page);
-    await mockValidateRoute(page, "5", 0.92, true); // Correct answer, 92% readiness
-    await page.click('label:has-text("5")');
+    await mockValidateRoute(page, "C", 0.92, true); // Correct answer, 92% readiness
+    await page.click('label:has-text("C")');
     await page.click('button:has-text("Submit Quiz")');
     await expect(page.locator("text=Well done! You nailed it!")).toBeVisible({ timeout: 5000 });
     await expect(page.locator("text=Test Readiness:")).toBeVisible();
