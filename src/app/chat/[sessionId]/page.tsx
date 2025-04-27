@@ -1,6 +1,6 @@
 // File path: src/app/chat/[sessionId]/page.tsx
 // Renders the live chat page for both new and existing sessions, ensuring consistent message rendering.
-// Refactored to inline ChatHeader and ChatContent logic, keeping only ErrorDialogs and ShareDialog as shared components.
+// Updated to fix "set is not a function" error by accessing set dynamically in async operations.
 
 "use client";
 
@@ -23,7 +23,6 @@ import { ShareDialog } from "@/components/ui/ShareDialog";
 
 export default function ChatPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = React.use(params);
-  const store = useAppStore();
   const {
     step,
     messages,
@@ -48,8 +47,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
     addMessage,
     retry,
     reset,
-    set,
-  } = store;
+  } = useAppStore();
 
   const [localProblem, setLocalProblem] = useState<string>("");
   const [localImages, setLocalImages] = useState<File[]>([]);
@@ -63,11 +61,16 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   }, []);
 
   useEffect(() => {
+    let isMounted = true; // Track if component is mounted
     const controller = new AbortController();
+
     async function loadSession() {
-      set({ error: null, errorType: null, showErrorPopup: false });
+      // Reset state synchronously before async operation
+      if (!isMounted) return;
+      useAppStore.setState({ error: null, errorType: null, showErrorPopup: false });
 
       if (sessionId === "new") {
+        if (!isMounted) return;
         reset();
         setLocalProblem("");
         setLocalImages([]);
@@ -102,10 +105,11 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         const data = await res.json();
         const fetchedSession: Session = data.session;
 
-        // Use the shared utility to build messages
         const updatedMessages = buildSessionMessages(fetchedSession);
 
-        set({
+        // Update state after async operation completes
+        if (!isMounted) return;
+        useAppStore.setState({
           sessionId: fetchedSession.id,
           problem: fetchedSession.problem || "",
           imageUrls: fetchedSession.images || [],
@@ -125,21 +129,28 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           await storeHandleSubmit(fetchedSession.problem, fetchedSession.images || [], []);
         }
       } catch (err) {
-        if (err.name !== "AbortError") {
-          set({ 
-            error: err.message || "Error loading session", 
+        if (err.name !== "AbortError" && isMounted) {
+          // Update error state after async failure
+          useAppStore.setState({
+            error: err.message || "Error loading session",
             errorType: "retryable",
-            showErrorPopup: true 
+            showErrorPopup: true,
           });
         }
       } finally {
-        setIsLoadingSession(false);
+        if (isMounted) {
+          setIsLoadingSession(false);
+        }
       }
     }
 
     loadSession();
-    return () => controller.abort();
-  }, [sessionId, set, reset, storeHandleSubmit]);
+
+    return () => {
+      isMounted = false; // Mark component as unmounted
+      controller.abort();
+    };
+  }, [sessionId, reset, storeHandleSubmit]); // Removed set from dependencies
 
   useEffect(() => {
     if (storeSessionId) {
@@ -228,7 +239,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   };
 
   const handleClosePopup = () => {
-    set({ showErrorPopup: false, error: null, errorType: null });
+    useAppStore.setState({ showErrorPopup: false, error: null, errorType: null });
   };
 
   if (isLoadingSession) {

@@ -105,6 +105,9 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                 - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" errors).        
         - Include charts and diagrams in a "charts" array with the following structure:
           - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
+          - Each chart/diagram drawing should correspond to a specific reference in the text.
+          - Each chart/diagram should plot figures, shapes and functions that represent accurately any formulas, equations, or data mentioned in the text.
+          - Each chart/diagram should be relevant to the content and enhance understanding for K-12 students.
           - Text labels and titles should be in plain text, concise and readable on small screens without any formatting (no HTML, no Markdown in chart and diagram labels).
           - Each chart has:
             - "id": Unique string identifier (e.g., "chart1").
@@ -152,6 +155,47 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                 }
               }
             }
+          - Example Plotly chart with complex functions:
+            {
+              "id": "chart4",
+              "format": "plotly",
+              "title": "Figure 4: Polynomial Function",
+              "config": {
+                "data": [
+                  {
+                    "id": "polynomial",
+                    "type": "scatter",
+                    "mode": "lines",
+                    "x": [
+                      // Generated using numpy.linspace(-5, 5, 100)
+                      -5.0, -4.899, ..., 4.899, 5.0
+                    ],
+                    "y": [
+                      // Generated using 0.01*x**3 - 0.1*x**2 + 0.5*x
+                      -2.250, -2.096, ..., 2.096, 2.250
+                    ],
+                    "name": "Cubic Polynomial",
+                    "line": {"color": "orange", "width": 2}
+                  }
+                ],
+                "layout": {
+                  "shapes": [
+                    {
+                      "id": "polygon",
+                      "type": "path",
+                      "path": "M -2,0 L 0,1 L 2,0 L 0,-1 Z", // Triangle-like polygon
+                      "line": {"color": "blue", "width": 2},
+                      "fillcolor": "rgba(0, 0, 255, 0.2)"
+                    }
+                  ],
+                  "title": {"text": "Cubic Polynomial with Polygon", "x": 0.5},
+                  "xaxis": {"title": "X", "range": [-6, 6]},
+                  "yaxis": {"title": "Y", "range": [-3, 3]},
+                  "showlegend": true
+                }
+              }
+            }
+          
         - Use charts/diagrams when relevant (e.g., flowcharts for processes, graphs for data, sequence diagrams for interactions).
         - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
         - Ensure chart and diagram IDs are unique and sequential within the chat session.

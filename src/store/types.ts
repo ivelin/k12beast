@@ -92,6 +92,7 @@ export interface Message {
   createdAt?: Date;
   renderAs?: "markdown" | "html";
   charts?: ChartConfig[]; // Supports React Flow/Plotly diagrams
+  experimental_attachments?: { name: string; url: string }[]; // For user-submitted images
 }
 
 export interface AppState {
@@ -104,25 +105,27 @@ export interface AppState {
   charts: ChartConfig[];
   examples: Example | null;
   quiz: Quiz | null;
-  error: string | null;
   loading: boolean;
   quizAnswer: string;
   correctAnswer: string | null;
   quizFeedback: QuizFeedback | null;
+  validationError: string | null; // For quiz validation errors
+  sessionError: string | null; // For session-related errors (e.g., handleSubmit, append)
   messages: Message[];
   cloned_from?: string | null;
   hasSubmittedProblem: boolean;
   sessionTerminated: boolean;
-  showErrorPopup: boolean;
+  lastFailedProblem: string | null;
+  lastFailedImages: File[];
   set: (updates: Partial<AppState>) => void;
   setStep: (step: Step) => void;
-  setError: (error: string | null) => void;
   addMessage: (message: MessageElement) => void;
   handleSubmit: (problem: string, imageUrls: string[], images: File[]) => Promise<void>;
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
   handleValidate: (answer: string, quiz: Quiz) => Promise<void>;
   append: (message: Message, imageUrls: string[], images: File[]) => Promise<void>;
+  retry: () => Promise<void>;
   reset: () => void;
 }
 

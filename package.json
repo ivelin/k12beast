@@ -28,6 +28,7 @@
     "dompurify": "^3.2.5",
     "dotenv": "^16.4.5",
     "framer-motion": "^11.18.2",
+    "immer": "^10.1.1",
     "lucide-react": "^0.441.0",
     "mathjax-full": "^3.2.2",
     "next": "15.2.4",

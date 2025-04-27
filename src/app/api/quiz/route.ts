@@ -68,24 +68,7 @@ const responseFormat = `Return a valid JSON object with a new quiz problem relat
   12. Ensure all fields are present, especially the "solution" field with at least two steps.
     - The "solution" field must have at least two steps, each with a title and content.
     - When the solution references charts, it should reference them exaclty as they are referenced in the example problem statement. Not via relative direction like "the chart above" or "the chart below".
-  13. If the AI fails to generate a valid quiz, return a default response with a problem, answerFormat, options, correctAnswer, solution, difficulty, encouragementIfCorrect, encouragementIfIncorrect, and readiness fields.
   `;
-
-// Default response if the AI fails to generate a valid quiz
-const defaultResponse: QuizResponse = {
-  problem: "Unable to generate quiz due to API response format.",
-  answerFormat: "multiple-choice",
-  options: ["Option 1", "Option 2", "Option 3", "Option 4"],
-  correctAnswer: "Option 1",
-  solution: [
-    { title: "Step 1", content: "The AI response was not in the expected format." },
-    { title: "Step 2", content: "Please try requesting another quiz." },
-  ],
-  difficulty: "easy",
-  encouragementIfCorrect: "Great job! Keep it up!",
-  encouragementIfIncorrect: "Nice try! Let's review and try again.",
-  readiness: { confidenceIfCorrect: 0.5, confidenceIfIncorrect: 0.4 },
-};
 
 // Handles POST requests to generate a new quiz for an existing session
 // Sessions are created only when a user submits a new problem via /api/tutor
@@ -131,15 +114,15 @@ export async function POST(req: NextRequest) {
       problem: problem,
       images: images,
       responseFormat,
-      defaultResponse,
+      defaultResponse: null,
       maxTokens: 1000,
       chatHistory: sessionHistory.messages || [],
     }) as QuizResponse;
 
     console.log("Generated quiz:", content);
 
-    // Ensure solution is present; fallback to default if missing
-    if (!content.solution || content.solution.length === 0) {
+    // Ensure solution is present; error if missing
+    if (!content || !content.solution || content.solution.length === 0) {
       console.error("AI model did not provide a solution.");
       return NextResponse.json(
         { error: "AI model did not provide a solution." },

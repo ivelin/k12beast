@@ -1,6 +1,6 @@
 // File path: src/store/session.ts
-// Updated to support manual retry of the last failed prompt operation with error type differentiation
-// Added debug log to verify state update for 401 errors
+// Manages session-related state and actions for K12Beast, including problem submission and retries
+// Updated to use sessionError and message bubbles for consistent error handling
 
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
@@ -14,18 +14,15 @@ export interface SessionState {
   imageUrls: string[];
   lesson: string | null;
   examples: Example | null;
-  error: string | null;
-  errorType: "retryable" | "nonRetryable" | null;
+  sessionError: string | null; // Tracks session-related errors for UI display
   loading: boolean;
   messages: Message[];
   hasSubmittedProblem: boolean;
   sessionTerminated: boolean;
-  showErrorPopup: boolean;
   lastFailedProblem: string | null;
   lastFailedImages: File[];
   set: (updates: Partial<SessionState>) => void;
   setStep: (step: Step) => void;
-  setError: (error: string | null, errorType?: "retryable" | "nonRetryable") => void;
   addMessage: (message: Message) => void;
   handleSubmit: (problem: string, imageUrls: string[], images: File[]) => Promise<void>;
   append: (message: Message, imageUrls: string[], images: File[]) => Promise<void>;
@@ -41,30 +38,25 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
   imageUrls: [],
   lesson: null,
   examples: null,
-  error: null,
-  errorType: null,
+  sessionError: null, // Initialize session error
   loading: false,
   messages: [],
   hasSubmittedProblem: false,
   sessionTerminated: false,
-  showErrorPopup: false,
   lastFailedProblem: null,
   lastFailedImages: [],
   set: (updates) => set(updates),
   setStep: (step) => set({ step }),
-  setError: (error, errorType) => set({ error, errorType }),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
   handleSubmit: async (problem, imageUrls, images) => {
     const { sessionId, addMessage, loading } = get();
     if (loading) return;
-    set({ 
-      loading: true, 
-      problem, 
-      imageUrls, 
-      hasSubmittedProblem: true, 
-      error: null, 
-      errorType: null,
-      showErrorPopup: false,
+    set({
+      loading: true,
+      problem,
+      imageUrls,
+      hasSubmittedProblem: true,
+      sessionError: null, // Clear previous session error
       lastFailedProblem: problem,
       lastFailedImages: images,
     });
@@ -79,18 +71,18 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         const headers: HeadersInit = { Authorization: `Bearer ${token}` };
         const formData = new FormData();
         images.forEach((image) => formData.append("files", image));
-        const uploadResponse = await fetch("/api/upload-image", { 
-          method: "POST", 
-          headers, 
-          body: formData 
+        const uploadResponse = await fetch("/api/upload-image", {
+          method: "POST",
+          headers,
+          body: formData,
         });
         if (!uploadResponse.ok) {
           const errorData = (await uploadResponse.json()) as { error: string };
           throw new Error(errorData.error || "Failed to upload images");
         }
-        const uploadResult = (await uploadResponse.json()) as { 
-          success: boolean; 
-          files: { name: string; url: string }[] 
+        const uploadResult = (await uploadResponse.json()) as {
+          success: boolean;
+          files: { name: string; url: string }[];
         };
         uploadedImageUrls = uploadResult.files.map((file) => file.url);
         set({ imageUrls: uploadedImageUrls });
@@ -122,12 +114,10 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       if (!res.ok) {
         const data = await res.json();
         if (data.terminateSession) {
-          console.log("Session termination triggered, setting error state");
+          console.log("Session termination triggered, resetting state");
           set({
-            error: data.error || "An error occurred",
-            errorType: "nonRetryable",
+            sessionError: data.error || "An error occurred. Session terminated.",
             sessionTerminated: true,
-            showErrorPopup: true,
             sessionId: null,
             step: "problem",
             lesson: null,
@@ -137,6 +127,13 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
             problem: "",
             imageUrls: [],
             images: [],
+            lastFailedProblem: null,
+            lastFailedImages: [],
+          });
+          addMessage({
+            role: "assistant",
+            content: data.error || "An error occurred. Session terminated.",
+            renderAs: "markdown",
           });
           return;
         }
@@ -149,27 +146,37 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         charts: lessonContent.charts,
         step: "lesson",
         sessionTerminated: false,
-        showErrorPopup: false,
+        sessionError: null, // Clear session error on success
         lastFailedProblem: null,
         lastFailedImages: [],
       });
-      addMessage({ 
-        role: "assistant", 
-        content: lessonContent.lesson, 
-        charts: lessonContent.charts, 
-        renderAs: "html" 
+      addMessage({
+        role: "assistant",
+        content: lessonContent.lesson,
+        charts: lessonContent.charts,
+        renderAs: "html",
       });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while starting your lesson. Let's try again!";
+      let errorMsg: string;
+      if (err instanceof Error) {
+        if (err.message.includes("NetworkError")) {
+          errorMsg = "Oops! We couldn't reach the server. Please check your internet connection and try again in a few moments.";
+        } else {
+          errorMsg = err.message; // Keep specific error messages for non-network errors
+        }
+      } else {
+        errorMsg = "Oops! Something went wrong while starting your lesson. Please try again in a few moments.";
+      }
       console.error("Error in handleSubmit:", err);
-      const errorType = err instanceof Error && (err.message.includes("Failed to fetch") || err.message.includes("network")) 
-        ? "retryable" 
-        : "nonRetryable";
+      const isRetryable = err instanceof Error && err.message.includes("NetworkError");
       set({
-        error: errorMsg,
-        errorType,
-        showErrorPopup: true,
-        sessionTerminated: errorType === "nonRetryable",
+        sessionError: isRetryable ? errorMsg : null, // Set sessionError only for retryable errors
+        sessionTerminated: !isRetryable,
+      });
+      addMessage({
+        role: "assistant",
+        content: errorMsg,
+        renderAs: "markdown",
       });
     } finally {
       set({ loading: false });
@@ -181,9 +188,9 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
     await handleSubmit(msg.content, imageUrls, images);
   },
   retry: async () => {
-    const { lastFailedProblem, lastFailedImages, errorType, handleSubmit } = get();
-    if (lastFailedProblem === null || errorType !== "retryable") return;
-    set({ error: null, errorType: null, showErrorPopup: false });
+    const { lastFailedProblem, lastFailedImages, sessionError, handleSubmit } = get();
+    if (lastFailedProblem === null || !sessionError) return; // Retry only if there's a sessionError (retryable)
+    set({ sessionError: null });
     await handleSubmit(lastFailedProblem, [], lastFailedImages);
   },
   reset: () =>
@@ -195,13 +202,11 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       imageUrls: [],
       lesson: null,
       examples: null,
-      error: null,
-      errorType: null,
+      sessionError: null,
       loading: false,
       messages: [],
       hasSubmittedProblem: false,
       sessionTerminated: false,
-      showErrorPopup: false,
       lastFailedProblem: null,
       lastFailedImages: [],
     }),

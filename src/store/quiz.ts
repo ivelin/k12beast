@@ -1,4 +1,7 @@
-// src/store/quiz.ts
+// File path: src/store/quiz.ts
+// Manages quiz-related state and actions for K12Beast, including example and quiz requests
+// Updated to clear validationError on successful quiz validation
+
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
 import { AppState, Quiz, QuizFeedback, Message } from "./types";
@@ -9,7 +12,8 @@ export interface QuizState {
   quiz: Quiz | null;
   quizAnswer: string;
   quizFeedback: QuizFeedback | null;
-  correctAnswer: string | null; // Add correctAnswer to the state
+  correctAnswer: string | null; // Tracks the correct answer for quiz feedback
+  validationError: string | null; // Tracks validation error message for UI display
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
   handleValidate: (answer: string, quiz: Quiz) => Promise<void>;
@@ -20,13 +24,17 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
   quizAnswer: "",
   quizFeedback: null,
   correctAnswer: null, // Initialize correctAnswer
+  validationError: null, // Initialize validation error message
   handleExamplesRequest: async () => {
     const { problem, imageUrls, sessionId, addMessage, loading, sessionTerminated } = get();
     if (loading || sessionTerminated) return;
     set({ loading: true });
     try {
       addMessage({ role: "user", content: "Request Example", renderAs: "markdown" });
-      const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
       if (!token) throw new Error("Failed to request examples: Authentication required.");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -39,13 +47,15 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         const res = await fetch("/api/examples", {
           method: "POST",
           headers,
-          body: "",
+          body: JSON.stringify({ problem, images: imageUrls }), // Include problem and images
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
         if (!res.ok) {
           const errorData = await res.json();
-          throw new Error(errorData.error || "Oops! Something went wrong while fetching an example. Let's try again!");
+          throw new Error(
+            errorData.error || "Oops! Something went wrong while fetching an example. Let's try again!"
+          );
         }
         const data = await res.json();
         if (!data || !data.problem) {
@@ -63,14 +73,28 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         });
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") {
-          throw new Error("Oops! The AI had a little glitch and was snoozing. Let's try again in a moment!");
+          throw new Error("Oops! The request timed out. Please check your connection and try again!");
         }
-        throw err;
+        // Handle network errors explicitly
+        if (err instanceof TypeError && err.message.includes("NetworkError")) {
+          throw new Error(
+            "Oops! We couldn't reach the server. Please check your internet connection and try again in a few moments."
+          );
+        }
+        throw err; // Rethrow other errors
       }
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while fetching an example. Let's try again!";
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : "Oops! Something went wrong while fetching an example. Please try again in a few moments.";
       console.error("Error in handleExamplesRequest:", err);
-      set({ error: errorMsg, showErrorPopup: true });
+      // Add error as a message bubble instead of showing a dialog
+      addMessage({
+        role: "assistant",
+        content: errorMsg,
+        renderAs: "markdown",
+      });
     } finally {
       set({ loading: false });
     }
@@ -78,11 +102,14 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
   handleQuizSubmit: async () => {
     const { problem, imageUrls, sessionId, addMessage, loading, sessionTerminated } = get();
     if (loading || sessionTerminated) return;
-    set({ loading: true, step: "quizzes" });
+    set({ loading: true, step: "quizzes", validationError: null }); // Clear validation error on new quiz request
     try {
       if (!sessionId) throw new Error("No active session. Please start a new chat session.");
       addMessage({ role: "user", content: "Take a Quiz", renderAs: "markdown" });
-      const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
       if (!token) throw new Error("Failed to fetch quiz: Authentication required.");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -105,9 +132,24 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         renderAs: "html",
       });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to fetch quiz. Please try again.";
+      let errorMsg: string;
+      if (err instanceof Error) {
+        if (err.message.includes("NetworkError")) {
+          errorMsg = "Oops! We couldn't reach the server. Please check your internet connection and try again in a few moments.";
+        } else {
+          errorMsg = err.message; // Keep specific error messages for non-network errors
+        }
+      } else {
+        errorMsg = "Oops! Something went wrong while fetching a quiz. Please try again in a few moments.";
+      }
       console.error("Error in handleQuizSubmit:", err);
-      set({ error: errorMsg, showErrorPopup: true });
+      // Add error as a message bubble and revert step to allow further actions
+      addMessage({
+        role: "assistant",
+        content: errorMsg,
+        renderAs: "markdown",
+      });
+      set({ step: "lesson", quiz: null }); // Revert to lesson step and clear quiz state
     } finally {
       set({ loading: false });
     }
@@ -115,9 +157,12 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
   handleValidate: async (answer, quiz) => {
     const { sessionId, addMessage, loading, sessionTerminated } = get();
     if (loading || sessionTerminated) return;
-    set({ loading: true });
+    set({ loading: true, validationError: null }); // Clear previous validation error
     try {
-      const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
       if (!token) throw new Error("Failed to validate quiz: Authentication required.");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -143,11 +188,31 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         charts: data.charts,
         renderAs: "html",
       });
-      set({ quizAnswer: answer, quizFeedback: data, correctAnswer: data.correctAnswer }); // Store correctAnswer
+      set({
+        quizAnswer: answer,
+        quizFeedback: data,
+        correctAnswer: data.correctAnswer,
+        validationError: null, // Clear validation error on successful validation
+      }); // Store correctAnswer and clear validation error
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to validate quiz answer. Please try again.";
+      let errorMsg: string;
+      if (err instanceof Error) {
+        if (err.message.includes("NetworkError")) {
+          errorMsg = "Oops! We couldn't reach the server. Please check your internet connection and try again in a few moments.";
+        } else {
+          errorMsg = err.message; // Keep specific error messages for non-network errors
+        }
+      } else {
+        errorMsg = "Oops! Something went wrong while validating your quiz answer. Please try again in a few moments.";
+      }
       console.error("Error in handleValidate:", err);
-      set({ error: errorMsg, showErrorPopup: true });
+      // Add error as a message bubble and set validation error for UI
+      addMessage({
+        role: "assistant",
+        content: errorMsg,
+        renderAs: "markdown",
+      });
+      set({ validationError: errorMsg }); // Set validation error for UI display
     } finally {
       set({ loading: false });
     }

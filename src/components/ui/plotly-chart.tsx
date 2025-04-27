@@ -3,6 +3,7 @@
 // Handles Plotly chart rendering to SVG with dynamic sizing and improved readability for mobile.
 // Increased font sizes significantly to counteract scaling effects on mobile.
 // Added JavaScript to enforce minimum font size on SVG text elements.
+// Updated to deep clone chart data to avoid read-only errors with Plotly.
 
 "use client";
 
@@ -26,7 +27,16 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
     if (chartData?.format !== "plotly" || !config) return false;
     if (!config?.data || !config.layout || !Array.isArray(config.data) || config.data.length === 0) return false;
     for (const trace of config.data) {
-      if (!trace?.x || !trace.y || !trace.type || !Array.isArray(trace.x) || !Array.isArray(trace.y) || trace.x.length !== trace.y.length || trace.x.length === 0) return false;
+      if (
+        !trace?.x ||
+        !trace.y ||
+        !trace.type ||
+        !Array.isArray(trace.x) ||
+        !Array.isArray(trace.y) ||
+        trace.x.length !== trace.y.length ||
+        trace.x.length === 0
+      )
+        return false;
     }
     return true;
   };
@@ -34,8 +44,10 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
   useEffect(() => {
     const renderPlotlyChart = async () => {
       try {
-        let plotlyData = chartConfig.config.data;
-        let plotlyLayout = chartConfig.config.layout;
+        // Deep clone the chart data and layout to ensure they are mutable
+        const clonedConfig = JSON.parse(JSON.stringify(chartConfig.config));
+        let plotlyData = clonedConfig.data;
+        let plotlyLayout = clonedConfig.layout;
 
         if (!validatePlotlyConfig(chartConfig)) {
           console.warn(`Chart ${id} does not appear to be a valid Plotly config.`);
@@ -68,14 +80,17 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
         console.log(`Plotly.newPlot result for chart ${id}:`, plotResult);
 
         let svgContent = await Plotly.toImage(tempDiv, { format: "svg", width: baseWidth, height: baseHeight });
-        console.log(`Plotly.toImage result for chart ${id}:`, svgContent);
+        // console.log(`Plotly.toImage result for chart ${id}:`, svgContent);
 
         Plotly.purge(tempDiv);
         document.body.removeChild(tempDiv);
         console.log(`Cleaned up tempDiv for Plotly chart ${id}`);
 
-        let svgString = svgContent.startsWith("data:image/svg+xml;base64,") ? atob(svgContent.replace("data:image/svg+xml;base64,", ""))
-          : svgContent.startsWith("data:image/svg+xml,") ? decodeURIComponent(svgContent.replace("data:image/svg+xml,", "")) : svgContent;
+        let svgString = svgContent.startsWith("data:image/svg+xml;base64,")
+          ? atob(svgContent.replace("data:image/svg+xml;base64,", ""))
+          : svgContent.startsWith("data:image/svg+xml,")
+          ? decodeURIComponent(svgContent.replace("data:image/svg+xml,", ""))
+          : svgContent;
         svgString = svgString.replace(/<\?xml[^>]*\>/g, "").trim();
         if (!svgString.startsWith("<svg")) throw new Error("Invalid SVG content");
 

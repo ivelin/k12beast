@@ -1,4 +1,7 @@
-/* src/app/chat/QuizSection.tsx */
+// File path: src/app/chat/QuizSection.tsx
+// Displays the quiz UI for K12Beast, allowing users to answer multiple-choice questions
+// Updated to remove duplicate error message display; relies on message bubble for errors
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -17,12 +20,12 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
     sessionId,
     quiz,
     setStep,
-    setError,
     handleQuizSubmit,
     handleValidate,
     quizAnswer,
     quizFeedback,
     loading,
+    validationError, // Still access validationError, but not displayed
   } = useAppStore();
 
   const [hasFetchedQuiz, setHasFetchedQuiz] = useState(false);
@@ -48,19 +51,13 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
 
   const handleSubmitAnswer = async () => {
     if (!quiz) return; // Additional runtime check for safety
-    try {
-      await handleValidate(answer, quiz);
-      const updatedFeedback = useAppStore.getState().quizFeedback;
-      if (updatedFeedback) {
-        setStep("lesson"); // Transition to lesson step to show feedback in chat
-      } else {
-        console.error("No feedback received after validation");
-        setError("Failed to validate quiz answer. Please try again.");
-      }
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to submit quiz answer";
-      console.error("Error submitting quiz answer:", err);
-      setError(errorMsg);
+    await handleValidate(answer, quiz); // Let handleValidate manage errors
+    const updatedFeedback = useAppStore.getState().quizFeedback;
+    if (updatedFeedback) {
+      setStep("lesson"); // Transition to lesson step to show feedback in chat
+    } else {
+      console.error("No feedback received after validation");
+      // Error is already handled by handleValidate via message bubble
     }
   };
 
@@ -69,12 +66,9 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
 
   return (
     <div className="mb-4 flex flex-col items-center">
-      {useAppStore.getState().error && (
-        <div className="text-red-500">{useAppStore.getState().error}</div>
-      )}
       {quiz.answerFormat === "multiple-choice" && quiz.options && quiz.options.length > 0 ? (
         <div className="w-full max-w-md">
-          {['A', 'B', 'C', 'D'].map((option: string, index: number) => {
+          {["A", "B", "C", "D"].map((option: string, index: number) => {
             const isUserAnswer = option === answer;
             return (
               <div key={index} className="my-2 flex items-center">
