@@ -62,7 +62,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     images,
     responseFormat,
     defaultResponse,
-    maxTokens = 1000,
+    maxTokens = 10000,
     chatHistory = [],
   } = options;
 

@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       images,
       responseFormat,
       defaultResponse,
-      maxTokens: 1000,
+      maxTokens: 10000,
       chatHistory: sessionHistory?.messages || [], // Changed to chatHistory to match xaiClient.ts
     }) as ExampleResponse;
 

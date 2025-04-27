@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       images: images,
       responseFormat,
       defaultResponse: null,
-      maxTokens: 1000,
+      maxTokens: 10000,
       chatHistory: sessionHistory.messages || [],
     }) as QuizResponse;
 

@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       responseFormat,
       sessionId,
       defaultResponse: { isK12: true, lesson: "No lesson generated." },
-      maxTokens: 1000,
+      maxTokens: 10000,
       chatHistory: [],
     });
 
