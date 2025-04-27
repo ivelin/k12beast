@@ -1,6 +1,6 @@
 // File path: src/middleware.ts
 // Middleware to handle authentication and public route access for K12Beast
-// Updated to use /api/auth/user for token validation to modularize auth logic
+// Uses /api/auth/user for token validation and treats /api/auth/* as public
 
 import { NextResponse, NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
@@ -35,8 +35,8 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Allow all /public/* routes to bypass auth
-  if (pathname.startsWith("/public")) {
+  // Allow all /public/* and /api/auth/* routes to bypass auth
+  if (pathname.startsWith("/public") || pathname.startsWith("/api/auth")) {
     console.log(`Middleware [${requestId}]: Allowing public access to ${pathname}`);
     const response = NextResponse.next();
     response.headers.set("x-request-id", requestId);
@@ -70,8 +70,11 @@ export async function middleware(request: NextRequest) {
       const res = await fetch(`${request.nextUrl.origin}/api/auth/user`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log(`Middleware [${requestId}]: Auth API response - status: ${res.status}, body: ${await res.text()}`);
+      console.log(`Middleware [${requestId}]: Auth API response - status: ${res.status}`);
       user = res.ok ? await res.json() : null;
+      if (!res.ok) {
+        console.log(`Middleware [${requestId}]: Auth API error - body: ${await res.text()}`);
+      }
     } catch (error) {
       console.error(`Middleware [${requestId}]: Auth fetch error - ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -111,5 +114,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/chat/:path*", "/history", "/session/:path*", "/public/:path*", "/api/upload-image", "/logout"],
+  matcher: ["/", "/chat/:path*", "/history", "/session/:path*", "/public/:path*", "/api/auth/:path*", "/api/upload-image", "/logout"],
 };
