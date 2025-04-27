@@ -1,6 +1,6 @@
 // File path: src/app/layout.tsx
 // Root layout for K12Beast, including navigation with Feedback and Open Source links on home page
-// Updated to redact sensitive information in logs
+// Updated to redact sensitive information in logs and use ErrorDialogs for session expiration
 
 "use client";
 
@@ -15,22 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useRouter, usePathname } from "next/navigation";
 import supabase from "@/supabase/browserClient";
 import useAppStore from "@/store";
-
-// Modal component for session expiration
-const SessionExpiredModal = ({ onLogin }: { onLogin: () => void }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
-      <h2 className="text-xl font-semibold mb-4">Session Expired</h2>
-      <p className="mb-4">Your session has expired. Please log back in to continue.</p>
-      <button
-        onClick={onLogin}
-        className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-      >
-        Log In
-      </button>
-    </div>
-  </div>
-);
+import { ErrorDialogs } from "@/components/ui/ErrorDialogs";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -255,7 +240,13 @@ export default function RootLayout({
             </div>
           </nav>
           <main className="p-4">{children}</main>
-          {sessionExpired && <SessionExpiredModal onLogin={handleLoginRedirect} />}
+          {/* Use ErrorDialogs for session expiration with sessionExpired type */}
+          <ErrorDialogs
+            showErrorPopup={sessionExpired}
+            errorType="sessionExpired"
+            error="Your session has expired. Please log back in to continue."
+            onClosePopup={handleLoginRedirect}
+          />
           <Toaster
             position="top-center"
             duration={2000}

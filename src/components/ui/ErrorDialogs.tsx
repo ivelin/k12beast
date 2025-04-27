@@ -1,12 +1,12 @@
-// File path: src/app/components/ui/ErrorDialogs.tsx
-// Component for error dialogs (retryable, non-retryable, and simple close dialog)
+// File path: src/components/ui/ErrorDialogs.tsx
+// Component for error dialogs (retryable, non-retryable, session-expired, and simple close dialog)
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 interface ErrorDialogsProps {
   showErrorPopup: boolean;
-  errorType: "retryable" | "nonRetryable" | "simple" | null; // Add "simple" for PublicSessionPage
+  errorType: "retryable" | "nonRetryable" | "sessionExpired" | "simple" | null; // Add "sessionExpired" type
   error: string | null;
   onRetry?: () => Promise<void>; // Optional for retryable errors
   onNewChat?: () => void; // Optional for non-retryable errors
@@ -61,6 +61,24 @@ export function ErrorDialogs({
               <Button onClick={onNewChat} variant="default">
                 Start New Chat
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Session Expired Dialog (e.g., for layout.tsx session expiration) */}
+      {errorType === "sessionExpired" && (
+        <Dialog 
+          open={showErrorPopup} 
+          onOpenChange={onClosePopup}
+        >
+          <DialogContent aria-describedby="error-description-session-expired">
+            <DialogHeader>
+              <DialogTitle>Oops!</DialogTitle>
+            </DialogHeader>
+            <p id="error-description-session-expired">{error}</p>
+            <DialogFooter>
+              <Button onClick={onClosePopup}>Login</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -1,15 +1,18 @@
 // File path: tests/e2e/session-expiration.spec.ts
-// Tests session expiration behavior for authenticated users
+// Tests session expiration handling, ensuring users are prompted to log back in
 
-import { test, expect } from './fixtures'; // Import extended test with login fixture
+import { test } from './fixtures';
+import { expect } from '@playwright/test';
 
 test.describe('Session Expiration', () => {
-  test('should show session expired modal when session expires', async ({ page, login }) => {
-    // Log in the user using the fixture
-    await login();
+  const mockSessionId = 'mock-session-id';
 
-    // Mock the /api/tutor endpoint to return 401 Unauthorized, simulating session expiration
-    await page.route('**/api/tutor', async (route) => {
+  test('should show session expired modal when session expires', async ({ page, login, context }) => {
+    // Log in the user using the fixture
+    await login({ page, context });
+
+    // Mock /api/tutor to return 401, simulating session expiration
+    await context.route('**/api/tutor', async (route) => {
       console.log('Mocking API request for /api/tutor with 401 Unauthorized');
       return route.fulfill({
         status: 401,
@@ -34,14 +37,13 @@ test.describe('Session Expiration', () => {
     // Verify the modal contains the expected title and error message
     const modal = page.locator('div[role="dialog"]');
     await expect(modal.getByText('Oops!')).toBeVisible();
-    await expect(modal.getByText('Unauthorized')).toBeVisible();
+    await expect(modal.getByText('Your session has expired. Please log back in to continue.')).toBeVisible();
 
-    // Click the "Start New Chat" button in the error modal
-    await modal.getByRole('button', { name: 'Start New Chat' }).click();
+    // Click the "Close" button in the error modal
+    await modal.getByRole('button', { name: 'Close' }).click();
 
-    // Wait for redirect to /chat/new after clicking "Start New Chat"
-    await page.waitForURL(/\/chat\/new/, { timeout: 10000 });
-
-    // Optionally, add further assertions if additional modals or redirects occur
+    // Wait for redirect to /public/login after clicking "Close"
+    await page.waitForURL(/\/public\/login/, { timeout: 10000 });
+    await expect(page).toHaveURL('http://localhost:3000/public/login');
   });
 });

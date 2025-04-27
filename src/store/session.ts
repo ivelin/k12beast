@@ -1,6 +1,7 @@
 // File path: src/store/session.ts
 // Manages session-related state and actions for K12Beast, including problem submission and retries
 // Updated to use sessionError and message bubbles for consistent error handling
+// Added dispatch of supabase:auth event on session termination
 
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
@@ -135,6 +136,12 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
             content: data.error || "An error occurred. Session terminated.",
             renderAs: "markdown",
           });
+          // Dispatch a supabase:auth event to trigger session expiration in layout.tsx
+          window.dispatchEvent(
+            new CustomEvent("supabase:auth", {
+              detail: { event: "SIGNED_OUT", session: null },
+            })
+          );
           return;
         }
         throw new Error(data.error || "Failed to submit problem");
