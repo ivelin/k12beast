@@ -1,6 +1,6 @@
 // File path: src/app/api/auth/user/route.ts
 // API route to fetch user details from Supabase using an auth token
-// Updated to add detailed logging for debugging token validation issues
+// Updated to log detailed Supabase errors and verify project URL for token validation
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -32,11 +32,14 @@ export async function GET(request: NextRequest) {
 
     // Validate token with Supabase
     const { data: { user }, error } = await supabase.auth.getUser(token);
-    console.log(`API [${requestId}]: Supabase getUser response - user: ${user ? user.id : 'none'}, error: ${error ? error.message : 'none'}`);
+    console.log(`API [${requestId}]: Supabase getUser response - user: ${user ? user.id : 'none'}, error: ${error ? error.message : 'none'}, error_status: ${error ? error.status : 'none'}`);
 
     if (error || !user) {
-      console.log(`API [${requestId}]: Invalid or expired token`);
-      return NextResponse.json({ error: error?.message || "Invalid or expired token" }, { status: 401 });
+      console.log(`API [${requestId}]: Invalid or expired token, error details: ${error?.message || 'No user found'}`);
+      return NextResponse.json(
+        { error: error?.message || "Invalid or expired token" },
+        { status: 401 }
+      );
     }
 
     // Return user data
