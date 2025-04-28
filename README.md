@@ -201,6 +201,7 @@ Here are solutions to common issues when setting up K12Beast:
 
 For more information on the tools and technologies used in K12Beast, check out these resources:
 
+- **K12Beast Medium Article**: Learn about the project’s background and motivation at [medium.com/@ivelin.atanasoff.ivanov/k12beast-kids-grok-it-da024ab7a864](https://medium.com/@ivelin.atanasoff.ivanov/k12beast-kids-grok-it-da024ab7a864).
 - **Next.js Documentation**: Learn about Next.js features and APIs at [nextjs.org/docs](https://nextjs.org/docs).
 - **Supabase Documentation**: Explore Supabase features, including database and Edge Functions, at [supabase.com/docs](https://supabase.com/docs).
 - **PostgreSQL Documentation**: For using a local PostgreSQL instance, refer to [postgresql.org/docs](https://www.postgresql.org/docs).
