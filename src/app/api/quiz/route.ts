@@ -1,4 +1,6 @@
-// src/app/api/quiz/route.ts
+// File path: src/app/api/quiz/route.ts
+// Handles POST requests to generate a new quiz for an existing session, ensuring quiz options are clear and unambiguous.
+
 import { NextRequest, NextResponse } from "next/server";
 import { sendXAIRequest } from "@/utils/xaiClient";
 import { handleXAIError } from "@/utils/xaiUtils";
@@ -20,8 +22,9 @@ interface QuizResponse {
   readiness: { confidenceIfCorrect: number; confidenceIfIncorrect: number };
 }
 
+// Define the response format for the xAI API to generate a quiz
 const responseFormat = `Return a valid JSON object with a new quiz problem related to the same topic as the original k12 input problem prompt by the user. 
-  Follow these gudelines:
+  Follow these guidelines:
   1. The quiz must be a multiple-choice question with exactly four distinct and plausible options that test the student's understanding of the topic. 
     - Each option should be labeled with a letter (A, B, C, D) and should be concise.
   2. Provide a brief context or scenario to make the problem engaging. 
@@ -30,8 +33,8 @@ const responseFormat = `Return a valid JSON object with a new quiz problem relat
   engagement with lessons and examples (e.g., fewer example requests might indicate mastery), 
   and inferred skill level and progress (e.g., improvement over time). 
   5. Provide two alternative encouragement messages using emojis, XP points, leveling up, etc.: 
-  one for if the student answers correctly, 
-  and another one for if they answer incorrectly. 
+    one for if the student answers correctly, 
+    and another one for if they answer incorrectly. 
   6. Structure: 
         {
           "problem": "<p>Here's an example problem:</p><p> ... uses the formula <math>...</math> .... Take a look at Figure 1, which shows... Figure 2 shows ...</p>", 
@@ -40,7 +43,7 @@ const responseFormat = `Return a valid JSON object with a new quiz problem relat
                 "title": "Step 1", "content": "Step content with optional MathJax formulas and references to existing figures 1, 2 or even new 3, 4 ..."
               },
               {"title": "Step N", "content": "Step content..."}
-              ], 
+          ], 
           "charts": [
             {
               "id": "chart1",
@@ -51,15 +54,14 @@ const responseFormat = `Return a valid JSON object with a new quiz problem relat
               "config": {}
             }
           ],
-        "answerFormat": "multiple-choice", 
-        "options": ["A: option A with possible formulas and reference to charts from the example problem statement", "B: option B", "C: option C", "D: option D"], 
-        "correctAnswer": "single letter correct option (A, B, C or D)", 
-        "difficulty": "easy|medium|hard", 
-        "encouragementIfCorrect": "Gamified message of if correct ", 
-        "encouragementIfIncorrect": "Gamified message if incorrect using emojis, XP points, leveling up, etc.",
-        "readiness": {"confidenceIfCorrect": 0.92, "confidenceIfIncorrect": 0.75}
+          "answerFormat": "multiple-choice", 
+          "options": ["A: option A with possible formulas and reference to charts from the example problem statement", "B: option B", "C: option C", "D: option D"], 
+          "correctAnswer": "single letter correct option (A, B, C or D)", 
+          "difficulty": "easy|medium|hard", 
+          "encouragementIfCorrect": "Gamified message of if correct ", 
+          "encouragementIfIncorrect": "Gamified message if incorrect using emojis, XP points, leveling up, etc.",
+          "readiness": {"confidenceIfCorrect": 0.92, "confidenceIfIncorrect": 0.75}
         }.
-
   7. The "options" fields must be a single character (A, B, C, D) followed by a colon and the option text.
   8. The "correctAnswer" field must be a single character (A, B, C, D) indicating the correct option.
   9. The "difficulty" field should be one of "easy", "medium", or "hard" based on the complexity of the problem.
@@ -67,8 +69,11 @@ const responseFormat = `Return a valid JSON object with a new quiz problem relat
   11. The "confidenceIfCorrect" and "confidenceIfIncorrect" fields should be numbers between 0 and 1 indicating the AI's confidence that the student would achieve at least a 99% success rate on an end-of-semester test without AI assistance, depending on whether they answer this quiz correctly or incorrectly. 
   12. Ensure all fields are present, especially the "solution" field with at least two steps.
     - The "solution" field must have at least two steps, each with a title and content.
-    - When the solution references charts, it should reference them exaclty as they are referenced in the example problem statement. Not via relative direction like "the chart above" or "the chart below".
-  `;
+    - When the solution references charts, it should reference them exactly as they are referenced in the example problem statement. Not via relative direction like "the chart above" or "the chart below".
+  13. Ensure the correct answer is uniquely correct and unambiguous. The three incorrect options must be plausible but distinctly wrong to anyone with a good understanding of the topic. 
+    - Incorrect options should not be debatable as correct or reflect common misconceptions that could confuse students.
+    - Options must be clearly distinguishable to ensure a clear learning experience for students.
+`;
 
 // Handles POST requests to generate a new quiz for an existing session
 // Sessions are created only when a user submits a new problem via /api/tutor
@@ -207,7 +212,6 @@ export async function POST(req: NextRequest) {
     // Excludes correctAnswer, solution, encouragementIfCorrect, encouragementIfIncorrect, and readiness to prevent
     // leaking sensitive information before the student submits their answer
     // These fields are returned only after validation via /api/validate
-    
     return NextResponse.json(
       {
         problem: content.problem,

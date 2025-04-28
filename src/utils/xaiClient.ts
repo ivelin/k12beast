@@ -114,7 +114,9 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
             - "id": Unique string identifier (e.g., "chart1").
             - "format": "plotly" for Plotly charts or "reactflow" for React Flow diagrams.
             - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for React Flow, an object with "nodes" (array of nodes) and "edges" (array of edges).
-          - For all React Flow diagrams (including flowcharts and sequence diagrams), keep it simple and use vertically aligned nodes to represent steps or actors, and edges to represent transitions or interactions.
+          - For all React Flow diagrams (including flowcharts and sequence diagrams):
+            - keep it simple and use vertically aligned nodes to represent steps or actors, and edges to represent transitions or interactions.
+            - Make sure the edges have clearly visible direction arrows to indicate the flow of the process.
           - Example React Flow diagram with title (vertical orientation):
               {
                 "id": "diagram1",
