@@ -1,4 +1,8 @@
-// src/app/public/signup/page.tsx
+// File path: src/app/public/signup/page.tsx
+// Handles sign-up flow with Supabase Auth
+// Includes eye icon to toggle password visibility
+// No client-side email or password validation
+
 "use client";
 
 import { useState } from "react";
@@ -6,25 +10,20 @@ import supabase from "../../../supabase/browserClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSignUp = async () => {
     setMessage("");
     setLoading(true);
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
-
-    if (!trimmedEmail || !trimmedPassword) {
-      setMessage("Please enter both email and password.");
-      setLoading(false);
-      return;
-    }
 
     try {
       const { error } = await supabase.auth.signUp({
@@ -53,8 +52,6 @@ export default function SignUp() {
       setLoading(false);
     }
   };
-
-  const isFormValid = email.trim().length > 0 && password.trim().length > 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -85,21 +82,35 @@ export default function SignUp() {
             <Label htmlFor="password" className="block text-sm font-medium text-foreground">
               Password
             </Label>
-            <Input
-              type="password"
-              id="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1"
-              required
-              disabled={loading}
-            />
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 pr-10"
+                required
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <Eye className="h-5 w-5 text-muted-foreground" />
+                )}
+              </button>
+            </div>
           </div>
           <Button
             onClick={handleSignUp}
             className="w-full"
-            disabled={loading || !isFormValid}
+            disabled={loading}
           >
             {loading ? (
               <>
