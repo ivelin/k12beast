@@ -273,6 +273,23 @@ button[type="submit"]:hover {
   background-color: hsl(var(--muted)) !important;
 }
 
+/* Ensure Plotly chart text doesn't shrink below a readable size */
+.plotly-svg svg text {
+  font-size: max(16px, 1rem) !important; /* Enforce minimum font size more aggressively */
+}
+
+/* Increase Plotly chart size on mobile */
+@media (max-width: 640px) {
+  .plotly-svg {
+    min-height: 450px !important; /* Increase minimum height to make the chart larger on mobile */
+    width: 100% !important;
+  }
+  .plotly-svg svg {
+    min-height: 450px !important; /* Ensure the SVG itself respects the minimum height */
+    width: 100% !important;
+  }
+}
+
 /* Essential animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateX(-20px); }

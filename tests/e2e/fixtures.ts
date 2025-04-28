@@ -1,6 +1,9 @@
-// tests/e2e/fixtures.ts
-import { test as base, Page } from "@playwright/test";
+// File path: tests/e2e/fixtures.ts
+// Extends Playwright test with login/logout fixtures for consistent authentication
+
+import { test as base, Page, BrowserContext } from "@playwright/test";
 import * as dotenv from 'dotenv';
+import { loginUser } from './utils';
 
 // Load environment variables from .env.local
 dotenv.config({ path: '.env.local' });
@@ -9,75 +12,33 @@ dotenv.config({ path: '.env.local' });
 export const test = base.extend<{
   login: () => Promise<void>;
   logout: () => Promise<void>;
+  context: BrowserContext;
 }>({
-  login: async ({ page }, use) => {
-    const testUserEmail = process.env.TEST_USER_EMAIL;
-    const testUserPassword = process.env.TEST_USER_PASSWORD;
+  context: async ({ browser }, use) => {
+    // Provides a BrowserContext for the test; does not manage pages directly
+    const context = await browser.newContext({
+      storageState: 'playwright/.auth/user.json',
+    });
+    await use(context);
+    // Cleanup: Clear cookies and local storage, but do not close the context
+    await context.clearCookies();
+    await context.addInitScript(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  },
 
-    if (!testUserEmail) {
-      throw new Error('TEST_USER_EMAIL environment variable is not set. Please provide the email for the test user in .env.local.');
-    }
-    if (!testUserPassword) {
-      throw new Error('TEST_USER_PASSWORD environment variable is not set. Please provide the password for the test user in .env.local.');
-    }
+  page: async ({ context }, use) => {
+    // Provides a single Page within the provided BrowserContext
+    const page = await context.newPage();
+    await use(page);
+    // Lifecycle is managed by the test or Playwright test runner
+  },
 
+  login: async ({ page, context }, use) => {
     const loginFn = async () => {
-      // Navigate to the login page
-      await page.goto("http://localhost:3000/public/login", { timeout: 5000 });
-
-      // Check if already logged in (redirected to /chat/new)
-      const currentUrl = page.url();
-      if (currentUrl.includes("/chat/new")) {
-        console.log("User is already logged in (redirected to /chat/new). Skipping login.");
-        return; // User is already authenticated, no need to log in again
-      }
-
-      // Ensure the page has fully loaded
-      await page.waitForLoadState("load");
-
-      // Wait for the email input to be visible
-      const emailInput = page.locator('#email');
-      try {
-        await emailInput.waitFor({ state: "visible", timeout: 5000 });
-      } catch (error) {
-        console.log("Email input not found. Current URL:", page.url());
-        console.log("Page content:", await page.content());
-        throw new Error("Email input not found on login page");
-      }
-
-      // Wait for the password input to be visible
-      const passwordInput = page.locator('#password');
-      try {
-        await passwordInput.waitFor({ state: "visible", timeout: 5000 });
-      } catch (error) {
-        console.log("Password input not found. Current URL:", page.url());
-        console.log("Page content:", await page.content());
-        throw new Error("Password input not found on login page");
-      }
-
-      // Fill in the login form
-      await emailInput.fill(testUserEmail);
-      await passwordInput.fill(testUserPassword);
-      await page.click('button[type="submit"]');
-
-      // Wait for redirect to /chat/new/
-      try {
-        await page.waitForURL("http://localhost:3000/chat/new", { timeout: 5000 });
-      } catch (error) {
-        // Check for login error message
-        const errorMessage = await page.locator('text=Invalid email or password').textContent({ timeout: 5000 }).catch(() => null);
-        if (errorMessage) {
-          throw new Error(`Login failed: ${errorMessage}. Please check TEST_USER_EMAIL and TEST_USER_PASSWORD in .env.local.`);
-        }
-
-        // If no error message, log the page state and throw the original error
-        console.log('Current URL after login attempt:', page.url());
-        console.log('Page content after login attempt:', await page.content());
-        throw new Error(`Failed to redirect to /chat/new/: ${error.message}`);
-      }
-
-      // Save the authenticated state
-      await page.context().storageState({ path: "playwright/.auth/user.json" });
+      // Use the utility function to perform the login
+      await loginUser(page, context);
     };
 
     await use(loginFn);
@@ -85,21 +46,21 @@ export const test = base.extend<{
 
   logout: async ({ page }, use) => {
     const logoutFn = async () => {
-      await page.goto("http://localhost:3000/logout", { timeout: 5000 });
-      try {
-        await page.waitForURL("http://localhost:3000/public/login", { timeout: 5000 });
-      } catch (error) {
-        console.log("Logout redirect failed. Current URL:", page.url());
-        try {
-          console.log("Page content:", await page.content());
-        } catch (contentError) {
-          console.log("Failed to access page content (context may be closed):", contentError.message);
-        }
-        // Fallback: Navigate to /public/login manually if redirect fails
-        await page.goto("http://localhost:3000/public/login", { timeout: 5000 });
+      // Ensure the page is valid
+      if (!page) {
+        throw new Error('Page object is not provided to logout fixture');
       }
-      // Ensure the page has fully loaded
-      await page.waitForLoadState("load");
+
+      console.log("Navigating to /logout...");
+      await page.goto("http://localhost:3000/logout", { timeout: 30000 });
+
+      // Verify logout confirmation message
+      console.log("Verifying logout confirmation message...");
+      await page.locator('text=You have been successfully logged out.').waitFor({ state: 'visible', timeout: 30000 });
+      console.log("page URL:", await page.url());
+
+      // Stay on the /logout page, do not navigate to /public/login
+      console.log("Remaining on /logout page after logout.");
     };
 
     await use(logoutFn);

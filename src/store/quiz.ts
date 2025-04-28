@@ -1,14 +1,20 @@
-// src/store/quiz.ts
+// File path: src/store/quiz.ts
+// Manages quiz-related state and actions for K12Beast, including example and quiz requests
+// Updated to delay step change until quiz data is loaded
+// Updated to handle network errors consistently with session.ts
+
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
 import { AppState, Quiz, QuizFeedback, Message } from "./types";
 import { formatQuizFeedbackMessage } from "@/utils/quizUtils";
+import { formatQuizProblemMessage } from "@/utils/quizUtils";
 
 export interface QuizState {
   quiz: Quiz | null;
   quizAnswer: string;
   quizFeedback: QuizFeedback | null;
-  correctAnswer: string | null; // Add correctAnswer to the state
+  correctAnswer: string | null; // Tracks the correct answer for quiz feedback
+  validationError: string | null; // Tracks validation error message for UI display
   handleExamplesRequest: () => Promise<void>;
   handleQuizSubmit: () => Promise<void>;
   handleValidate: (answer: string, quiz: Quiz) => Promise<void>;
@@ -18,14 +24,18 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
   quiz: null,
   quizAnswer: "",
   quizFeedback: null,
-  correctAnswer: null, // Initialize correctAnswer
+  correctAnswer: null,
+  validationError: null,
   handleExamplesRequest: async () => {
     const { problem, imageUrls, sessionId, addMessage, loading, sessionTerminated } = get();
     if (loading || sessionTerminated) return;
     set({ loading: true });
     try {
       addMessage({ role: "user", content: "Request Example", renderAs: "markdown" });
-      const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
       if (!token) throw new Error("Failed to request examples: Authentication required.");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -33,7 +43,7 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         Authorization: `Bearer ${token}`,
       };
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
       try {
         const res = await fetch("/api/examples", {
           method: "POST",
@@ -44,27 +54,63 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         clearTimeout(timeoutId);
         if (!res.ok) {
           const errorData = await res.json();
-          throw new Error(errorData.error || "Oops! Something went wrong while fetching an example. Let's try again!");
+          throw new Error(
+            errorData.error || "Oops! Something went wrong while fetching an example. Let's try again!"
+          );
         }
         const data = await res.json();
+        if (!data || !data.problem) {
+          throw new Error("No example response returned from xAI API");
+        }
+
         set({ examples: data, step: "examples" });
         addMessage({
           role: "assistant",
           content: `<p><strong>Example:</strong> ${data.problem}</p><p><strong>Solution:</strong></p><ul>${data.solution
             .map((s: any) => `<li><strong>${s.title}:</strong> ${s.content}</li>`)
             .join("")}</ul>`,
+          charts: data.charts,
           renderAs: "html",
         });
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") {
-          throw new Error("Oops! The AI had a little glitch and was snoozing. Let's try again in a moment!");
+          throw new Error("Oops! The request timed out. Please check your connection and try again!");
+        }
+        if (err instanceof TypeError && err.message.includes("NetworkError")) {
+          throw new Error(
+            "Oops! We couldn't reach the server. Please check your internet connection and try again in a few moments."
+          );
         }
         throw err;
       }
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Oops! Something went wrong while fetching an example. Let's try again!";
+      let errorMsg: string;
+      let isRetryable = false;
+      if (err instanceof Error) {
+        // Treat all 400+ and 500+ errors, NetworkError, and "Failed to fetch" as retryable, except specific non-retryable cases
+        if (
+          (err.message.includes("NetworkError") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.match(/^(4|5)\d{2}/) ||
+            err.message.includes("Service Unavailable") ||
+            err.message.includes("Too Many Requests")) &&
+          !err.message.includes("K12-related")
+        ) {
+          errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
+          isRetryable = true;
+        } else {
+          errorMsg = err.message; // Keep specific error messages for non-retryable errors
+        }
+      } else {
+        errorMsg = "Oops! Something went wrong while fetching an example. Please try again in a few moments. If the issue persists, start a new chat.";
+        isRetryable = true;
+      }
       console.error("Error in handleExamplesRequest:", err);
-      set({ error: errorMsg, showErrorPopup: true });
+      addMessage({
+        role: "assistant",
+        content: errorMsg,
+        renderAs: "markdown",
+      });
     } finally {
       set({ loading: false });
     }
@@ -72,11 +118,14 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
   handleQuizSubmit: async () => {
     const { problem, imageUrls, sessionId, addMessage, loading, sessionTerminated } = get();
     if (loading || sessionTerminated) return;
-    set({ loading: true, step: "quizzes" });
+    set({ loading: true, validationError: null }); // Do not set step: "quizzes" yet
     try {
       if (!sessionId) throw new Error("No active session. Please start a new chat session.");
       addMessage({ role: "user", content: "Take a Quiz", renderAs: "markdown" });
-      const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
       if (!token) throw new Error("Failed to fetch quiz: Authentication required.");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -86,20 +135,47 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers,
-        body: JSON.stringify({ problem, images: imageUrls }),
+        body: "",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch quiz. Please try again.");
-      set({ quiz: data, quizAnswer: "", quizFeedback: null, correctAnswer: null }); // Reset correctAnswer
+      set({ quiz: data, quizAnswer: "", quizFeedback: null, correctAnswer: null, step: "quizzes" }); // Set step after successful fetch
+      const quizHtml = formatQuizProblemMessage(data);
       addMessage({
         role: "assistant",
-        content: `<p><strong>Quiz:</strong></p><p>${data.problem}</p>`,
+        content: quizHtml,
+        charts: data.charts,
         renderAs: "html",
       });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to fetch quiz. Please try again.";
+      let errorMsg: string;
+      let isRetryable = false;
+      if (err instanceof Error) {
+        // Treat all 400+ and 500+ errors, NetworkError, and "Failed to fetch" as retryable, except specific non-retryable cases
+        if (
+          (err.message.includes("NetworkError") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.match(/^(4|5)\d{2}/) ||
+            err.message.includes("Service Unavailable") ||
+            err.message.includes("Too Many Requests")) &&
+          !err.message.includes("K12-related")
+        ) {
+          errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
+          isRetryable = true;
+        } else {
+          errorMsg = err.message; // Keep specific error messages for non-retryable errors
+        }
+      } else {
+        errorMsg = "Oops! Something went wrong while fetching a quiz. Please try again in a few moments. If the issue persists, start a new chat.";
+        isRetryable = true;
+      }
       console.error("Error in handleQuizSubmit:", err);
-      set({ error: errorMsg, showErrorPopup: true });
+      addMessage({
+        role: "assistant",
+        content: errorMsg,
+        renderAs: "markdown",
+      });
+      set({ step: "lesson", quiz: null }); // Revert to lesson step on error
     } finally {
       set({ loading: false });
     }
@@ -107,9 +183,12 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
   handleValidate: async (answer, quiz) => {
     const { sessionId, addMessage, loading, sessionTerminated } = get();
     if (loading || sessionTerminated) return;
-    set({ loading: true });
+    set({ loading: true, validationError: null });
     try {
-      const token = document.cookie.split("; ").find((row) => row.startsWith("supabase-auth-token="))?.split("=")[1];
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("supabase-auth-token="))
+        ?.split("=")[1];
       if (!token) throw new Error("Failed to validate quiz: Authentication required.");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -127,18 +206,48 @@ export const createQuizStore: StateCreator<AppState, [], [], QuizState> = (set, 
         const errorMsg = (data as any).error || "Failed to validate quiz";
         throw new Error(errorMsg);
       }
-      // Update the quiz with the correct answer from the validate response
       const updatedQuiz = { ...quiz, correctAnswer: data.correctAnswer };
       addMessage({
         role: "assistant",
         content: formatQuizFeedbackMessage(updatedQuiz, answer, data),
+        charts: data.charts,
         renderAs: "html",
       });
-      set({ quizAnswer: answer, quizFeedback: data, correctAnswer: data.correctAnswer }); // Store correctAnswer
+      set({
+        quizAnswer: answer,
+        quizFeedback: data,
+        correctAnswer: data.correctAnswer,
+        validationError: null,
+      });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to validate quiz answer. Please try again.";
+      let errorMsg: string;
+      let isRetryable = false;
+      if (err instanceof Error) {
+        // Treat all 400+ and 500+ errors, NetworkError, and "Failed to fetch" as retryable, except specific non-retryable cases
+        if (
+          (err.message.includes("NetworkError") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.match(/^(4|5)\d{2}/) ||
+            err.message.includes("Service Unavailable") ||
+            err.message.includes("Too Many Requests")) &&
+          !err.message.includes("K12-related")
+        ) {
+          errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
+          isRetryable = true;
+        } else {
+          errorMsg = err.message; // Keep specific error messages for non-retryable errors
+        }
+      } else {
+        errorMsg = "Oops! Something went wrong while validating your answer. Please try again in a few moments. If the issue persists, start a new chat.";
+        isRetryable = true;
+      }
       console.error("Error in handleValidate:", err);
-      set({ error: errorMsg, showErrorPopup: true });
+      set({ validationError: errorMsg });
+      addMessage({
+        role: "assistant",
+        content: errorMsg,
+        renderAs: "markdown",
+      });
     } finally {
       set({ loading: false });
     }

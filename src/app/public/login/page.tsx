@@ -1,5 +1,7 @@
 // File path: src/app/public/login/page.tsx
-// Updated to prevent unexpected "Forgot Password" dialog on iPhone by validating click events and improving autofill handling
+// Handles login and sign-up flows with Supabase Auth
+// Includes eye icon to toggle password visibility in main form and reset dialog
+// No client-side email or password validation
 
 "use client";
 
@@ -8,7 +10,7 @@ import supabase from "../../../supabase/browserClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Utility to debounce a function
@@ -29,6 +31,7 @@ export default function Login() {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetMessage, setResetMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const emailInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
@@ -63,13 +66,6 @@ export default function Login() {
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
 
-    if (!trimmedEmail || !trimmedPassword) {
-      console.error("Validation failed: Email or password is empty", { email: trimmedEmail, password: trimmedPassword });
-      setMessage("Please enter both email and password.");
-      setLoading(false);
-      return;
-    }
-
     try {
       if (isSignUp) {
         console.log("Attempting sign-up with email:", trimmedEmail);
@@ -82,7 +78,7 @@ export default function Login() {
           if (error.message.includes("already registered")) {
             setMessage("This email is already registered. Please log in or use a different email.");
           } else if (error.message.includes("For security purposes")) {
-            setMessage("You’ve recently tried signing up. Please wait a moment.");
+            setMessage("Too many sign-up attempts. Please wait a few minutes and try again.");
           } else {
             setMessage(error.message || "Sign-up error. Please try again.");
           }
@@ -133,18 +129,17 @@ export default function Login() {
     setResetMessage("");
 
     const trimmedResetEmail = resetEmail.trim();
-    if (!trimmedResetEmail) {
-      setResetMessage("Please enter your email.");
-      setLoading(false);
-      return;
-    }
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(trimmedResetEmail, {
         redirectTo: `${window.location.origin}/public/reset-password`,
       });
       if (error) {
-        setResetMessage(error.message || "Failed to send reset email. Please try again.");
+        if (error.message.includes("email rate limit exceeded")) {
+          setResetMessage("Too many reset attempts. Please wait a few minutes and try again.");
+        } else {
+          setResetMessage(error.message || "Failed to send reset email. Please try again.");
+        }
         setLoading(false);
         return;
       }
@@ -163,7 +158,8 @@ export default function Login() {
     console.log("Forgot Password button clicked:", {
       eventType: e.type,
       target: e.currentTarget.textContent,
-      isTouchEvent: e.nativeEvent instanceof TouchEvent,
+      // Safely check for TouchEvent to avoid ReferenceError
+      isTouchEvent: typeof TouchEvent !== "undefined" && e.nativeEvent instanceof TouchEvent,
     });
 
     // Only open dialog for intentional clicks (ignore autofill or programmatic triggers)
@@ -178,9 +174,6 @@ export default function Login() {
     console.log("Debounced reset dialog triggered");
     setIsResetDialogOpen(true);
   }, 300);
-
-  const isFormValid = email.trim().length > 0 && password.trim().length > 0;
-  const isResetFormValid = resetEmail.trim().length > 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -210,18 +203,32 @@ export default function Login() {
             <Label htmlFor="password" className="block text-sm font-medium text-foreground">
               Password
             </Label>
-            <Input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onInput={(e) => setPassword(e.currentTarget.value)}
-              ref={passwordInputRef}
-              className="mt-1"
-              required
-              disabled={loading}
-              autoComplete="current-password"
-            />
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onInput={(e) => setPassword(e.currentTarget.value)}
+                ref={passwordInputRef}
+                className="mt-1 pr-10"
+                required
+                disabled={loading}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <Eye className="h-5 w-5 text-muted-foreground" />
+                )}
+              </button>
+            </div>
             {!isSignUp && (
               <button
                 type="button"
@@ -234,11 +241,15 @@ export default function Login() {
             )}
           </div>
           {message && (
-            <p className={`text-sm ${message.includes("successful") ? "text-green-500" : "text-destructive"}`}>
+            <p
+              className={`text-sm ${
+                message.includes("successful") ? "text-green-500" : "text-destructive"
+              }`}
+            >
               {message}
             </p>
           )}
-          <Button type="submit" className="w-full" disabled={loading || !isFormValid}>
+          <Button type="submit" className="w-full" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -281,11 +292,15 @@ export default function Login() {
               />
             </div>
             {resetMessage && (
-              <p className={`text-sm ${resetMessage.includes("sent") ? "text-green-500" : "text-destructive"}`}>
+              <p
+                className={`text-sm ${
+                  resetMessage.includes("sent") ? "text-green-500" : "text-destructive"
+                }`}
+              >
                 {resetMessage}
               </p>
             )}
-            <Button type="submit" className="w-full" disabled={loading || !isResetFormValid}>
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

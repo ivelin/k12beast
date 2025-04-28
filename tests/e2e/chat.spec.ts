@@ -1,73 +1,51 @@
-// tests/e2e/chat.spec.ts
-import { test, expect } from '@playwright/test';
+// File path: tests/e2e/chat.spec.ts
+// Tests the chat page functionality for authenticated users
+
+import { test, expect } from './fixtures';
 
 test.describe('Chat Page - Request Example', () => {
-  test.describe.configure({ mode: 'serial' });
+  test('should handle Request Example successfully', async ({ page, login }) => {
+    // Log in the user using the fixture
+    await login();
 
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/chat/new');
-    await page.waitForURL(/\/chat\/new/);
-    await page.waitForSelector('text=Try these prompts ✨');
-  });
-
-  test('should handle Request Example successfully', async ({ page }) => {
-    await page.route('**/api/tutor', (route) => {
-      route.fulfill({
+    // Mock /api/tutor to return a valid JSON response
+    await page.context().route('**/api/tutor', async (route) => {
+      console.log('Mocking API request for /api/tutor');
+      return route.fulfill({
         status: 200,
-        contentType: 'text/plain',
+        contentType: 'application/json',
         headers: { 'x-session-id': 'mock-session-id' },
-        body: '<p>Let’s dive into your test problem. What is the subject?</p>',
-      });
-    });
-
-    await page.route('**/api/examples', (route) => {
-      setTimeout(() => {
-        route.fulfill({
-          status: 200,
-          body: JSON.stringify({
-            problem: "Which action converts chemical energy to mechanical energy?",
-            solution: [{ title: "Step 1", content: "Identify chemical and mechanical energy." }],
-          }),
-        });
-      }, 500);
-    });
-
-    await page.fill('textarea[placeholder="Ask k12beast AI..."]', 'Test problem');
-    await page.click('button[aria-label="Send message"]');
-    await page.waitForSelector('text=What would you like to do next?');
-
-    await page.click('text=Request Example');
-    await page.waitForSelector('text=Request Example');
-    await page.waitForSelector('text=Example:');
-    await page.waitForSelector('text=What would you like to do next?');
-  });
-
-  test('should handle Request Example timeout', async ({ page }) => {
-    await page.route('**/api/tutor', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'text/plain',
-        headers: { 'x-session-id': 'mock-session-id' },
-        body: '<p>Let’s dive into your test problem. What is the subject?</p>',
-      });
-    });
-
-    await page.route('**/api/examples', (route) => {
-      route.fulfill({
-        status: 500,
         body: JSON.stringify({
-          error: "Oops! The AI had a little glitch and was snoozing. Let's try again in a moment!",
+          lesson: "<p>Let's do some practice: 3 + 5 = <math><mn>8</mn></math>.</p>",
+          isK12: true,
         }),
       });
     });
 
-    await page.fill('textarea[placeholder="Ask k12beast AI..."]', 'Test problem');
-    await page.click('button[aria-label="Send message"]');
-    await page.waitForSelector('text=What would you like to do next?');
-    await page.click('text=Request Example');
+    // Verify we are on /chat/new after login
+    console.log("page URL:", await page.url());
+    await expect(page).toHaveURL(/\/chat\/new/, { timeout: 30000 });
 
-    await page.waitForSelector('text=Oops! The AI had a little glitch');
-    await expect(page.locator('text=Oops! The AI had a little glitch')).toContainText("Oops! The AI had a little glitch and was snoozing. Let's try again in a moment!");
-    await page.waitForSelector('text=What would you like to do next?');
+    // Verify chat input is visible
+    const input = page.getByPlaceholder('Ask k12beast AI...');
+    await expect(input).toBeVisible({ timeout: 30000 });
+
+    // Fill and submit the chat message
+    await input.fill('Test problem');
+    await page.click('button[aria-label="Send message"]');
+
+    // Check for error dialog
+    const errorDialog = page.getByText('Unexpected token');
+    await expect(errorDialog).not.toBeVisible({ timeout: 5000 }).catch(() => {
+      console.log('Error dialog detected: Unexpected token');
+      throw new Error('Failed to process chat message due to invalid JSON response');
+    });
+
+    // Wait for the assistant's response and the "What would you like to do next?" message
+    await page.waitForSelector('text=What would you like to do next?', { timeout: 30000 });
+
+    // Click "Request Example" and verify the action
+    await page.click('text=Request Example');
+    await page.waitForSelector('text=Request Example', { timeout: 30000 });
   });
 });

@@ -1,6 +1,33 @@
 // src/utils/quizUtils.ts
 import { Quiz, QuizFeedback } from "@/store/types";
 
+
+/**
+ * Formats the quiz problem message as HTML for consistent rendering.
+ * @param quiz - The quiz object containing problem and options
+ * @returns The formatted HTML string for the feedback message
+ */
+export function formatQuizProblemMessage(
+  quiz: Quiz,
+): string {
+    // Debugging logs to inspect types and values
+    console.log("formatQuizProblemMessage: problem:", quiz.problem, "type:", typeof quiz.problem);
+    console.log("formatQuizProblemMessage: quiz.options:", quiz.options, "types:", quiz.options.map(o => typeof o));
+
+    const quizHtml = 
+      `<strong>Quiz:</strong><br>
+      <p>${quiz.problem}</p>
+      <p><strong>Choose an Answer:</strong></p>
+      <ul>
+        ${quiz.options.map((option, index) => `<li>${option}</li>`).join("")}
+      </ul>
+      `;  
+ 
+    console.log("formatQuizProblemMessage: HTML", {quizHtml});
+
+  return quizHtml
+}
+
 /**
  * Formats the quiz feedback message as HTML for consistent rendering.
  * @param quiz - The quiz object containing options and correct answer
@@ -31,8 +58,8 @@ export function formatQuizFeedbackMessage(
       const correctAnswerStr = String(quiz.correctAnswer);
       const answerStr = String(answer);
 
-      const isCorrect = optionStr === correctAnswerStr;
-      const isUserAnswer = optionStr === answerStr;
+      const isCorrect = optionStr.startsWith(correctAnswerStr);
+      const isUserAnswer = optionStr.startsWith(answerStr);
       
       // Debugging comparison results
       console.log(`formatQuizFeedbackMessage: Comparing option "${optionStr}" (type: ${typeof optionStr}) with correctAnswer "${correctAnswerStr}" (type: ${typeof correctAnswerStr}) - isCorrect: ${isCorrect}`);
@@ -45,9 +72,9 @@ export function formatQuizFeedbackMessage(
         .filter(Boolean)
         .join(" ");
       return `<li class="${classNames}">${o}${
-        isUserAnswer ? ' <span class="answer-tag">(Your answer)</span>' : ""
+        isUserAnswer ? ' <strong>(Your answer)</strong>' : ""
       }${
-        isCorrect ? ' <span class="correct-tag">(Correct answer)</span>' : ""
+        isCorrect ? ' <strong>(Correct answer)</strong>' : ""
       }</li>`;
     })
     .join("");

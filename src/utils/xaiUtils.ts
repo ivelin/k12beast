@@ -2,8 +2,9 @@
 import { NextResponse } from "next/server";
 
 export function validateRequestInputs(problem?: string, images?: string[]) {
+  console.log("validateRequestInputs inputs:", { problem, images }); // Log inputs for debugging
   if (!problem && (!images || images.length === 0)) {
-    throw new Error("Missing problem or images");
+    throw new Error(`Missing problem or images: \n problem: ${problem}, \n images: ${images}`);
   }
 }
 

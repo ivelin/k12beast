@@ -1,10 +1,16 @@
-// src/hooks/use-auto-scroll.ts
+// File path: src/hooks/use-auto-scroll.ts
+// Hook to auto-scroll to the bottom of a chat container
+
 import { useEffect, useRef, useState } from "react";
 
 const ACTIVATION_THRESHOLD = 50;
 const MIN_SCROLL_UP_THRESHOLD = 10;
 
-export function useAutoScroll(dependencies: React.DependencyList) {
+interface UseAutoScrollOptions {
+  messagesLength: number; // Example dependency passed to the hook
+}
+
+export function useAutoScroll({ messagesLength }: UseAutoScrollOptions) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousScrollTop = useRef<number | null>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -43,7 +49,7 @@ export function useAutoScroll(dependencies: React.DependencyList) {
 
   useEffect(() => {
     if (shouldAutoScroll) scrollToBottom();
-  }, dependencies);
+  }, [messagesLength, shouldAutoScroll]); // Explicitly list dependencies
 
   return {
     containerRef,

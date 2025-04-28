@@ -50,8 +50,9 @@ describe('POST /api/tutor', () => {
 
     // Assertions
     expect(response.status).toBe(200);
-    const responseText = await response.text();
-    expect(responseText).toBe('<p>The answer to your question is simple: 4!</p>');
+    const responseBody = await response.json();
+    expect(responseBody.isK12).toBe(true);
+    expect(responseBody.lesson).toBe('<p>The answer to your question is simple: 4!</p>');
     expect(response.headers.get('x-session-id')).toBe('mock-session-id');
     expect(jest.requireMock('../../src/supabase/serverClient').upsert)
       .toHaveBeenCalledWith(
@@ -65,8 +66,11 @@ describe('POST /api/tutor', () => {
     expect(jest.requireMock('../../src/supabase/serverClient').update)
       .toHaveBeenCalledWith(
         expect.objectContaining({
-          lesson: '<p>The answer to your question is simple: 4!</p>',
-        })
+          lesson: JSON.stringify({
+            isK12: true,
+            lesson: '<p>The answer to your question is simple: 4!</p>',
+          }),
+          updated_at: expect.any(String),        })
       );
   });
 });

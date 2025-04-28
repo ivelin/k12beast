@@ -1,28 +1,25 @@
-/* src/app/chat/QuizSection.tsx */
+// File path: src/app/chat/QuizSection.tsx
+// Displays the quiz UI for K12Beast, allowing users to answer multiple-choice questions
+// Updated to remove onQuizUpdate and associated useEffect to prevent infinite loop
+
 "use client";
 
 import { useEffect, useState } from "react";
 import useAppStore from "@/store";
 import { Quiz } from "@/store/types";
 
-// Define the type for the onQuizUpdate prop
-interface QuizUpdate {
-  type: string;
-  content: string;
-}
-
-export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: QuizUpdate) => void }) {
+export default function QuizSection() {
   const {
     step,
     sessionId,
     quiz,
     setStep,
-    setError,
     handleQuizSubmit,
     handleValidate,
     quizAnswer,
     quizFeedback,
     loading,
+    validationError,
   } = useAppStore();
 
   const [hasFetchedQuiz, setHasFetchedQuiz] = useState(false);
@@ -37,44 +34,26 @@ export default function QuizSection({ onQuizUpdate }: { onQuizUpdate: (update: Q
     }
   }, [step, quiz, hasFetchedQuiz, handleQuizSubmit]);
 
-  useEffect(() => {
-    if (quiz) {
-      console.log("QuizSection: Quiz object loaded:", quiz);
-      onQuizUpdate({ type: "quiz", content: quiz.problem });
-    } else {
-      console.warn("QuizSection: No quiz object available");
-    }
-  }, [quiz, onQuizUpdate]);
+  // Removed useEffect for onQuizUpdate, as quiz message is handled in handleQuizSubmit
 
   const handleSubmitAnswer = async () => {
-    if (!quiz) return; // Additional runtime check for safety
-    try {
-      await handleValidate(answer, quiz);
-      const updatedFeedback = useAppStore.getState().quizFeedback;
-      if (updatedFeedback) {
-        setStep("lesson"); // Transition to lesson step to show feedback in chat
-      } else {
-        console.error("No feedback received after validation");
-        setError("Failed to validate quiz answer. Please try again.");
-      }
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to submit quiz answer";
-      console.error("Error submitting quiz answer:", err);
-      setError(errorMsg);
+    if (!quiz) return;
+    await handleValidate(answer, quiz);
+    const updatedFeedback = useAppStore.getState().quizFeedback;
+    if (updatedFeedback) {
+      setStep("lesson");
+    } else {
+      console.error("No feedback received after validation");
     }
   };
 
-  // Hide the QuizSection if step is not "quizzes" or if quizFeedback is present
   if (step !== "quizzes" || !quiz) return null;
 
   return (
     <div className="mb-4 flex flex-col items-center">
-      {useAppStore.getState().error && (
-        <div className="text-red-500">{useAppStore.getState().error}</div>
-      )}
       {quiz.answerFormat === "multiple-choice" && quiz.options && quiz.options.length > 0 ? (
         <div className="w-full max-w-md">
-          {quiz.options.map((option: string, index: number) => {
+          {["A", "B", "C", "D"].map((option: string, index: number) => {
             const isUserAnswer = option === answer;
             return (
               <div key={index} className="my-2 flex items-center">

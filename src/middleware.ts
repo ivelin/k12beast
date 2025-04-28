@@ -1,6 +1,9 @@
-// src/middleware.ts
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+// File path: src/middleware.ts
+// Middleware to handle authentication and public route access for K12Beast
+// Updated to validate tokens directly with Supabase client for debugging project mismatch
+
+import { NextResponse, NextRequest } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { v4 as uuidv4 } from "uuid";
 
 const recentRequests = new Set<string>();
@@ -50,47 +53,47 @@ export async function middleware(request: NextRequest) {
   }
 
   const cookies = request.headers.get("cookie") || "";
+  console.log(`Middleware [${requestId}]: Raw cookie header - ${cookies}`);
   let token = getCookie("supabase-auth-token", cookies);
-  console.log(`Middleware [${requestId}]: Token from cookie -`, token || "none");
+  console.log(`Middleware [${requestId}]: Token from cookie - ${token ? token.slice(0, 20) + '...' : 'none'}`);
 
   if (!token) {
     const authHeader = request.headers.get("Authorization");
     if (authHeader?.startsWith("Bearer ")) {
       token = authHeader.slice(7);
-      console.log(`Middleware [${requestId}]: Token from Authorization -`, token);
+      console.log(`Middleware [${requestId}]: Token from Authorization - ${token.slice(0, 20) + '...'}`);
     }
   }
 
   let user = null;
   if (token) {
     try {
-      const res = await fetch(`${request.nextUrl.origin}/api/auth/user`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      console.log(`Middleware [${requestId}]: Auth API status -`, res.status);
-      if (res.ok) {
-        user = await res.json();
-        console.log(`Middleware [${requestId}]: User fetched -`, user.email || "no email");
-      } else if (res.status === 401) {
-        console.log(`Middleware [${requestId}]: 401 Unauthorized, redirect to /public/login`);
-        const loginUrl = new URL("/public/login", request.url);
-        loginUrl.searchParams.set("redirect", pathname);
-        const response = NextResponse.redirect(loginUrl);
-        response.headers.set("x-request-id", requestId);
-        return response;
+      // Initialize Supabase client directly
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      console.log(`Middleware [${requestId}]: Supabase URL - ${process.env.NEXT_PUBLIC_SUPABASE_URL}`);
+      console.log(`Middleware [${requestId}]: Service role key - ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set (last 5 chars: ' + process.env.SUPABASE_SERVICE_ROLE_KEY.slice(-5) + ')' : 'missing'}`);
+
+      // Validate token with Supabase
+      const { data: { user: fetchedUser }, error } = await supabase.auth.getUser(token);
+      console.log(`Middleware [${requestId}]: Supabase getUser response - user: ${fetchedUser ? fetchedUser.id : 'none'}, error: ${error ? error.message : 'none'}, error_status: ${error ? error.status : 'none'}`);
+
+      if (error || !fetchedUser) {
+        console.log(`Middleware [${requestId}]: Invalid or expired token, error details: ${error?.message || 'No user found'}`);
       } else {
-        console.log(`Middleware [${requestId}]: Auth API failed -`, res.statusText);
-        user = null;
+        user = fetchedUser;
+        console.log(`Middleware [${requestId}]: User fetched - ${user.email || 'no email'}`);
       }
     } catch (error) {
-      console.error(`Middleware [${requestId}]: Auth fetch error -`, error.message);
-      user = null;
+      console.error(`Middleware [${requestId}]: Auth fetch error - ${error instanceof Error ? error.message : String(error)}`);
     }
   } else {
     console.log(`Middleware [${requestId}]: No token found in cookie or header`);
   }
 
-  console.log(`Middleware [${requestId}]: Pathname - ${pathname}, User -`, !!user);
+  console.log(`Middleware [${requestId}]: Pathname - ${pathname}, User - ${!!user}`);
   if (process.env.NODE_ENV === "development") {
     console.log(`Middleware [${requestId}]: Note - Duplicate GET logs may appear in dev mode due to Next.js`);
   }

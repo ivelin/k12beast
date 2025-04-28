@@ -1,4 +1,8 @@
-// src/app/api/tutor/route.ts
+/* src/app/api/tutor/route.ts
+ * Handles POST requests to create a new tutoring session when a user submits a problem.
+ * Returns a JSON response with the lesson HTML and charts for rendering.
+ */
+
 import { v4 as uuidv4 } from "uuid";
 import { NextResponse } from "next/server";
 import supabase from "@/supabase/serverClient";
@@ -15,11 +19,21 @@ const responseFormat = `Return a JSON object with the tutoring lesson based on t
   3. If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn. 
   4. Encourage the student to request more examples and quizzes when ready, but do not provide a quiz in this response.
   5. Structure for K12-related problems: 
-    {
-      "isK12": true, 
-      "lesson": "<p>[evaluation text]</p><p>[lesson text]</p><p>If you feel comfortable...</p>"
-    }. 
-    Ensure the "lesson" field is a single HTML string with no nested JSON objects.`;
+      {
+        "isK12": true,
+        "lesson": "<p>Looks like...</p><p>To help, see Figure 1 to visualize, and refer to Figure 2 to... The formula is <math>...</math>...</p><p>If you feel comfortable with this...</p>",
+        "charts": [
+          {
+            "id": "chart1",
+            "config": {...},
+          {
+            "id": "chart2",
+            "config": {...}
+          }
+        ]
+      }    
+  6. Ensure the "lesson" field is a single HTML string with no nested JSON objects.
+  `;
 
 // Handles POST requests to create a new tutoring session when a user submits a problem
 // Only creates a session if the problem is K12-related; otherwise, returns an error
@@ -47,10 +61,22 @@ export async function POST(request: Request) {
       problem,
       images,
       responseFormat,
+      sessionId,
       defaultResponse: { isK12: true, lesson: "No lesson generated." },
-      maxTokens: 1000,
+      maxTokens: 10000,
       chatHistory: [],
     });
+
+    console.log("tutor lesson response:", lessonResponse);  // Log the full response for debugging
+
+    // Check if the response is valid
+    if (!lessonResponse || !lessonResponse.lesson) {
+      console.error("No lesson returned from xAI API");
+      return NextResponse.json(
+        { error: "Failed to generate lesson: No lesson content returned" },
+        { status: 500 }
+      );
+    }
 
     // Check if the response is K12-related
     if (!lessonResponse.isK12) {
@@ -94,21 +120,10 @@ export async function POST(request: Request) {
 
     console.log("Session upserted successfully:", sessionData);
 
-    if (!lessonResponse.lesson) {
-      console.error("No lesson returned from xAI API");
-      return NextResponse.json(
-        { error: "Failed to generate lesson: No lesson content returned" },
-        { status: 500 }
-      );
-    }
-
-    // The lesson field is a single HTML string; store and return it as plain text
-    const lessonContent = lessonResponse.lesson;
-
     // Update the session with the lesson content
     const { error: updateError } = await supabase
       .from("sessions")
-      .update({ lesson: lessonContent, updated_at: new Date().toISOString() })
+      .update({ lesson: JSON.stringify(lessonResponse), updated_at: new Date().toISOString() })
       .eq("id", sessionId);
 
     if (updateError) {
@@ -119,14 +134,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Return the lesson content as plain text with x-session-id header
-    return new NextResponse(lessonContent, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/plain",
-        "x-session-id": sessionId,
-      },
-    });
+    // Return the full JSON response with lesson and charts
+    return NextResponse.json(
+      lessonResponse,
+      {
+        status: 200,
+        headers: {
+          "x-session-id": sessionId,
+        },
+      }
+    );
   } catch (error) {
     return handleApiError(error, "/api/tutor");
   }
