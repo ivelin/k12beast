@@ -7,9 +7,14 @@ import { expect } from '@playwright/test';
 test.describe('Problem Submission Network Error Handling', () => {
   let attemptCount = 0;
 
-  test('should handle retryable network errors with manual retry', async ({ page, login, context }) => {
+  // Ensure each test runs in its own isolated browser context
+  test.beforeEach(async ({ context }) => {
     attemptCount = 0;
+    // Clear any existing routes to avoid interference from other tests
+    await context.unroute('**/api/tutor');
+  });
 
+  test('should handle retryable network errors with manual retry', async ({ page, login, context }) => {
     // Log in the user using the fixture
     await login({ page, context });
 
@@ -86,15 +91,17 @@ test.describe('Problem Submission Network Error Handling', () => {
     await page.fill('textarea[placeholder="Ask k12beast AI..."]', 'What is the capital of France?');
     await page.click('button[aria-label="Send message"]');
 
-    // Verify the error message appears in the chat
-    await expect(page.getByText(/K12-related/i)).toBeVisible({ timeout: 10000 });
+    // Verify the error message appears in the chat (increase timeout to handle potential delays)
+    await expect(page.getByText(/K12-related/i)).toBeVisible({ timeout: 15000 });
 
     // Verify the prompt input controls are not present (session terminated)
     const input = page.getByPlaceholder('Ask k12beast AI...');
     await expect(input).not.toBeVisible({ timeout: 5000 });
 
     // Click the "New Chat" button to start a new session
-    await page.click('button[aria-label="New chat"]');
+    const newChatButton = page.getByRole('button', { name: 'New chat' });
+    await expect(newChatButton).toBeVisible({ timeout: 5000 });
+    await newChatButton.click();
 
     // Wait for redirect to /chat/new
     await page.waitForURL(/\/chat\/new/, { timeout: 10000 });

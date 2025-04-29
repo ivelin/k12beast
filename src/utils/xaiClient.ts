@@ -1,6 +1,7 @@
 // File path: src/utils/xaiClient.ts
 // Handles requests to xAI API for generating educational content, including React Flow and Plotly diagrams.
 // Updated to ensure all flow charts use vertically oriented nodes and edges for better alignment in a vertically scrolling chat interface.
+// Added explicit timeout and enhanced retry logic for 504 Gateway Timeout errors to improve reliability in Vercel preview deployments.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
@@ -9,6 +10,8 @@ import { ChartConfig } from "@/store/types";
 const openai = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
   baseURL: "https://api.x.ai/v1",
+  // Set explicit timeout of 30 seconds to handle slower responses in Vercel preview environments
+  timeout: 30000,
 });
 
 interface XAIResponse {
@@ -55,6 +58,9 @@ function sanitizeResponse(rawContent: string): string {
 
   return cleaned.trim();
 }
+
+// Utility for exponential backoff delay
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
   const {
@@ -249,6 +255,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
   console.log("Full xAI API request:", JSON.stringify(requestPayload, null, 2));
 
   const maxRetries = 3;
+  const retryableStatusCodes = [504]; // Retry specifically for Gateway Timeout
   let rawContent: string | undefined;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -263,24 +270,31 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
       console.log("xAI API response JSON parsed content object:", content);
 
       return content;
-    } catch (error: unknown) {
+    } catch (error: any) {
+      const isRetryable = retryableStatusCodes.includes(error.status);
+      const backoff = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
       console.warn(
-        `xAI request failed (attempt ${attempt}/${maxRetries}):`,
-        (error as Error).message
+        `xAI request failed (attempt ${attempt}/${maxRetries}): ${error.message}. ` +
+        `Status: ${error.status || "unknown"}. ` +
+        `${isRetryable ? `Retrying after ${backoff}ms...` : "Not retryable."}`
       );
-      if (attempt === maxRetries) {
-        console.error("Final attempt failed. Raw response:", rawContent ?? "No response");
-        console.error("Returning default response with error message.");
-        return {
-          ...defaultResponse,
-          lesson: defaultResponse.lesson
-            ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON format.`
-            : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON format.`,
-        };
+
+      if (isRetryable && attempt < maxRetries) {
+        await sleep(backoff);
+        continue;
       }
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      console.error("Final attempt failed. Raw response:", rawContent ?? "No response");
+      console.error("Returning default response with error message.");
+      return {
+        ...defaultResponse,
+        lesson: defaultResponse.lesson
+          ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error.`
+          : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error.`,
+      };
     }
   }
+
   return defaultResponse;
 }
 
