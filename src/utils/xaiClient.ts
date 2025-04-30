@@ -68,7 +68,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
     images,
     responseFormat,
     defaultResponse,
-    maxTokens = 10000,
+    maxTokens = 3000,
     chatHistory = [],
   } = options;
 
@@ -92,7 +92,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
       - Infer the student's approximate age, grade level, and skill level (beginner, intermediate, advanced) from the chat history.
       - Adapt your response based on this chat history—e.g., avoid repeating examples or quiz problems already given, and adjust difficulty based on performance trends.
       - If the chat history includes quiz responses, adjust the difficulty: provide more challenging problems if the student answered correctly, or simpler problems if they answered incorrectly.
-      - Try to keep the response length within 1000 tokens most of the time.
+      - Try to keep the response length within 500 tokens most of the time. In exceptional cases, you can go up to 1000 tokens.
 
     2. **Response Format**:
       - Always return a raw JSON object as a string strictly formatted for JSON.parse() with the response fields specified in the user prompt.

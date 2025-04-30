@@ -4,6 +4,7 @@
 // Added dispatch of supabase:auth event on session termination
 // Updated to treat all 400+ and 500+ errors as retryable, except specific non-retryable cases
 // Updated to treat "Failed to fetch" errors as retryable for timeouts
+// Updated to handle invalid JSON responses as retryable network errors
 
 import { StateCreator } from "zustand";
 import { toast } from "sonner";
@@ -115,11 +116,17 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         body: JSON.stringify({ problem, images: uploadedImageUrls }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        if (data.terminateSession) {
+        let errorData: { error?: string; terminateSession?: boolean };
+        try {
+          errorData = await res.json();
+        } catch (jsonError) {
+          // If JSON parsing fails, treat as a retryable network error
+          throw new Error(`Network error: Received status ${res.status} with invalid JSON response`);
+        }
+        if (errorData.terminateSession) {
           console.log("Session termination triggered, resetting state");
           set({
-            sessionError: data.error || "An error occurred. Session terminated.",
+            sessionError: errorData.error || "An error occurred. Session terminated.",
             sessionTerminated: true,
             sessionId: null,
             step: "problem",
@@ -135,7 +142,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
           });
           addMessage({
             role: "assistant",
-            content: data.error || "An error occurred. Session terminated.",
+            content: errorData.error || "An error occurred. Session terminated.",
             renderAs: "markdown",
           });
           // Dispatch a supabase:auth event to trigger session expiration in layout.tsx
@@ -146,7 +153,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
           );
           return;
         }
-        throw new Error(data.error || "Failed to submit problem");
+        throw new Error(errorData.error || `Failed to submit problem: HTTP ${res.status}`);
       }
       const lessonContent = (await res.json()) as Lesson;
       set({
@@ -169,13 +176,14 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       let errorMsg: string;
       let isRetryable = false;
       if (err instanceof Error) {
-        // Treat all 400+ and 500+ errors, NetworkError, and "Failed to fetch" as retryable, except specific non-retryable cases
+        // Treat all 400+ and 500+ errors, NetworkError, "Failed to fetch", and invalid JSON responses as retryable, except specific non-retryable cases
         if (
           (err.message.includes("NetworkError") ||
             err.message.includes("Failed to fetch") ||
             err.message.match(/^(4|5)\d{2}/) ||
             err.message.includes("Service Unavailable") ||
-            err.message.includes("Too Many Requests")) &&
+            err.message.includes("Too Many Requests") ||
+            err.message.includes("invalid JSON response")) &&
           !err.message.includes("K12-related")
         ) {
           errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
