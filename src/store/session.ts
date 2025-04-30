@@ -1,13 +1,10 @@
 // File path: src/store/session.ts
 // Manages session-related state and actions for K12Beast, including problem submission and retries
-// Updated to use sessionError and message bubbles for consistent error handling
-// Added dispatch of supabase:auth event on session termination
-// Updated to treat all 400+ and 500+ errors as retryable, except specific non-retryable cases
-// Updated to treat "Failed to fetch" errors as retryable for timeouts
-// Updated to handle invalid JSON responses as retryable network errors
+// Updated to handle invalid JSON responses more robustly with content-type checks
+// Ensures all errors are displayed as chat messages for consistent UX
+// Logs detailed errors for debugging
 
 import { StateCreator } from "zustand";
-import { toast } from "sonner";
 import { AppState, Step, Example, Message, Lesson } from "./types";
 
 export interface SessionState {
@@ -18,7 +15,7 @@ export interface SessionState {
   imageUrls: string[];
   lesson: string | null;
   examples: Example | null;
-  sessionError: string | null; // Tracks session-related errors for UI display
+  sessionError: string | null;
   loading: boolean;
   messages: Message[];
   hasSubmittedProblem: boolean;
@@ -42,7 +39,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
   imageUrls: [],
   lesson: null,
   examples: null,
-  sessionError: null, // Initialize session error
+  sessionError: null,
   loading: false,
   messages: [],
   hasSubmittedProblem: false,
@@ -60,7 +57,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       problem,
       imageUrls,
       hasSubmittedProblem: true,
-      sessionError: null, // Clear previous session error
+      sessionError: null,
       lastFailedProblem: problem,
       lastFailedImages: images,
     });
@@ -80,10 +77,18 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
           headers,
           body: formData,
         });
+
+        // Validate content-type before parsing
+        const uploadContentType = uploadResponse.headers.get("content-type");
+        if (!uploadContentType || !uploadContentType.includes("application/json")) {
+          throw new Error("Received non-JSON response from the server during image upload.");
+        }
+
         if (!uploadResponse.ok) {
           const errorData = (await uploadResponse.json()) as { error: string };
           throw new Error(errorData.error || "Failed to upload images");
         }
+
         const uploadResult = (await uploadResponse.json()) as {
           success: boolean;
           files: { name: string; url: string }[];
@@ -115,12 +120,18 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         headers,
         body: JSON.stringify({ problem, images: uploadedImageUrls }),
       });
+
+      // Validate content-type before parsing (for both success and error cases)
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Received non-JSON response from the server during problem submission.");
+      }
+
       if (!res.ok) {
         let errorData: { error?: string; terminateSession?: boolean };
         try {
           errorData = await res.json();
         } catch (jsonError) {
-          // If JSON parsing fails, treat as a retryable network error
           throw new Error(`Network error: Received status ${res.status} with invalid JSON response`);
         }
         if (errorData.terminateSession) {
@@ -145,7 +156,6 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
             content: errorData.error || "An error occurred. Session terminated.",
             renderAs: "markdown",
           });
-          // Dispatch a supabase:auth event to trigger session expiration in layout.tsx
           window.dispatchEvent(
             new CustomEvent("supabase:auth", {
               detail: { event: "SIGNED_OUT", session: null },
@@ -155,6 +165,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         }
         throw new Error(errorData.error || `Failed to submit problem: HTTP ${res.status}`);
       }
+
       const lessonContent = (await res.json()) as Lesson;
       set({
         sessionId: res.headers.get("x-session-id") || sessionId,
@@ -162,7 +173,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         charts: lessonContent.charts,
         step: "lesson",
         sessionTerminated: false,
-        sessionError: null, // Clear session error on success
+        sessionError: null,
         lastFailedProblem: null,
         lastFailedImages: [],
       });
@@ -176,20 +187,20 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       let errorMsg: string;
       let isRetryable = false;
       if (err instanceof Error) {
-        // Treat all 400+ and 500+ errors, NetworkError, "Failed to fetch", and invalid JSON responses as retryable, except specific non-retryable cases
         if (
           (err.message.includes("NetworkError") ||
             err.message.includes("Failed to fetch") ||
             err.message.match(/^(4|5)\d{2}/) ||
             err.message.includes("Service Unavailable") ||
             err.message.includes("Too Many Requests") ||
-            err.message.includes("invalid JSON response")) &&
+            err.message.includes("invalid JSON response") ||
+            err.message.includes("non-JSON response")) &&
           !err.message.includes("K12-related")
         ) {
           errorMsg = "Oops! We couldn't reach the server. Please try again in a few moments. If the issue persists, start a new chat.";
           isRetryable = true;
         } else {
-          errorMsg = err.message; // Keep specific error messages for non-retryable errors
+          errorMsg = err.message;
         }
       } else {
         errorMsg = "Oops! Something went wrong while starting your lesson. Please try again in a few moments. If the issue persists, start a new chat.";
@@ -197,9 +208,9 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       }
       console.error("Error in handleSubmit:", err);
       set({
-        sessionError: isRetryable ? errorMsg : null, // Set sessionError for retryable errors
-        sessionTerminated: !isRetryable, // Terminate session only for non-retryable errors
-        hasSubmittedProblem: !isRetryable, // Keep hasSubmittedProblem false for retryable errors to show input
+        sessionError: isRetryable ? errorMsg : null,
+        sessionTerminated: !isRetryable,
+        hasSubmittedProblem: !isRetryable,
       });
       addMessage({
         role: "assistant",
@@ -217,7 +228,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
   },
   retry: async () => {
     const { lastFailedProblem, lastFailedImages, sessionError, handleSubmit } = get();
-    if (lastFailedProblem === null || !sessionError) return; // Retry only if there's a sessionError (retryable)
+    if (lastFailedProblem === null || !sessionError) return;
     set({ sessionError: null });
     await handleSubmit(lastFailedProblem, [], lastFailedImages);
   },
