@@ -1,3 +1,5 @@
+// File path: src/components/ui/chat.tsx
+
 "use client"
 
 import {

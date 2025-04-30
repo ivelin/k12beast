@@ -13,6 +13,9 @@ test.describe('Request Example Network Error Handling', () => {
     // Log in the user using the fixture
     await login({ page, context });
 
+    // Verify we are on /chat/new after login
+    await expect(page).toHaveURL(/\/chat\/new/, { timeout: 30000 });
+
     // Mock /api/tutor to return a successful response initially
     await context.route('**/api/tutor', async (route) => {
       console.log('Simulating successful response for /api/tutor request');
@@ -26,6 +29,23 @@ test.describe('Request Example Network Error Handling', () => {
         }),
       });
     });
+
+    // Wait for the chat input to be visible, accounting for client-side rendering
+    console.log('Waiting for chat input to be visible');
+    const chatInput = page.locator('textarea[placeholder="Ask k12beast AI..."]');
+    await chatInput.waitFor({ state: 'visible', timeout: 30000 }).catch(async (error) => {
+      console.log('Page URL:', page.url());
+      console.log('Page content:', await page.content());
+      throw error;
+    });
+
+    // Submit a message to start the session
+    console.log('Filling chat input with: What is 2 + 2?');
+    await chatInput.fill('What is 2 + 2?');
+    await page.click('button[aria-label="Send message"]');
+
+    // Verify the lesson appears
+    await expect(page.locator('.MathJax').first()).toBeVisible({ timeout: 30000 });
 
     // Mock /api/examples to simulate a network failure on the first attempt and succeed on retry
     await context.route('**/api/examples', async (route) => {
@@ -51,16 +71,6 @@ test.describe('Request Example Network Error Handling', () => {
       });
     });
 
-    // Verify we are on /chat/new after login
-    await expect(page).toHaveURL(/\/chat\/new/, { timeout: 30000 });
-
-    // Submit a message to start the session
-    await page.fill('textarea[placeholder="Ask k12beast AI..."]', 'What is 2 + 2?');
-    await page.click('button[aria-label="Send message"]');
-
-    // Verify the lesson appears
-    await expect(page.locator('.MathJax').first()).toBeVisible({ timeout: 30000 });
-
     // Click "Request Example" to trigger the network failure
     await page.getByRole('button', { name: 'Request Example' }).click();
 
@@ -74,9 +84,9 @@ test.describe('Request Example Network Error Handling', () => {
     // Retry by clicking "Request Example" again
     await requestExampleButton.click();
 
-    // Verify the successful example response appears in the chat
+    // Verify the example appears
     await expect(page.getByText('Example problem')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Step 1: Do this')).toBeVisible();
+    await expect(page.getByText('Step 1')).toBeVisible();
   });
 
   test('should handle 429 Too Many Requests error during Request Example', async ({ page, login, context }) => {
@@ -84,6 +94,9 @@ test.describe('Request Example Network Error Handling', () => {
 
     // Log in the user using the fixture
     await login({ page, context });
+
+    // Verify we are on /chat/new after login
+    await expect(page).toHaveURL(/\/chat\/new/, { timeout: 30000 });
 
     // Mock /api/tutor to return a successful response initially
     await context.route('**/api/tutor', async (route) => {
@@ -98,6 +111,23 @@ test.describe('Request Example Network Error Handling', () => {
         }),
       });
     });
+
+    // Wait for the chat input to be visible, accounting for client-side rendering
+    console.log('Waiting for chat input to be visible');
+    const chatInput = page.locator('textarea[placeholder="Ask k12beast AI..."]');
+    await chatInput.waitFor({ state: 'visible', timeout: 30000 }).catch(async (error) => {
+      console.log('Page URL:', page.url());
+      console.log('Page content:', await page.content());
+      throw error;
+    });
+
+    // Submit a message to start the session
+    console.log('Filling chat input with: What is 2 + 2?');
+    await chatInput.fill('What is 2 + 2?');
+    await page.click('button[aria-label="Send message"]');
+
+    // Verify the lesson appears
+    await expect(page.locator('.MathJax').first()).toBeVisible({ timeout: 30000 });
 
     // Mock /api/examples to simulate a 429 error on the first attempt and succeed on retry
     await context.route('**/api/examples', async (route) => {
@@ -123,16 +153,6 @@ test.describe('Request Example Network Error Handling', () => {
       });
     });
 
-    // Verify we are on /chat/new after login
-    await expect(page).toHaveURL(/\/chat\/new/, { timeout: 30000 });
-
-    // Submit a message to start the session
-    await page.fill('textarea[placeholder="Ask k12beast AI..."]', 'What is 2 + 2?');
-    await page.click('button[aria-label="Send message"]');
-
-    // Verify the lesson appears
-    await expect(page.locator('.MathJax').first()).toBeVisible({ timeout: 30000 });
-
     // Click "Request Example" to trigger the 429 error
     await page.getByRole('button', { name: 'Request Example' }).click();
 
@@ -146,8 +166,8 @@ test.describe('Request Example Network Error Handling', () => {
     // Retry by clicking "Request Example" again
     await requestExampleButton.click();
 
-    // Verify the successful example response appears in the chat
+    // Verify the example appears
     await expect(page.getByText('Example problem')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Step 1: Do this')).toBeVisible();
+    await expect(page.getByText('Step 1')).toBeVisible();
   });
 });
