@@ -1,7 +1,8 @@
 // File path: src/utils/xaiClient.ts
 // Handles requests to xAI API for generating educational content, including React Flow and Plotly diagrams.
 // Updated to ensure all flow charts use vertically oriented nodes and edges for better alignment in a vertically scrolling chat interface.
-// Added explicit timeout and enhanced retry logic for 504 Gateway Timeout errors to improve reliability in Vercel preview deployments.
+// Enhanced retry logic for 504 Gateway Timeout errors with improved logging for Vercel production deployments.
+// Modified to return HTTP error code in default response for failed requests.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
@@ -10,7 +11,7 @@ import { ChartConfig } from "@/store/types";
 const openai = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
   baseURL: "https://api.x.ai/v1",
-  // Set explicit timeout of 30 seconds to handle slower responses in Vercel preview environments
+  // Set explicit timeout of 30 seconds to handle slower responses in Vercel production environments
   timeout: 30000,
 });
 
@@ -62,17 +63,22 @@ function sanitizeResponse(rawContent: string): string {
 // Utility for exponential backoff delay
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
+// Modified return type to handle both successful responses and error responses with HTTP status
+export async function sendXAIRequest(options: XAIRequestOptions): Promise<
+  XAIResponse | { status: number; json: XAIResponse }
+> {
   const {
     problem,
     images,
     responseFormat,
     defaultResponse,
-    maxTokens = 3000,
+    maxTokens = 1000,
     chatHistory = [],
+    sessionId,
+    userId,
   } = options;
 
-  console.log("sendXAIRequest inputs:", { problem, images });
+  console.log("sendXAIRequest inputs:", { problem, images, sessionId, userId });
   validateRequestInputs(problem, images);
 
   const chatHistoryText =
@@ -110,7 +116,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                 - For fractions (division), use <mfrac> to represent the numerator and denominator, e.g., <math><mfrac><mi>x</mi><mn>2</mn></mfrac></math> for \( \frac{x}{2} \).
                 - Do not use text nodes like '/' or '*' directly between elements to represent operations; instead, use <mfrac> for division, <mo>×</mo> for multiplication, <msup> for exponents, etc.
                 - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" errors).        
-        - Include charts and diagrams in a "charts" array with the following structure:
+        - When appropriate, include charts and diagrams in a "charts" array with the following structure:
           - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
           - Each chart/diagram drawing should correspond to a specific reference in the text.
           - Each chart/diagram should plot figures, shapes and functions that represent accurately any formulas, equations, or data mentioned in the text.
@@ -257,6 +263,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
   const maxRetries = 3;
   const retryableStatusCodes = [504]; // Retry specifically for Gateway Timeout
   let rawContent: string | undefined;
+  let lastError: any;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const response = await openai.chat.completions.create(requestPayload);
@@ -271,6 +278,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
 
       return content;
     } catch (error: any) {
+      lastError = error;
       const isRetryable = retryableStatusCodes.includes(error.status);
       const backoff = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
       console.warn(
@@ -285,17 +293,36 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
       }
 
       console.error("Final attempt failed. Raw response:", rawContent ?? "No response");
-      console.error("Returning default response with error message.");
+      console.error("Error details:", {
+        message: error.message,
+        status: error.status,
+        stack: error.stack,
+      });
+      console.error("Returning default response with HTTP error status.");
+      const errorMessage = lastError.message || "Unknown error";
       return {
-        ...defaultResponse,
-        lesson: defaultResponse.lesson
-          ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error.`
-          : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error.`,
+        status: 503, // Service Unavailable due to network error with xAI API
+        json: {
+          ...defaultResponse,
+          error: defaultResponse.error
+            ? `${defaultResponse.error} Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error: ${errorMessage}`
+            : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error: ${errorMessage}`,
+        },
       };
     }
   }
 
-  return defaultResponse;
+  console.error("All attempts failed. Returning default response with HTTP error status.");
+  const finalErrorMessage = lastError?.message || "Unknown error";
+  return {
+    status: 503, // Service Unavailable due to network error with xAI API
+    json: {
+      ...defaultResponse,
+      error: defaultResponse.error
+        ? `${defaultResponse.error} Failed after ${maxRetries} attempts due to network error: ${finalErrorMessage}`
+        : `Failed after ${maxRetries} attempts due to network error: ${finalErrorMessage}`,
+    },
+  };
 }
 
 export { handleXAIError } from "./xaiUtils";
