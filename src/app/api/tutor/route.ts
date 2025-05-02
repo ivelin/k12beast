@@ -69,10 +69,10 @@ export async function POST(request: Request) {
     console.log("tutor lesson response:", lessonResponse);  // Log the full response for debugging
 
     // Check if the response is valid
-    if (!lessonResponse || !lessonResponse.lesson) {
+    if (!lessonResponse) {
       console.error("No lesson returned from xAI API");
       return NextResponse.json(
-        { error: "Failed to generate lesson: No lesson content returned" },
+        { error: "Ooops! The AI may be snoozing. Let's try again in a few moments." },
         { status: 500 }
       );
     }
@@ -89,6 +89,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check if the response is valid
+    if (!lessonResponse.lesson) {
+      console.error("No lesson returned from xAI API");
+      return NextResponse.json(
+        { error: "Ooops! No lesson content returned. The AI may be snoozing. Let's try again in a few moments." },
+        { status: 500 }
+      );
+    }
+    
     // If the problem is K12-related, proceed to create the session
     console.log("Creating session for K12 problem:", { problem, images, userId: user.id, sessionId });
 
