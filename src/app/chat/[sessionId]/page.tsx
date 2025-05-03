@@ -1,6 +1,6 @@
 // File path: src/app/chat/[sessionId]/page.tsx
 // Renders the live chat page for both new and existing sessions, ensuring consistent message rendering
-// Updated to remove duplicate validationError display; relies on message bubble for errors
+// Updated to handle session termination by hiding input and prompt suggestions
 
 "use client";
 
@@ -283,7 +283,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           <MessageList messages={messages} isTyping={loading} />
         </ChatMessages>
 
-        {!loading && step === "problem" && !hasSubmittedProblem && (
+        {!loading && step === "problem" && !hasSubmittedProblem && !sessionTerminated && (
           <PromptSuggestions
             className="mb-8"
             label="Try these prompts ✨"
@@ -306,7 +306,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
             disabled={loading || step === "quizzes"}
           />
         )}
-        {step === "problem" && !hasSubmittedProblem && (
+        {step === "problem" && !hasSubmittedProblem && !sessionTerminated && (
           <ChatForm
             className="mt-auto"
             isPending={loading}
