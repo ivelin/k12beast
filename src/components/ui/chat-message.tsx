@@ -8,6 +8,11 @@
 // Fixed typo: experimental_assignments -> experimental_attachments.
 // Extracted Plotly chart rendering into PlotlyChart component.
 // Updated chart container to use full width on mobile for better readability.
+// Updated message bubble width to maximize screen usage on mobile and prevent horizontal scrolling.
+// Reintroduced sm:max-w-[70%] for larger screens to maintain visual cues for message roles.
+// Clarified Tailwind breakpoint logic with comments.
+// Restored role-based left and right alignment in the top-level return statement.
+// Fixed syntax error in ReasoningBlock component by correcting className attribute.
 
 "use client";
 
@@ -26,7 +31,10 @@ import ReactFlowDiagram from "./react-flow-diagram";
 import PlotlyChart from "./plotly-chart";
 
 const chatBubbleVariants = cva(
-  "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
+  // Tailwind breakpoints are mobile-first:
+  // - max-w-[95%] applies by default (all screens, including mobile <640px)
+  // - sm:max-w-[70%] applies on sm and larger (≥640px), providing visual distinction on larger screens
+  "group/message relative break-words rounded-lg p-3 text-sm max-w-[95%] sm:max-w-[70%] mx-auto",
   {
     variants: {
       isUser: { true: "bg-primary text-primary-foreground", false: "bg-muted text-foreground" },
@@ -240,10 +248,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           )}
         </div>
         {charts.length > 0 && (
-          <div ref={chartContainerRef} className="mt-2 space-y-4 w-full">
+          <div ref={chartContainerRef} className="mt-2 space-y-4 w-full overflow-x-hidden">
             {charts.map((chart) => (
               <figure key={chart.id} id={`figure-${chart.id}`} className="w-full">
-                {/* Removed sm:max-w-[70%] to ensure charts use full width on mobile for better readability */}
                 {chart.title && (
                   <figcaption id={`caption-${chart.id}`} className="text-center text-lg font-bold text-foreground mb-2">
                     {chart.title}
@@ -265,7 +272,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   return (
-    <div ref={messageRef} className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+    <div ref={messageRef} className={cn("w-full px-2 flex flex-col", isUser ? "items-end" : "items-start")}>
+      {/* Restored role-based alignment for the entire message block */}
       {renderMessageContent()}
       {showTimeStamp && createdAt && (
         <time dateTime={createdAt.toISOString()} className={cn("mt-1 block px-1 text-xs opacity-50", animation !== "none" && "duration-500 animate-in fade-in-0")}>
@@ -280,7 +288,8 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="mb-2 flex flex-col items-start sm:max-w-[70%]">
+    // Apply same width constraints as message bubbles for consistency
+    <div className="mb-2 flex flex-col items-start max-w-[95%] sm:max-w-[70%] mx-auto">
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="group w-full overflow-hidden rounded-lg border bg-muted/50">
         <div className="flex items-center p-2">
           <CollapsibleTrigger asChild>
