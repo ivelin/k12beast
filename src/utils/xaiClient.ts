@@ -116,12 +116,17 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                 - For fractions (division), use <mfrac> to represent the numerator and denominator, e.g., <math><mfrac><mi>x</mi><mn>2</mn></mfrac></math> for \( \frac{x}{2} \).
                 - Do not use text nodes like '/' or '*' directly between elements to represent operations; instead, use <mfrac> for division, <mo>×</mo> for multiplication, <msup> for exponents, etc.
                 - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" errors).        
-        - When appropriate, include charts and diagrams in a "charts" array with the following structure:
+        - When relevant use charts and diagrams with the following structure:
+          - Always include charts and diagrams in a "charts" array in the JSON response.
           - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
           - Each chart/diagram drawing should correspond to a specific reference in the text.
           - Each chart/diagram should plot figures, shapes and functions that represent accurately any formulas, equations, or data mentioned in the text.
           - Each chart/diagram should be relevant to the content and enhance understanding for K-12 students.
           - Text labels and titles should be in plain text, concise and readable on small screens without any formatting (no HTML, no Markdown in chart and diagram labels).
+          - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
+          - Do not include html tags for charts and diagrams in the text.
+          - Ensure chart and diagram IDs are unique and sequential within the chat session.
+          - Do not reference images, charts, or formulas outside this immediate prompt and response.
           - Each chart has:
             - "id": Unique string identifier (e.g., "chart1").
             - "format": "plotly" for Plotly charts or "reactflow" for React Flow diagrams.
@@ -211,10 +216,6 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
               }
             }
           
-        - Use charts/diagrams when relevant (e.g., flowcharts for processes, graphs for data, sequence diagrams for interactions).
-        - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
-        - Ensure chart and diagram IDs are unique and sequential within the chat session.
-        - Do not reference images, charts, or formulas outside this immediate prompt and response.
         - Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
     3. **School Tests Alignment**:
       - Align with standardized school test formats, including technology-enhanced items (e.g., graphs, equations).
