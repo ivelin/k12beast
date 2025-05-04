@@ -4,6 +4,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import Plotly from "plotly.js-dist";
 
+// Define props interface for better TypeScript type checking
 interface PlotlyChartProps {
   chartConfig: any;
   id: string;
@@ -49,23 +50,24 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
           plotlyLayout = {};
         }
 
-        // Adjust font sizes for mobile and enable responsiveness
+        // Adjust font sizes and layout for mobile readability
         const isMobile = containerWidth < 640;
         plotlyLayout = {
           ...plotlyLayout,
           responsive: true, // Makes chart resize with container
-          font: { size: isMobile ? 48 : 16 },
-          xaxis: { ...plotlyLayout.xaxis, tickfont: { size: isMobile ? 44 : 14 } },
-          yaxis: { ...plotlyLayout.yaxis, tickfont: { size: isMobile ? 44 : 14 } },
-          margin: { l: 80, r: 20, t: 20, b: 80 },
+          autosize: true, // Ensure responsiveness
+          font: { size: isMobile ? 14 : 16 }, // Adjusted font size for readability
+          xaxis: { ...plotlyLayout.xaxis, tickfont: { size: isMobile ? 12 : 14 } },
+          yaxis: { ...plotlyLayout.yaxis, tickfont: { size: isMobile ? 12 : 14 } },
+          margin: { l: isMobile ? 60 : 80, r: 20, t: 20, b: isMobile ? 60 : 80 }, // Adjusted margins for mobile
         };
 
         const tempDiv = document.createElement("div");
         document.body.appendChild(tempDiv);
 
-        // Maintain aspect ratio for SVG generation
+        // Adjust dimensions for mobile screens
         const aspectRatio = 3 / 4;
-        const baseWidth = isMobile ? 1000 : 800;
+        const baseWidth = isMobile ? 600 : 800; // Reduced base width for mobile
         const baseHeight = baseWidth * aspectRatio;
 
         await Plotly.newPlot(tempDiv, plotlyData, plotlyLayout, { staticPlot: true });
@@ -90,7 +92,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
           const textElements = svgDoc.getElementsByTagName("text");
           for (let i = 0; i < textElements.length; i++) {
             const fontSize = parseFloat(textElements[i].getAttribute("font-size") || "0");
-            if (fontSize < 16) textElements[i].setAttribute("font-size", "16");
+            if (fontSize < 12) textElements[i].setAttribute("font-size", "12"); // Adjusted minimum
           }
           svgString = new XMLSerializer().serializeToString(svgDoc.documentElement);
         }
@@ -125,7 +127,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
         svgElement.style.height = "auto";
         svgElement.style.maxWidth = "100%"; // Prevents overflow
         svgElement.style.display = "block";
-        svgElement.style.minHeight = containerWidth < 640 ? "450px" : "auto";
+        svgElement.style.minHeight = containerWidth < 640 ? "400px" : "auto"; // Adjusted min height
         svgElement.setAttribute("aria-labelledby", `caption-${id}`);
         svgRef.current.innerHTML = "";
         svgRef.current.appendChild(svgElement);
@@ -137,8 +139,8 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
   }, [svgContent, id, containerWidth]);
 
   return (
-    // Container adapts to parent width, removing min-w-[300px] for small screens
-    <div className="w-full sm:max-w-[70%]">
+    // Container adapts to parent width with responsive classes
+    <div className="w-full sm:p-2">
       {error ? (
         <p className="text-red-500">{error}</p>
       ) : svgContent ? (

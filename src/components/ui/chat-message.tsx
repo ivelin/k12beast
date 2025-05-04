@@ -7,6 +7,7 @@
 // Ensured charts fully utilize the message area width with updated CSS.
 // Fixed typo: experimental_assignments -> experimental_attachments.
 // Extracted Plotly chart rendering into PlotlyChart component.
+// Updated chart container to use full width on mobile for better readability.
 
 "use client";
 
@@ -241,7 +242,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         {charts.length > 0 && (
           <div ref={chartContainerRef} className="mt-2 space-y-4 w-full">
             {charts.map((chart) => (
-              <figure key={chart.id} id={`figure-${chart.id}`} className="w-full sm:max-w-[70%] mx-auto">
+              <figure key={chart.id} id={`figure-${chart.id}`} className="w-full">
+                {/* Removed sm:max-w-[70%] to ensure charts use full width on mobile for better readability */}
                 {chart.title && (
                   <figcaption id={`caption-${chart.id}`} className="text-center text-lg font-bold text-foreground mb-2">
                     {chart.title}

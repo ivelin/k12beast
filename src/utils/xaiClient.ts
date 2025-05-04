@@ -3,6 +3,7 @@
 // Updated to ensure all flow charts use vertically oriented nodes and edges for better alignment in a vertically scrolling chat interface.
 // Enhanced retry logic for 504 Gateway Timeout errors with improved logging for Vercel production deployments.
 // Modified to return HTTP error code in default response for failed requests.
+// Added mobile optimization guidelines for Plotly charts.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
@@ -11,7 +12,6 @@ import { ChartConfig } from "@/store/types";
 const openai = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
   baseURL: "https://api.x.ai/v1",
-  // Set explicit timeout of 30 seconds to handle slower responses in Vercel production environments
   timeout: 30000,
 });
 
@@ -43,27 +43,20 @@ interface XAIRequestOptions {
   userId?: string;
 }
 
-// Sanitize raw API response to extract valid JSON, removing invalid characters and extraneous text
 function sanitizeResponse(rawContent: string): string {
-  // Remove control characters outside quotes
   let cleaned = rawContent.replace(
     /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F](?=(?:(?:[^"]*"){2})*[^"]*$)/g,
     ""
   );
-
-  // Extract content between ```json and ```, or the first valid JSON object if no markers
   const jsonMatch = cleaned.match(/```json\s*([\s\S]*?)\s*```/) || cleaned.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     cleaned = jsonMatch[1] || jsonMatch[0];
   }
-
   return cleaned.trim();
 }
 
-// Utility for exponential backoff delay
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Modified return type to handle both successful responses and error responses with HTTP status
 export async function sendXAIRequest(options: XAIRequestOptions): Promise<
   XAIResponse | { status: number; json: XAIResponse }
 > {
@@ -132,8 +125,13 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
             - "format": "plotly" for Plotly charts or "reactflow" for React Flow diagrams.
             - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for React Flow, an object with "nodes" (array of nodes) and "edges" (array of edges).
           - For all React Flow diagrams (including flowcharts and sequence diagrams):
-            - keep it simple and use vertically aligned nodes to represent steps or actors, and edges to represent transitions or interactions.
+            - Keep it simple and use vertically aligned nodes to represent steps or actors, and edges to represent transitions or interactions.
             - Make sure the edges have clearly visible direction arrows to indicate the flow of the process.
+          - For all Plotly charts:
+            - Optimize for mobile devices:
+              - Use simple chart types (e.g., scatter, bar, line) and avoid complex shapes unless necessary.
+              - Ensure the chart fits within a 600px width for mobile screens.
+              - Minimize data points to improve rendering performance (e.g., fewer than 100 points for scatter plots).
           - Example React Flow diagram with title (vertical orientation):
               {
                 "id": "diagram1",
@@ -170,8 +168,9 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                   }
                 ],
                 "layout": {
-                  "xaxis": { "title": "Time (s)" },
-                  "yaxis": { "title": "Distance (m)" }
+                  "font": { "size": 14 },
+                  "xaxis": { "title": "Time (s)", "tickfont": { "size": 12 } },
+                  "yaxis": { "title": "Distance (m)", "tickfont": { "size": 12 } }
                 }
               }
             }
@@ -208,14 +207,14 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                       "fillcolor": "rgba(0, 0, 255, 0.2)"
                     }
                   ],
+                  "font": { "size": 14 },
                   "title": {"text": "Cubic Polynomial with Polygon", "x": 0.5},
-                  "xaxis": {"title": "X", "range": [-6, 6]},
-                  "yaxis": {"title": "Y", "range": [-3, 3]},
+                  "xaxis": {"title": "X", "range": [-6, 6], "tickfont": { "size": 12 }},
+                  "yaxis": {"title": "Y", "range": [-3, 3], "tickfont": { "size": 12 }},
                   "showlegend": true
                 }
               }
             }
-          
         - Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
     3. **School Tests Alignment**:
       - Align with standardized school test formats, including technology-enhanced items (e.g., graphs, equations).
@@ -281,7 +280,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
     } catch (error: any) {
       lastError = error;
       const isRetryable = retryableStatusCodes.includes(error.status);
-      const backoff = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+      const backoff = Math.pow(2, attempt - 1) * 1000;  // Exponential backoff: 1s, 2s, 4s
       console.warn(
         `xAI request failed (attempt ${attempt}/${maxRetries}): ${error.message}. ` +
         `Status: ${error.status || "unknown"}. ` +
