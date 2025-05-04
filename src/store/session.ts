@@ -2,6 +2,7 @@
 // Manages session-related state and actions for K12Beast, including problem submission and retries
 // Updated to handle non-K12 responses by terminating the session and providing a clear call-to-action
 // Improved error handling to avoid misinterpreting non-401 errors as session expirations
+// Added handling for image-only submissions by providing a default problem text
 
 import { StateCreator } from "zustand";
 import { AppState, Step, Example, Message, Lesson } from "./types";
@@ -51,13 +52,17 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
   handleSubmit: async (problem, imageUrls, images) => {
     const { sessionId, addMessage, loading } = get();
     if (loading) return;
+
+    // Handle image-only submissions by providing a default problem text
+    const effectiveProblem = problem.trim() || "Please explain the concept shown in the attached image.";
+
     set({
       loading: true,
-      problem,
+      problem: effectiveProblem,
       imageUrls,
       hasSubmittedProblem: true,
       sessionError: null,
-      lastFailedProblem: problem,
+      lastFailedProblem: effectiveProblem,
       lastFailedImages: images,
     });
     try {
@@ -97,7 +102,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       }
       addMessage({
         role: "user",
-        content: problem,
+        content: effectiveProblem,
         renderAs: "markdown",
         experimental_attachments: uploadedImageUrls.map((i, idx) => ({
           name: images[idx]?.name || `Image ${idx + 1}`,
@@ -117,7 +122,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers,
-        body: JSON.stringify({ problem, images: uploadedImageUrls }),
+        body: JSON.stringify({ problem: effectiveProblem, images: uploadedImageUrls }),
       });
 
       // Validate content-type before parsing (for both success and error cases)

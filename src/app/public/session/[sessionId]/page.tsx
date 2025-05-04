@@ -1,6 +1,7 @@
 // File path: src/app/public/session/[sessionId]/page.tsx
 // Renders a public view of a shared session, displaying messages and diagrams.
 // Refactored to inline ChatHeader and ChatContent logic, keeping only ErrorDialogs and ShareDialog as shared components.
+// Removed container class and adjusted padding to maximize content width on mobile.
 
 "use client";
 
@@ -125,14 +126,14 @@ export default function PublicSessionPage({ params }: { params: Promise<{ sessio
   };
 
   if (isLoadingSession) {
-    return <div className="container mx-auto p-4">Loading session, please wait...</div>;
+    return <div className="p-4">Loading session, please wait...</div>;
   }
 
   return (
-    <div className="container">
+    <div className="w-full"> {/* Removed container class, using w-full to maximize width */}
       {/* Cloned From Label */}
       {clonedFrom && (
-        <div className="text-sm text-muted-foreground mb-4">
+        <div className="text-sm text-muted-foreground mb-4 px-2">
           <p>
             This session was cloned from{" "}
             <Link
@@ -146,7 +147,7 @@ export default function PublicSessionPage({ params }: { params: Promise<{ sessio
           </p>
         </div>
       )}
-      <div className="flex justify-end items-center mb-4 space-x-2">
+      <div className="flex justify-end items-center mb-4 space-x-2 px-2">
         {isAuthenticated ? (
           <ClientCloneButton sessionId={sessionId} />
         ) : (

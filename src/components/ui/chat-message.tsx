@@ -13,6 +13,8 @@
 // Clarified Tailwind breakpoint logic with comments.
 // Restored role-based left and right alignment in the top-level return statement.
 // Fixed syntax error in ReasoningBlock component by correcting className attribute.
+// Adjusted chart container padding to minimize wasted space on mobile.
+// Reduced message container padding to maximize content width.
 
 "use client";
 
@@ -272,8 +274,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   return (
-    <div ref={messageRef} className={cn("w-full px-2 flex flex-col", isUser ? "items-end" : "items-start")}>
-      {/* Restored role-based alignment for the entire message block */}
+    <div ref={messageRef} className={cn("w-full px-1 sm:px-4 flex flex-col", isUser ? "items-end" : "items-start")}>
+      {/* Reduced padding to 4px on mobile to maximize content width */}
       {renderMessageContent()}
       {showTimeStamp && createdAt && (
         <time dateTime={createdAt.toISOString()} className={cn("mt-1 block px-1 text-xs opacity-50", animation !== "none" && "duration-500 animate-in fade-in-0")}>

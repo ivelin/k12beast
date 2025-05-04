@@ -1,6 +1,7 @@
 // File path: src/app/layout.tsx
 // Root layout for K12Beast, including navigation with Feedback and Open Source links on home page
 // Updated to redact sensitive information in logs and use ErrorDialogs for session expiration
+// Reduced padding on mobile to maximize message and chart width
 
 "use client";
 
@@ -241,7 +242,11 @@ export default function RootLayout({
               )}
             </div>
           </nav>
-          <main className="p-4">{children}</main>
+          {/* Reduced padding on mobile to maximize content width */}
+          <main className="p-2 sm:p-4">
+            {/* Ensure container has minimal padding on mobile */}
+            {children}
+          </main>
           {/* Use ErrorDialogs for session expiration with sessionExpired type */}
           <ErrorDialogs
             showErrorPopup={sessionExpired}

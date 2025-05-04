@@ -1,4 +1,8 @@
 // File path: src/components/ui/react-flow-diagram.tsx
+// Client-side React Flow diagram component for rendering flowcharts and sequence diagrams.
+// Updated to constrain node positions and widths to fit within the container on mobile.
+// Adjusted Dagre layout to center nodes and fit within container width.
+
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
@@ -61,7 +65,8 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
       const isMobile = containerWidth < 640;
       const useHorizontalLayout = !isMobile;
 
-      const nodeWidth = isMobile ? 180 : Math.max(500, containerWidth * 0.98 / (chartConfig.nodes.length || 1));
+      // Adjust node width to fit within container on mobile
+      const nodeWidth = isMobile ? Math.min(180, containerWidth - 40) : Math.max(500, containerWidth * 0.98 / (chartConfig.nodes.length || 1));
       const nodeHeight = isMobile ? 60 : 100;
       const fontSize = isMobile ? "14px" : "18px";
 
@@ -94,6 +99,7 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
         rankdir: useHorizontalLayout ? "LR" : "TB",
         nodesep: isMobile ? 15 : 20,
         ranksep: isMobile ? 15 : 20,
+        align: "UL", // Align nodes to the upper-left to simplify centering
       });
 
       dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -108,23 +114,24 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
 
       dagre.layout(dagreGraph);
 
-      const adjustedNodes: Node[] = initialNodes.map((node: Node) => {
+      // Calculate total layout dimensions before adjusting positions
+      let adjustedNodes: Node[] = initialNodes.map((node: Node) => {
         const nodeWithPosition = dagreGraph.node(node.id);
         return {
           ...node,
           position: {
-            x: nodeWithPosition.x - (useHorizontalLayout ? 0 : nodeWidth / 2),
-            y: nodeWithPosition.y - (useHorizontalLayout ? nodeHeight / 2 : 0),
+            x: nodeWithPosition.x,
+            y: nodeWithPosition.y,
           },
         };
       });
 
+      // Calculate bounding box of the layout
       const positions = adjustedNodes.map((node: Node) => node.position);
       const minX = Math.min(...positions.map((pos) => pos.x));
       const maxX = Math.max(...positions.map((pos) => pos.x + nodeWidth));
       const minY = Math.min(...positions.map((pos) => pos.y));
       const maxY = Math.max(...positions.map((pos) => pos.y + nodeHeight));
-
       const layoutWidth = maxX - minX + (isMobile ? 40 : 60);
       const layoutHeight = maxY - minY + (isMobile ? 120 : 60);
 
@@ -146,7 +153,7 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
   }, [chartConfig, id, canRender]);
 
   return (
-    <div className="w-full sm:max-w-[70%] overflow-x-auto">
+    <div className="w-full overflow-x-hidden"> {/* Ensure no horizontal overflow */}
       <div ref={containerRef} className="w-full" style={{ width: canvasWidth, height: `${canvasHeight}px`, maxWidth: "100%" }}>
         {error ? (
           <p className="text-red-500">{error}</p>
