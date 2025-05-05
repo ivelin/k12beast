@@ -1,9 +1,8 @@
 // File path: src/components/ui/plotly-chart.tsx
-// Dedicated component for rendering Plotly charts, extracted from chat-message.tsx.
-// Handles Plotly chart rendering to SVG with dynamic sizing and improved readability for mobile.
-// Increased font sizes significantly to counteract scaling effects on mobile.
-// Added JavaScript to enforce minimum font size on SVG text elements.
-// Updated to deep clone chart data to avoid read-only errors with Plotly.
+// Client-side Plotly chart component that renders Plotly charts as SVGs for static rendering.
+// Uses Plotly.toImage to convert the chart to SVG format for accessibility and performance.
+// Handles responsive resizing and sanitizes SVG output for safe rendering.
+// Updated to dynamically adjust baseWidth to container width on mobile to prevent overflow.
 
 "use client";
 
@@ -21,7 +20,6 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
   const [error, setError] = useState<string | null>(null);
   const svgRef = useRef<HTMLDivElement>(null);
 
-  // Validate Plotly configuration
   const validatePlotlyConfig = (chartData: any): boolean => {
     const config = chartData.config;
     if (chartData?.format !== "plotly" || !config) return false;
@@ -44,7 +42,6 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
   useEffect(() => {
     const renderPlotlyChart = async () => {
       try {
-        // Deep clone the chart data and layout to ensure they are mutable
         const clonedConfig = JSON.parse(JSON.stringify(chartConfig.config));
         let plotlyData = clonedConfig.data;
         let plotlyLayout = clonedConfig.layout;
@@ -55,36 +52,30 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
           plotlyLayout = {};
         }
 
-        // Detect mobile viewport for font size adjustment
-        const isMobile = containerWidth < 640; // Align with sm breakpoint
-
-        // Enhance layout for better readability
+        const isMobile = containerWidth < 640;
         plotlyLayout = {
           ...plotlyLayout,
-          font: { size: isMobile ? 48 : 16 }, // Significantly larger font on mobile to counteract scaling
-          xaxis: { ...plotlyLayout.xaxis, tickfont: { size: isMobile ? 44 : 14 } },
-          yaxis: { ...plotlyLayout.yaxis, tickfont: { size: isMobile ? 44 : 14 } },
-          margin: { l: 80, r: 20, t: 20, b: 80 }, // Increased margins for mobile
+          responsive: true,
+          autosize: true,
+          font: { size: isMobile ? 14 : 16 },
+          xaxis: { ...plotlyLayout.xaxis, tickfont: { size: isMobile ? 12 : 14 } },
+          yaxis: { ...plotlyLayout.yaxis, tickfont: { size: isMobile ? 12 : 14 } },
+          margin: { l: isMobile ? 60 : 80, r: 20, t: 20, b: isMobile ? 60 : 80 },
         };
 
         const tempDiv = document.createElement("div");
         document.body.appendChild(tempDiv);
-        console.log(`Created tempDiv for Plotly chart ${id}`);
 
-        // Calculate the height to maintain aspect ratio (default 800x600, aspect ratio 4:3)
+        // Dynamically set baseWidth to container width on mobile to prevent overflow
         const aspectRatio = 3 / 4;
-        const baseWidth = isMobile ? 1000 : 800; // Reduced base width further to minimize scaling
+        const baseWidth = isMobile ? containerWidth : 800; // Use container width on mobile
         const baseHeight = baseWidth * aspectRatio;
 
-        const plotResult = await Plotly.newPlot(tempDiv, plotlyData, plotlyLayout, { staticPlot: true });
-        console.log(`Plotly.newPlot result for chart ${id}:`, plotResult);
-
+        await Plotly.newPlot(tempDiv, plotlyData, plotlyLayout, { staticPlot: true });
         let svgContent = await Plotly.toImage(tempDiv, { format: "svg", width: baseWidth, height: baseHeight });
-        // console.log(`Plotly.toImage result for chart ${id}:`, svgContent);
 
         Plotly.purge(tempDiv);
         document.body.removeChild(tempDiv);
-        console.log(`Cleaned up tempDiv for Plotly chart ${id}`);
 
         let svgString = svgContent.startsWith("data:image/svg+xml;base64,")
           ? atob(svgContent.replace("data:image/svg+xml;base64,", ""))
@@ -94,16 +85,13 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
         svgString = svgString.replace(/<\?xml[^>]*\>/g, "").trim();
         if (!svgString.startsWith("<svg")) throw new Error("Invalid SVG content");
 
-        // Enforce minimum font size on all text elements in the SVG
         if (isMobile) {
           const parser = new DOMParser();
           const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
           const textElements = svgDoc.getElementsByTagName("text");
           for (let i = 0; i < textElements.length; i++) {
             const fontSize = parseFloat(textElements[i].getAttribute("font-size") || "0");
-            if (fontSize < 16) {
-              textElements[i].setAttribute("font-size", "16");
-            }
+            if (fontSize < 12) textElements[i].setAttribute("font-size", "12");
           }
           svgString = new XMLSerializer().serializeToString(svgDoc.documentElement);
         }
@@ -138,7 +126,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
         svgElement.style.height = "auto";
         svgElement.style.maxWidth = "100%";
         svgElement.style.display = "block";
-        svgElement.style.minHeight = containerWidth < 640 ? "450px" : "auto"; // Ensure minimum height on mobile
+        svgElement.style.minHeight = containerWidth < 640 ? "400px" : "auto";
         svgElement.setAttribute("aria-labelledby", `caption-${id}`);
         svgRef.current.innerHTML = "";
         svgRef.current.appendChild(svgElement);
@@ -150,7 +138,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
   }, [svgContent, id, containerWidth]);
 
   return (
-    <div className="w-full sm:max-w-[70%] min-w-[300px]">
+    <div className="w-full p-1 sm:p-2"> {/* Reduced padding on mobile */}
       {error ? (
         <p className="text-red-500">{error}</p>
       ) : svgContent ? (

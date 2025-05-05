@@ -1,10 +1,13 @@
 // File path: src/app/layout.tsx
-// Root layout for K12Beast, including navigation with Feedback and Open Source links on home page
-// Updated to redact sensitive information in logs and use ErrorDialogs for session expiration
+// Root layout for K12Beast, including navigation with Feedback and Open Source links on home page.
+// Updated to redact sensitive information in logs and use ErrorDialogs for session expiration.
+// Reduced padding on mobile to maximize message and chart width.
+// Centered the chat area on desktop screens by adding a container with max-w-5xl mx-auto.
 
 "use client";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from '@vercel/analytics/next';
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
@@ -161,6 +164,7 @@ export default function RootLayout({
             </div>
             <Toaster />
           </ThemeProvider>
+          <Analytics />
         </body>
       </html>
     );
@@ -239,7 +243,13 @@ export default function RootLayout({
               )}
             </div>
           </nav>
-          <main className="p-4">{children}</main>
+          {/* Reduced padding on mobile to maximize content width */}
+          <main className="p-2 sm:p-4">
+            {/* Center the chat area on desktop with max-w-5xl, full width on mobile */}
+            <div className="w-full sm:max-w-5xl sm:mx-auto">
+              {children}
+            </div>
+          </main>
           {/* Use ErrorDialogs for session expiration with sessionExpired type */}
           <ErrorDialogs
             showErrorPopup={sessionExpired}
@@ -259,6 +269,7 @@ export default function RootLayout({
           />
           <SpeedInsights />
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );

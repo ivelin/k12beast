@@ -1,4 +1,7 @@
-// tests/server/tutor-route.spec.ts
+// File path: tests/server/tutor-route.spec.ts
+// Tests the tutor API route to ensure proper lesson generation and session updates
+// Updated to include a test for non-K12 prompts
+
 import { NextRequest } from 'next/server';
 
 // Mock xaiClient
@@ -32,7 +35,11 @@ beforeAll(async () => {
 });
 
 describe('POST /api/tutor', () => {
-  it('should create a session and return a lesson', async () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should create a session and return a lesson for K12 prompt', async () => {
     // Mock NextRequest
     const mockRequest = {
       headers: new Headers({
@@ -70,7 +77,46 @@ describe('POST /api/tutor', () => {
             isK12: true,
             lesson: '<p>The answer to your question is simple: 4!</p>',
           }),
-          updated_at: expect.any(String),        })
+          updated_at: expect.any(String),
+        })
       );
+  });
+
+  it('should return non-K12 response without creating a session', async () => {
+    // Mock xaiClient to return a non-K12 response
+    const { sendXAIRequest } = jest.requireMock('../../src/utils/xaiClient');
+    sendXAIRequest.mockImplementationOnce(() =>
+      Promise.resolve({
+        isK12: false,
+        error: "The input 'How are you?' is not related to K12 education.",
+      })
+    );
+
+    // Mock NextRequest
+    const mockRequest = {
+      headers: new Headers({
+        Authorization: 'Bearer mock-token',
+        'x-session-id': 'mock-session-id',
+      }),
+      json: jest.fn().mockResolvedValue({
+        problem: 'How are you?',
+        images: [],
+      }),
+    } as unknown as NextRequest;
+
+    // Call the POST function
+    const response = await POST(mockRequest);
+
+    // Assertions
+    expect(response.status).toBe(200);
+    const responseBody = await response.json();
+    expect(responseBody).toEqual({
+      isK12: false,
+      error: "The input 'How are you?' is not related to K12 education.",
+    });
+    expect(response.headers.get('x-session-id')).toBe('mock-session-id');
+    // Verify no session was created
+    expect(jest.requireMock('../../src/supabase/serverClient').upsert).not.toHaveBeenCalled();
+    expect(jest.requireMock('../../src/supabase/serverClient').update).not.toHaveBeenCalled();
   });
 });

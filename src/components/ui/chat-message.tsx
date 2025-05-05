@@ -7,6 +7,18 @@
 // Ensured charts fully utilize the message area width with updated CSS.
 // Fixed typo: experimental_assignments -> experimental_attachments.
 // Extracted Plotly chart rendering into PlotlyChart component.
+// Updated chart container to use full width on mobile for better readability.
+// Updated message bubble width to maximize screen usage on mobile and prevent horizontal scrolling.
+// Reintroduced sm:max-w-[70%] for larger screens to maintain visual cues for message roles.
+// Clarified Tailwind breakpoint logic with comments.
+// Restored role-based left and right alignment in the top-level return statement.
+// Fixed syntax error in ReasoningBlock component by correcting className attribute.
+// Adjusted chart container padding to minimize wasted space on mobile.
+// Reduced message container padding to maximize content width.
+// Ensured charts and diagrams do not stretch beyond the chat message container on desktop.
+// Removed mx-auto from chatBubbleVariants to fix centering of user and assistant messages,
+// allowing proper left (assistant) and right (user) alignment.
+// Added id attribute to user message bubble for consistent testability.
 
 "use client";
 
@@ -25,7 +37,11 @@ import ReactFlowDiagram from "./react-flow-diagram";
 import PlotlyChart from "./plotly-chart";
 
 const chatBubbleVariants = cva(
-  "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
+  // Tailwind breakpoints are mobile-first:
+  // - max-w-[95%] applies by default (all screens, including mobile <640px)
+  // - sm:max-w-[70%] applies on sm and larger (≥640px), providing visual distinction on larger screens
+  // Removed mx-auto to allow proper left/right alignment based on role
+  "group/message relative break-words rounded-lg p-3 text-sm max-w-[95%] sm:max-w-[70%]",
   {
     variants: {
       isUser: { true: "bg-primary text-primary-foreground", false: "bg-muted text-foreground" },
@@ -177,7 +193,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               ))}
             </div>
           )}
-          <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+          <div className={cn(chatBubbleVariants({ isUser, animation }))} id={role}>
             <MarkdownRenderer>{content}</MarkdownRenderer>
           </div>
         </>
@@ -239,21 +255,37 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           )}
         </div>
         {charts.length > 0 && (
-          <div ref={chartContainerRef} className="mt-2 space-y-4 w-full">
+          <div ref={chartContainerRef} className="mt-2 space-y-4 w-full overflow-x-hidden">
             {charts.map((chart) => (
-              <figure key={chart.id} id={`figure-${chart.id}`} className="w-full sm:max-w-[70%] mx-auto">
+              <figure key={chart.id} id={`figure-${chart.id}`} className="w-full">
                 {chart.title && (
                   <figcaption id={`caption-${chart.id}`} className="text-center text-lg font-bold text-foreground mb-2">
                     {chart.title}
                   </figcaption>
                 )}
-                {chart.format === "reactflow" ? (
-                  <ReactFlowDiagram chartConfig={chart.config} id={chart.id} />
-                ) : chart.format === "plotly" ? (
-                  <PlotlyChart chartConfig={chart} id={chart.id} containerWidth={messageRef.current?.getBoundingClientRect().width || 300} />
-                ) : (
-                  <p className="text-red-500">Unsupported chart format: {chart.id}</p>
-                )}
+                <div className="w-full p-1 sm:p-2">
+                  <div
+                    className="w-full max-w-full"
+                    style={{
+                      maxWidth: "100%", // Ensure chart doesn't exceed container width
+                      width: "100%", // Full width of the container
+                      height: chart.format === "reactflow" ? "650px" : "auto", // Fixed height for ReactFlow, auto for Plotly
+                      minHeight: chart.format === "plotly" ? "400px" : undefined, // Minimum height for Plotly charts
+                    }}
+                  >
+                    {chart.format === "reactflow" ? (
+                      <ReactFlowDiagram chartConfig={chart.config} id={chart.id} />
+                    ) : chart.format === "plotly" ? (
+                      <PlotlyChart
+                        chartConfig={chart}
+                        id={chart.id}
+                        containerWidth={messageRef.current?.getBoundingClientRect().width || 300}
+                      />
+                    ) : (
+                      <p className="text-red-500">Unsupported chart format: {chart.id}</p>
+                    )}
+                  </div>
+                </div>
               </figure>
             ))}
           </div>
@@ -263,7 +295,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   return (
-    <div ref={messageRef} className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+    <div ref={messageRef} className={cn("w-full px-1 sm:px-4 flex flex-col", isUser ? "items-end" : "items-start")}>
+      {/* Reduced padding to 4px on mobile to maximize content width */}
       {renderMessageContent()}
       {showTimeStamp && createdAt && (
         <time dateTime={createdAt.toISOString()} className={cn("mt-1 block px-1 text-xs opacity-50", animation !== "none" && "duration-500 animate-in fade-in-0")}>
@@ -278,7 +311,8 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="mb-2 flex flex-col items-start sm:max-w-[70%]">
+    // Apply same width constraints as message bubbles for consistency
+    <div className="mb-2 flex flex-col items-start max-w-[95%] sm:max-w-[70%] mx-auto">
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="group w-full overflow-hidden rounded-lg border bg-muted/50">
         <div className="flex items-center p-2">
           <CollapsibleTrigger asChild>

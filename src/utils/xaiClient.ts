@@ -1,7 +1,9 @@
 // File path: src/utils/xaiClient.ts
 // Handles requests to xAI API for generating educational content, including React Flow and Plotly diagrams.
 // Updated to ensure all flow charts use vertically oriented nodes and edges for better alignment in a vertically scrolling chat interface.
-// Added explicit timeout and enhanced retry logic for 504 Gateway Timeout errors to improve reliability in Vercel preview deployments.
+// Enhanced retry logic for 504 Gateway Timeout errors with improved logging for Vercel production deployments.
+// Modified to return HTTP error code in default response for failed requests.
+// Added mobile optimization guidelines for Plotly charts.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
@@ -10,7 +12,6 @@ import { ChartConfig } from "@/store/types";
 const openai = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
   baseURL: "https://api.x.ai/v1",
-  // Set explicit timeout of 30 seconds to handle slower responses in Vercel preview environments
   timeout: 30000,
 });
 
@@ -42,37 +43,35 @@ interface XAIRequestOptions {
   userId?: string;
 }
 
-// Sanitize raw API response to extract valid JSON, removing invalid characters and extraneous text
 function sanitizeResponse(rawContent: string): string {
-  // Remove control characters outside quotes
   let cleaned = rawContent.replace(
     /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F](?=(?:(?:[^"]*"){2})*[^"]*$)/g,
     ""
   );
-
-  // Extract content between ```json and ```, or the first valid JSON object if no markers
   const jsonMatch = cleaned.match(/```json\s*([\s\S]*?)\s*```/) || cleaned.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     cleaned = jsonMatch[1] || jsonMatch[0];
   }
-
   return cleaned.trim();
 }
 
-// Utility for exponential backoff delay
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIResponse> {
+export async function sendXAIRequest(options: XAIRequestOptions): Promise<
+  XAIResponse | { status: number; json: XAIResponse }
+> {
   const {
     problem,
     images,
     responseFormat,
     defaultResponse,
-    maxTokens = 3000,
+    maxTokens = 1000,
     chatHistory = [],
+    sessionId,
+    userId,
   } = options;
 
-  console.log("sendXAIRequest inputs:", { problem, images });
+  console.log("sendXAIRequest inputs:", { problem, images, sessionId, userId });
   validateRequestInputs(problem, images);
 
   const chatHistoryText =
@@ -110,19 +109,29 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                 - For fractions (division), use <mfrac> to represent the numerator and denominator, e.g., <math><mfrac><mi>x</mi><mn>2</mn></mfrac></math> for \( \frac{x}{2} \).
                 - Do not use text nodes like '/' or '*' directly between elements to represent operations; instead, use <mfrac> for division, <mo>×</mo> for multiplication, <msup> for exponents, etc.
                 - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" errors).        
-        - Include charts and diagrams in a "charts" array with the following structure:
+        - When relevant use charts and diagrams with the following structure:
+          - Always include charts and diagrams in a "charts" array in the JSON response.
           - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
           - Each chart/diagram drawing should correspond to a specific reference in the text.
           - Each chart/diagram should plot figures, shapes and functions that represent accurately any formulas, equations, or data mentioned in the text.
           - Each chart/diagram should be relevant to the content and enhance understanding for K-12 students.
           - Text labels and titles should be in plain text, concise and readable on small screens without any formatting (no HTML, no Markdown in chart and diagram labels).
+          - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
+          - Do not include html tags for charts and diagrams in the text.
+          - Ensure chart and diagram IDs are unique and sequential within the chat session.
+          - Do not reference images, charts, or formulas outside this immediate prompt and response.
           - Each chart has:
             - "id": Unique string identifier (e.g., "chart1").
             - "format": "plotly" for Plotly charts or "reactflow" for React Flow diagrams.
             - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for React Flow, an object with "nodes" (array of nodes) and "edges" (array of edges).
           - For all React Flow diagrams (including flowcharts and sequence diagrams):
-            - keep it simple and use vertically aligned nodes to represent steps or actors, and edges to represent transitions or interactions.
+            - Keep it simple and use vertically aligned nodes to represent steps or actors, and edges to represent transitions or interactions.
             - Make sure the edges have clearly visible direction arrows to indicate the flow of the process.
+          - For all Plotly charts:
+            - Optimize for mobile devices:
+              - Use simple chart types (e.g., scatter, bar, line) and avoid complex shapes unless necessary.
+              - Ensure the chart fits within a 600px width for mobile screens.
+              - Minimize data points to improve rendering performance (e.g., fewer than 100 points for scatter plots).
           - Example React Flow diagram with title (vertical orientation):
               {
                 "id": "diagram1",
@@ -159,8 +168,9 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                   }
                 ],
                 "layout": {
-                  "xaxis": { "title": "Time (s)" },
-                  "yaxis": { "title": "Distance (m)" }
+                  "font": { "size": 14 },
+                  "xaxis": { "title": "Time (s)", "tickfont": { "size": 12 } },
+                  "yaxis": { "title": "Distance (m)", "tickfont": { "size": 12 } }
                 }
               }
             }
@@ -197,18 +207,14 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
                       "fillcolor": "rgba(0, 0, 255, 0.2)"
                     }
                   ],
+                  "font": { "size": 14 },
                   "title": {"text": "Cubic Polynomial with Polygon", "x": 0.5},
-                  "xaxis": {"title": "X", "range": [-6, 6]},
-                  "yaxis": {"title": "Y", "range": [-3, 3]},
+                  "xaxis": {"title": "X", "range": [-6, 6], "tickfont": { "size": 12 }},
+                  "yaxis": {"title": "Y", "range": [-3, 3], "tickfont": { "size": 12 }},
                   "showlegend": true
                 }
               }
             }
-          
-        - Use charts/diagrams when relevant (e.g., flowcharts for processes, graphs for data, sequence diagrams for interactions).
-        - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
-        - Ensure chart and diagram IDs are unique and sequential within the chat session.
-        - Do not reference images, charts, or formulas outside this immediate prompt and response.
         - Ensure all quotes are properly escaped (e.g., \") and avoid raw control characters (e.g., no unescaped newlines, tabs, or other control characters except within quoted strings).
     3. **School Tests Alignment**:
       - Align with standardized school test formats, including technology-enhanced items (e.g., graphs, equations).
@@ -257,6 +263,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
   const maxRetries = 3;
   const retryableStatusCodes = [504]; // Retry specifically for Gateway Timeout
   let rawContent: string | undefined;
+  let lastError: any;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const response = await openai.chat.completions.create(requestPayload);
@@ -271,8 +278,9 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
 
       return content;
     } catch (error: any) {
+      lastError = error;
       const isRetryable = retryableStatusCodes.includes(error.status);
-      const backoff = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+      const backoff = Math.pow(2, attempt - 1) * 1000;  // Exponential backoff: 1s, 2s, 4s
       console.warn(
         `xAI request failed (attempt ${attempt}/${maxRetries}): ${error.message}. ` +
         `Status: ${error.status || "unknown"}. ` +
@@ -285,17 +293,36 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<XAIRes
       }
 
       console.error("Final attempt failed. Raw response:", rawContent ?? "No response");
-      console.error("Returning default response with error message.");
+      console.error("Error details:", {
+        message: error.message,
+        status: error.status,
+        stack: error.stack,
+      });
+      console.error("Returning default response with HTTP error status.");
+      const errorMessage = lastError.message || "Unknown error";
       return {
-        ...defaultResponse,
-        lesson: defaultResponse.lesson
-          ? `${defaultResponse.lesson} Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error.`
-          : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error.`,
+        status: 503, // Service Unavailable due to network error with xAI API
+        json: {
+          ...defaultResponse,
+          error: defaultResponse.error
+            ? `${defaultResponse.error} Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error: ${errorMessage}`
+            : `Failed to parse API response after ${maxRetries} attempts due to invalid JSON format or network error: ${errorMessage}`,
+        },
       };
     }
   }
 
-  return defaultResponse;
+  console.error("All attempts failed. Returning default response with HTTP error status.");
+  const finalErrorMessage = lastError?.message || "Unknown error";
+  return {
+    status: 503, // Service Unavailable due to network error with xAI API
+    json: {
+      ...defaultResponse,
+      error: defaultResponse.error
+        ? `${defaultResponse.error} Failed after ${maxRetries} attempts due to network error: ${finalErrorMessage}`
+        : `Failed after ${maxRetries} attempts due to network error: ${finalErrorMessage}`,
+    },
+  };
 }
 
 export { handleXAIError } from "./xaiUtils";

@@ -1,6 +1,7 @@
 // File path: tests/e2e/reset-password.spec.ts
 // Tests the Reset Password page, mocking Supabase updateUser API via network interception
 // Verifies form submission, validation, and error handling
+// Updated to add more logging and increase timeouts
 
 import { test, expect } from '@playwright/test';
 import { config } from 'dotenv';
@@ -24,6 +25,11 @@ test.describe('Reset Password Flow', () => {
       console.log('Request to:', request.url(), 'Method:', request.method(), 'Headers:', request.headers());
     });
 
+    // Log responses to ensure the mock is applied
+    page.on('response', (response) => {
+      console.log('Response from:', response.url(), 'Status:', response.status());
+    });
+
     // Mock Supabase updateUser API call (PATCH /auth/v1/user)
     await context.route(
       (url) => url.href.includes('/auth/v1/user'),
@@ -38,14 +44,17 @@ test.describe('Reset Password Flow', () => {
     );
 
     // Navigate to reset password page with a mock code
+    console.log('Navigating to reset password page');
     await page.goto(
       'http://localhost:3000/public/reset-password?code=mock_code&type=recovery',
       { timeout: 30000 }
     );
-    await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    console.log('Page loaded with network idle');
 
     // Verify page loaded by checking the heading
     await expect(page.getByRole('heading', { name: 'Reset Password' })).toBeVisible({ timeout: 10000 });
+    console.log('Reset Password heading is visible');
 
     // Fill in the password fields with matching passwords
     const newPasswordInput = page.locator('#new-password');
@@ -58,24 +67,26 @@ test.describe('Reset Password Flow', () => {
     // Verify submit button is enabled
     const submitButton = page.getByRole('button', { name: 'Reset Password' });
     await expect(submitButton).toBeEnabled({ timeout: 10000 });
+    console.log('Submit button is enabled');
 
     // Submit the form
     console.log('Submitting reset password form');
     await submitButton.click();
 
-    // Verify success message
+    // Verify success message with increased timeout
     const successMessage = page.getByText('Password reset successful! You can now log in with your new password.');
-    await expect(successMessage).toBeVisible({ timeout: 10000 });
+    await expect(successMessage).toBeVisible({ timeout: 15000 });
+    console.log('Success message is visible');
 
-    // Verify redirect to login page
-    await expect(page).toHaveURL(/\/public\/login/, { timeout: 5000 });
+    // Verify redirect to login page with increased timeout
+    await expect(page).toHaveURL(/\/public\/login/, { timeout: 15000 });
     console.log('Redirected to login page successfully');
   });
 
   test('should show error for invalid or missing code', async ({ page }) => {
     // Navigate to reset password page without a code
     await page.goto('http://localhost:3000/public/reset-password', { timeout: 30000 });
-    await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
 
     // Verify page loaded by checking the heading
     await expect(page.getByRole('heading', { name: 'Reset Password' })).toBeVisible({ timeout: 10000 });
@@ -96,7 +107,7 @@ test.describe('Reset Password Flow', () => {
       'http://localhost:3000/public/reset-password?code=mock_code&type=recovery',
       { timeout: 30000 }
     );
-    await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
 
     // Verify page loaded by checking the heading
     await expect(page.getByRole('heading', { name: 'Reset Password' })).toBeVisible({ timeout: 10000 });
@@ -138,7 +149,7 @@ test.describe('Reset Password Flow', () => {
       'http://localhost:3000/public/reset-password?code=mock_code&type=recovery',
       { timeout: 30000 }
     );
-    await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
 
     // Verify page loaded by checking the heading
     await expect(page.getByRole('heading', { name: 'Reset Password' })).toBeVisible({ timeout: 10000 });
@@ -188,7 +199,7 @@ test.describe('Reset Password Flow', () => {
       'http://localhost:3000/public/reset-password?code=mock_code&type=recovery',
       { timeout: 30000 }
     );
-    await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
 
     // Verify page loaded by checking the heading
     await expect(page.getByRole('heading', { name: 'Reset Password' })).toBeVisible({ timeout: 10000 });

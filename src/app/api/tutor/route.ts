@@ -1,7 +1,6 @@
-/* src/app/api/tutor/route.ts
- * Handles POST requests to create a new tutoring session when a user submits a problem.
- * Returns a JSON response with the lesson HTML and charts for rendering.
- */
+// File path: src/app/api/tutor/route.ts
+// Handles POST requests to evaluate a problem and create a new tutoring session if K12-related.
+// Returns the xAI lessonResponse directly with a 200 status.
 
 import { v4 as uuidv4 } from "uuid";
 import { NextResponse } from "next/server";
@@ -17,7 +16,7 @@ const responseFormat = `Return a JSON object with the tutoring lesson based on t
   2. For K12-related problems, evaluate the student's problem and proposed solution (if provided), followed by a personalized lesson plan, 
     all combined into a single HTML string with safe formatting. 
   3. If no proposed solution is provided, the evaluation section should explain the problem's context and what the student needs to learn. 
-  4. Encourage the student to request more examples and quizzes when ready, but do not provide a quiz in this response.
+  4. Encourage the user to request more examples and quizzes when ready, but do not provide a quiz in this response.
   5. Structure for K12-related problems: 
       {
         "isK12": true,
@@ -26,6 +25,7 @@ const responseFormat = `Return a JSON object with the tutoring lesson based on t
           {
             "id": "chart1",
             "config": {...},
+          },
           {
             "id": "chart2",
             "config": {...}
@@ -35,8 +35,7 @@ const responseFormat = `Return a JSON object with the tutoring lesson based on t
   6. Ensure the "lesson" field is a single HTML string with no nested JSON objects.
   `;
 
-// Handles POST requests to create a new tutoring session when a user submits a problem
-// Only creates a session if the problem is K12-related; otherwise, returns an error
+// Handles POST requests to evaluate a problem and create a new tutoring session if K12-related
 export async function POST(request: Request) {
   try {
     const { problem, images } = await request.json();
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
 
     console.log("Received problem:", { problem, images, userId: user.id, sessionId });
 
-    // Send request to xAI API to check if the problem is K12-related before creating a session
+    // Send request to xAI API to evaluate the problem
     const lessonResponse = await sendXAIRequest({
       problem,
       images,
@@ -66,74 +65,73 @@ export async function POST(request: Request) {
       chatHistory: [],
     });
 
-    console.log("tutor lesson response:", lessonResponse);  // Log the full response for debugging
+    console.log("tutor lesson response:", lessonResponse); // Log the full response for debugging
 
     // Check if the response is valid
-    if (!lessonResponse || !lessonResponse.lesson) {
+    if (!lessonResponse) {
       console.error("No lesson returned from xAI API");
       return NextResponse.json(
-        { error: "Failed to generate lesson: No lesson content returned" },
+        { error: "Ooops! The AI may be snoozing. Let's try again in a few moments." },
         { status: 500 }
       );
     }
 
-    // Check if the response is K12-related
-    if (!lessonResponse.isK12) {
-      console.log("Prompt is not K12-related:", lessonResponse.error);
-      return NextResponse.json(
-        {
-          error: lessonResponse.error || "This question doesn’t seem to be about school stuff for kids. Let’s try something like a math problem or a science question instead!",
-          terminateSession: true,
-        },
-        { status: 400 }
-      );
+    // If the problem is K12-related, create and update the session
+    if (lessonResponse.isK12) {
+      // Check if the response has a lesson
+      if (!lessonResponse.lesson) {
+        console.error("No lesson returned from xAI API");
+        return NextResponse.json(
+          { error: "Ooops! No lesson content returned. The AI may be snoozing. Let's try again in a few moments." },
+          { status: 500 }
+        );
+      }
+
+      console.log("Creating session for K12 problem:", { problem, images, userId: user.id, sessionId });
+
+      const { data: sessionData, error: sessionError } = await supabase
+        .from("sessions")
+        .upsert({
+          id: sessionId,
+          problem,
+          images,
+          lesson: null,
+          examples: null,
+          quizzes: null,
+          performanceHistory: null,
+          user_id: user.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "id" })
+        .select()
+        .single();
+
+      if (sessionError || !sessionData) {
+        console.error("Error creating or updating session:", sessionError?.message || "No session data returned");
+        return NextResponse.json(
+          { error: `Failed to create or update session: ${sessionError?.message || "Unknown error"}` },
+          { status: 500 }
+        );
+      }
+
+      console.log("Session upserted successfully:", sessionData);
+
+      // Update the session with the lesson content
+      const { error: updateError } = await supabase
+        .from("sessions")
+        .update({ lesson: JSON.stringify(lessonResponse), updated_at: new Date().toISOString() })
+        .eq("id", sessionId);
+
+      if (updateError) {
+        console.error("Error updating session with lesson:", updateError.message);
+        return NextResponse.json(
+          { error: `Failed to update session with lesson: ${updateError.message}` },
+          { status: 500 }
+        );
+      }
     }
 
-    // If the problem is K12-related, proceed to create the session
-    console.log("Creating session for K12 problem:", { problem, images, userId: user.id, sessionId });
-
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("sessions")
-      .upsert({
-        id: sessionId,
-        problem,
-        images,
-        lesson: null,
-        examples: null,
-        quizzes: null,
-        performanceHistory: null,
-        user_id: user.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "id" })
-      .select()
-      .single();
-
-    if (sessionError || !sessionData) {
-      console.error("Error creating or updating session:", sessionError?.message || "No session data returned");
-      return NextResponse.json(
-        { error: `Failed to create or update session: ${sessionError?.message || "Unknown error"}` },
-        { status: 500 }
-      );
-    }
-
-    console.log("Session upserted successfully:", sessionData);
-
-    // Update the session with the lesson content
-    const { error: updateError } = await supabase
-      .from("sessions")
-      .update({ lesson: JSON.stringify(lessonResponse), updated_at: new Date().toISOString() })
-      .eq("id", sessionId);
-
-    if (updateError) {
-      console.error("Error updating session with lesson:", updateError.message);
-      return NextResponse.json(
-        { error: `Failed to update session with lesson: ${updateError.message}` },
-        { status: 500 }
-      );
-    }
-
-    // Return the full JSON response with lesson and charts
+    // Return the xAI response (whether K12 or non-K12) with a 200 status
     return NextResponse.json(
       lessonResponse,
       {

@@ -1,13 +1,20 @@
 // File path: tests/server/mocks/xaiClient.ts
 // Mock xAI client for server-side tests, supporting rich formatting features
 
-export const sendXAIRequest = jest.fn().mockImplementation((options) => {
-  console.log("xAI request responseFormat:", options.responseFormat); // Debug log
+import { jest } from '@jest/globals';
 
-  // Handle /api/examples requests
+export const sendXAIRequest = jest.fn().mockImplementation((options) => {
+  console.log("xAI request responseFormat:", options.responseFormat);
+
   if (options.responseFormat.includes("Return a JSON object with a new example problem")) {
     if (options.testFailure) {
-      return Promise.reject(new Error("xAI API failed"));
+      return Promise.resolve({
+        status: 503,
+        json: {
+          lesson: "<p>Unable to generate example at this time.</p>",
+          error: "Failed after 3 attempts due to network error: Gateway Timeout",
+        },
+      });
     }
     return Promise.resolve({
       problem: "Example problem",
@@ -15,8 +22,16 @@ export const sendXAIRequest = jest.fn().mockImplementation((options) => {
     });
   }
 
-  // Handle /api/quiz requests
   if (options.responseFormat.includes("Return a valid JSON object with a new quiz problem")) {
+    if (options.testFailure) {
+      return Promise.resolve({
+        status: 503,
+        json: {
+          lesson: "<p>Unable to generate quiz at this time.</p>",
+          error: "Failed to parse API response after 3 attempts due to invalid JSON format or network error: Gateway Timeout",
+        },
+      });
+    }
     return Promise.resolve({
       problem: "<p>Solve this math problem: What is 3 + 3? Use the formula <math>3 + 3 = ?</math>. Take a look at Figure 1, which shows the addition process.</p>",
       solution: [
@@ -43,7 +58,6 @@ export const sendXAIRequest = jest.fn().mockImplementation((options) => {
     });
   }
 
-  // Handle /api/tutor requests (default lesson response)
   if (options.responseFormat.includes("Return a JSON object with the tutoring lesson")) {
     return Promise.resolve({
       isK12: true,
@@ -51,7 +65,6 @@ export const sendXAIRequest = jest.fn().mockImplementation((options) => {
     });
   }
 
-  // Fallback for unrecognized response formats
   console.warn("Unrecognized responseFormat:", options.responseFormat);
   return Promise.resolve({
     isK12: true,

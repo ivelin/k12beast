@@ -1,6 +1,9 @@
 // File path: src/app/chat/[sessionId]/page.tsx
 // Renders the live chat page for both new and existing sessions, ensuring consistent message rendering
-// Updated to remove duplicate validationError display; relies on message bubble for errors
+// Updated to handle session termination by hiding input and prompt suggestions
+// Removed container class and adjusted padding to maximize content width on mobile
+// Fixed append function naming conflict in PromptSuggestions to resolve ReferenceError
+// Fixed user input prompt passing to ensure problem is a string, not an object
 
 "use client";
 
@@ -202,12 +205,14 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
 
   const handleSubmit = async (problem: string, imageUrls: string[]) => {
     if (step === "quizzes") return;
+    // Ensure problem is a string and pass it directly to storeHandleSubmit
     await storeHandleSubmit(problem, imageUrls, localImages);
   };
 
-  const append = async (message: Message, imageUrls: string[]) => {
+  const handleAppend = async (message: Message, imageUrls: string[]) => {
     if (step === "quizzes") return;
     await storeAppend(message, imageUrls, localImages);
+
   };
 
   const handleNewChat = () => {
@@ -219,14 +224,14 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
   };
 
   if (isLoadingSession) {
-    return <div className="container mx-auto p-4">Loading session, please wait...</div>;
+    return <div className="p-4">Loading session, please wait...</div>;
   }
 
   return (
-    <div className="container">
+    <div className="w-full"> {/* Removed container class, using w-full to maximize width */}
       {/* Chat Header */}
       {cloned_from && (
-        <div className="text-sm text-muted-foreground mb-4">
+        <div className="text-sm text-muted-foreground mb-4 px-2">
           <p>
             This session was cloned from{" "}
             <Link
@@ -240,7 +245,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           </p>
         </div>
       )}
-      <div className="flex justify-end items-center mb-4">
+      <div className="flex justify-end items-center mb-4 px-2">
         <div className="flex space-x-2">
           <div className="relative group">
             <Button
@@ -283,11 +288,11 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
           <MessageList messages={messages} isTyping={loading} />
         </ChatMessages>
 
-        {!loading && step === "problem" && !hasSubmittedProblem && (
+        {!loading && step === "problem" && !hasSubmittedProblem && !sessionTerminated && (
           <PromptSuggestions
-            className="mb-8"
+            className="mb-8 px-2"
             label="Try these prompts ✨"
-            append={(message) => append(message, imageUrls)}
+            append={(message) => handleAppend(message, imageUrls)} // Pass the message string directly
             suggestions={[
               "Explain step-by-step how to solve this math problem: if x * x + 9 = 25, what is x?",
               "Problem: Room 1 is at 18'C. Room 2 is at 22'C. Which direction will heat flow?.",
@@ -299,16 +304,16 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
         )}
         {!loading && (step === "lesson" || step === "examples") && !sessionTerminated && (
           <PromptSuggestions
-            className="mb-8"
+            className="mb-8 px-2"
             label="What would you like to do next?"
             append={(message) => handleSuggestionAction(message.content)}
             suggestions={["Request Example", "Take a Quiz"]}
             disabled={loading || step === "quizzes"}
           />
         )}
-        {step === "problem" && !hasSubmittedProblem && (
+        {step === "problem" && !hasSubmittedProblem && !sessionTerminated && (
           <ChatForm
-            className="mt-auto"
+            className="mt-auto px-2"
             isPending={loading}
             handleSubmit={(e) => {
               e.preventDefault();
@@ -318,7 +323,7 @@ export default function ChatPage({ params }: { params: Promise<{ sessionId: stri
             {({ files, setFiles }) => (
               <MessageInput
                 value={localProblem}
-                onChange={(e) => setLocalProblem(e.target.value)}
+                onChange={(e) => setLocalProblem(e.target.value)} // Ensure localProblem updates with user input
                 allowAttachments={true}
                 files={localImages}
                 setFiles={setLocalImages}

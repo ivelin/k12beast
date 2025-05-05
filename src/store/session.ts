@@ -1,8 +1,8 @@
 // File path: src/store/session.ts
 // Manages session-related state and actions for K12Beast, including problem submission and retries
-// Updated to handle invalid JSON responses more robustly with content-type checks
-// Ensures all errors are displayed as chat messages for consistent UX
-// Logs detailed errors for debugging
+// Updated to handle non-K12 responses by terminating the session and providing a clear call-to-action
+// Improved error handling to avoid misinterpreting non-401 errors as session expirations
+// Added handling for image-only submissions by providing a default problem text
 
 import { StateCreator } from "zustand";
 import { AppState, Step, Example, Message, Lesson } from "./types";
@@ -52,13 +52,17 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
   handleSubmit: async (problem, imageUrls, images) => {
     const { sessionId, addMessage, loading } = get();
     if (loading) return;
+
+    // Handle image-only submissions by providing a default problem text
+    const effectiveProblem = problem.trim() || "Please explain the concept shown in the attached image.";
+
     set({
       loading: true,
-      problem,
+      problem: effectiveProblem,
       imageUrls,
       hasSubmittedProblem: true,
       sessionError: null,
-      lastFailedProblem: problem,
+      lastFailedProblem: effectiveProblem,
       lastFailedImages: images,
     });
     try {
@@ -98,7 +102,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       }
       addMessage({
         role: "user",
-        content: problem,
+        content: effectiveProblem,
         renderAs: "markdown",
         experimental_attachments: uploadedImageUrls.map((i, idx) => ({
           name: images[idx]?.name || `Image ${idx + 1}`,
@@ -118,7 +122,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers,
-        body: JSON.stringify({ problem, images: uploadedImageUrls }),
+        body: JSON.stringify({ problem: effectiveProblem, images: uploadedImageUrls }),
       });
 
       // Validate content-type before parsing (for both success and error cases)
@@ -134,10 +138,10 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         } catch (jsonError) {
           throw new Error(`Network error: Received status ${res.status} with invalid JSON response`);
         }
-        if (errorData.terminateSession) {
+        if (res.status === 401 || errorData.terminateSession) {
           console.log("Session termination triggered, resetting state");
           set({
-            sessionError: errorData.error || "An error occurred. Session terminated.",
+            sessionError: errorData.error || "Your session has expired. Please log back in to continue.",
             sessionTerminated: true,
             sessionId: null,
             step: "problem",
@@ -153,7 +157,7 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
           });
           addMessage({
             role: "assistant",
-            content: errorData.error || "An error occurred. Session terminated.",
+            content: errorData.error || "Your session has expired. Please log back in to continue.",
             renderAs: "markdown",
           });
           window.dispatchEvent(
@@ -166,7 +170,32 @@ export const createSessionStore: StateCreator<AppState, [], [], SessionState> = 
         throw new Error(errorData.error || `Failed to submit problem: HTTP ${res.status}`);
       }
 
-      const lessonContent = (await res.json()) as Lesson;
+      const responseData = await res.json();
+
+      // Check if the response indicates a non-K12 prompt
+      if (!responseData.isK12) {
+        set({
+          sessionTerminated: true,
+          sessionError: responseData.error,
+          step: "problem",
+          lesson: null,
+          examples: null,
+          lastFailedProblem: null,
+          lastFailedImages: [],
+        });
+        addMessage({
+          role: "assistant",
+          content: `
+            <p>🤔 ${responseData.error}</p>
+            <p>Please start a new chat and try a K12-related problem, like a math or science question! 📚</p>
+          `,
+          renderAs: "html",
+        });
+        return;
+      }
+
+      // Handle successful K12-related response
+      const lessonContent = responseData as Lesson;
       set({
         sessionId: res.headers.get("x-session-id") || sessionId,
         lesson: lessonContent.lesson,
