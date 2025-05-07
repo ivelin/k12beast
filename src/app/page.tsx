@@ -1,11 +1,12 @@
 // File path: src/app/page.tsx
-// Updated home page with improved mobile responsiveness for iPhone
+// Updated home page using reusable Footer component
 
 "use client";
 
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Footer } from "@/components/ui/footer";
 import { motion } from "framer-motion";
 
 // Animation variants for the hero section
@@ -22,7 +23,7 @@ const cardVariants = {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col">
       {/* Hero Section with Dragon Image */}
       <motion.div
         className="container text-center max-w-[90vw] sm:max-w-2xl py-8"
@@ -47,7 +48,8 @@ export default function Home() {
 
         {/* Description */}
         <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-8 px-4">
-          Your magical study companion for K12 success! Chat with our AI, take fun quizzes, and soar to the top of your class!
+          Your magical study companion for K12 success! Chat with our AI, take fun
+          quizzes, and soar to the top of your class!
         </p>
 
         {/* Call-to-Action Buttons */}
@@ -87,7 +89,9 @@ export default function Home() {
             className="bg-card p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow"
             variants={cardVariants}
           >
-            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">AI Tutor</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
+              AI Tutor
+            </h3>
             <p className="text-muted-foreground text-sm sm:text-base">
               Submit your problem via text or photo to start an AI tutoring session.
             </p>
@@ -98,7 +102,9 @@ export default function Home() {
             className="bg-card p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow"
             variants={cardVariants}
           >
-            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Personalized Quizzes</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
+              Personalized Quizzes
+            </h3>
             <p className="text-muted-foreground text-sm sm:text-base">
               Test your knowledge with fun and tailored quizzes.
             </p>
@@ -109,13 +115,18 @@ export default function Home() {
             className="bg-card p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow"
             variants={cardVariants}
           >
-            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Track Progress</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
+              Track Progress
+            </h3>
             <p className="text-muted-foreground text-sm sm:text-base">
               Monitor your readiness and excel in school tests.
             </p>
           </motion.div>
         </div>
       </motion.div>
+
+      {/* Footer with Legal Links */}
+      <Footer />
     </div>
   );
 }
