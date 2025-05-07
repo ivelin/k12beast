@@ -1,5 +1,6 @@
 // File path: src/utils/xaiClient.ts
 // Handles requests to xAI API for generating educational content, including React Flow and Plotly diagrams.
+// Ensures strict MathML syntax for <msup> tags to prevent rendering errors.
 // Updated to ensure all flow charts use vertically oriented nodes and edges for better alignment in a vertically scrolling chat interface.
 // Enhanced retry logic for 504 Gateway Timeout errors with improved logging for Vercel production deployments.
 // Modified to return HTTP error code in default response for failed requests.
@@ -65,7 +66,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
     images,
     responseFormat,
     defaultResponse,
-    maxTokens = 1000,
+    maxTokens = 10000, // support up to 10000 tokens conservatively in case the AI response exceeds the limit in the promptinstructions
     chatHistory = [],
     sessionId,
     userId,
@@ -108,7 +109,9 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                 - Always use proper strictly standard compliant MathML elements for mathematical operations.
                 - For fractions (division), use <mfrac> to represent the numerator and denominator, e.g., <math><mfrac><mi>x</mi><mn>2</mn></mfrac></math> for \( \frac{x}{2} \).
                 - Do not use text nodes like '/' or '*' directly between elements to represent operations; instead, use <mfrac> for division, <mo>×</mo> for multiplication, <msup> for exponents, etc.
-                - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" errors).        
+                - For exponents, use <msup> with exactly two children: the base and the exponent. Example: <math><msup><mi>e</mi><mn>3</mn></msup></math> for \( e^3 \).
+                - If the base of an exponent is a complex expression (e.g., a product like \( e^3 \times d \)), wrap it in an <mrow> tag, e.g., <math><msup><mrow><msup><mi>e</mi><mn>3</mn></msup><mo>×</mo><mi>d</mi></mrow><mn>2</mn></msup></math> for \( (e^3 \times d)^2 \).
+                - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" or "Wrong number of children for 'msup' node" errors).
         - When relevant use charts and diagrams with the following structure:
           - Always include charts and diagrams in a "charts" array in the JSON response.
           - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
