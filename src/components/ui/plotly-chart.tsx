@@ -3,6 +3,9 @@
 // Uses Plotly.toImage to convert the chart to SVG format for accessibility and performance.
 // Handles responsive resizing and sanitizes SVG output for safe rendering.
 // Updated to dynamically adjust baseWidth to container width on mobile to prevent overflow.
+// Ensures no title is set in Plotly layout to avoid duplication with external <figcaption>.
+
+
 
 "use client";
 
@@ -53,6 +56,11 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({ chartConfig, id, containerWid
         }
 
         const isMobile = containerWidth < 640;
+        // Ensure no title is set in the layout to avoid duplication with external <figcaption>
+        if (plotlyLayout.title) {
+          console.warn(`Removing title from Plotly layout for chart ${id} to prevent duplication.`);
+          delete plotlyLayout.title;
+        }
         plotlyLayout = {
           ...plotlyLayout,
           responsive: true,
