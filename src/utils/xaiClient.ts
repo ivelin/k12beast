@@ -1,9 +1,12 @@
 // File path: src/utils/xaiClient.ts
 // Handles requests to xAI API for generating educational content, including React Flow and Plotly diagrams.
+// Ensures strict MathML syntax for <msup> tags to prevent rendering errors.
 // Updated to ensure all flow charts use vertically oriented nodes and edges for better alignment in a vertically scrolling chat interface.
 // Enhanced retry logic for 504 Gateway Timeout errors with improved logging for Vercel production deployments.
 // Modified to return HTTP error code in default response for failed requests.
 // Added mobile optimization guidelines for Plotly charts.
+// Updated to remove chart title from Plotly layout to avoid duplication in UI.
+// Added stricter criteria for including charts to ensure they enhance understanding for K-12 students.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
@@ -65,7 +68,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
     images,
     responseFormat,
     defaultResponse,
-    maxTokens = 1000,
+    maxTokens = 10000, // support up to 10000 tokens conservatively in case the AI response exceeds the limit in the prompt instructions
     chatHistory = [],
     sessionId,
     userId,
@@ -108,21 +111,29 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                 - Always use proper strictly standard compliant MathML elements for mathematical operations.
                 - For fractions (division), use <mfrac> to represent the numerator and denominator, e.g., <math><mfrac><mi>x</mi><mn>2</mn></mfrac></math> for \( \frac{x}{2} \).
                 - Do not use text nodes like '/' or '*' directly between elements to represent operations; instead, use <mfrac> for division, <mo>×</mo> for multiplication, <msup> for exponents, etc.
-                - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" errors).        
-        - When relevant use charts and diagrams with the following structure:
+                - For exponents, use <msup> with exactly two children: the base and the exponent. Example: <math><msup><mi>e</mi><mn>3</mn></msup></math> for \( e^3 \).
+                - If the base of an exponent is a complex expression (e.g., a product like \( e^3 \times d \)), wrap it in an <mrow> tag, e.g., <math><msup><mrow><msup><mi>e</mi><mn>3</mn></msup><mo>×</mo><mi>d</mi></mrow><mn>2</mn></msup></math> for \( (e^3 \times d)^2 \).
+                - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" or "Wrong number of children for 'msup' node" errors).
+        - When relevant, use charts and diagrams with the following structure:
           - Always include charts and diagrams in a "charts" array in the JSON response.
+          - Only include charts or diagrams if they provide significant educational value and directly enhance the student's understanding of the concept being taught. Follow these criteria:
+            - **When to Include Charts**:
+              - Use charts for problems involving data visualization (e.g., plotting functions, comparing quantities, showing trends like distance vs. time).
+              - Use diagrams for processes or relationships (e.g., flowcharts for problem-solving steps, geometric diagrams for geometry problems).
+            - **When NOT to Include Charts**:
+              - Avoid charts that are redundant or do not add new insight (e.g., a bar chart showing the exponents in an expression unless it helps visualize a pattern).
           - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
           - Each chart/diagram drawing should correspond to a specific reference in the text.
-          - Each chart/diagram should plot figures, shapes and functions that represent accurately any formulas, equations, or data mentioned in the text.
-          - Each chart/diagram should be relevant to the content and enhance understanding for K-12 students.
-          - Text labels and titles should be in plain text, concise and readable on small screens without any formatting (no HTML, no Markdown in chart and diagram labels).
+          - Each chart/diagram should plot figures, shapes, and functions that represent accurately any formulas, equations, or data mentioned in the text.
+          - Text labels and titles should be in plain text, concise, and readable on small screens without any formatting (no HTML, no Markdown in chart and diagram labels).
           - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
-          - Do not include html tags for charts and diagrams in the text.
+          - Do not include HTML tags for charts and diagrams in the text.
           - Ensure chart and diagram IDs are unique and sequential within the chat session.
           - Do not reference images, charts, or formulas outside this immediate prompt and response.
           - Each chart has:
             - "id": Unique string identifier (e.g., "chart1").
             - "format": "plotly" for Plotly charts or "reactflow" for React Flow diagrams.
+            - "title": A string representing the chart title (e.g., "Figure 1: Distance vs. Time"), which will be rendered separately in the UI.
             - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for React Flow, an object with "nodes" (array of nodes) and "edges" (array of edges).
           - For all React Flow diagrams (including flowcharts and sequence diagrams):
             - Keep it simple and use vertically aligned nodes to represent steps or actors, and edges to represent transitions or interactions.
@@ -132,6 +143,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
               - Use simple chart types (e.g., scatter, bar, line) and avoid complex shapes unless necessary.
               - Ensure the chart fits within a 600px width for mobile screens.
               - Minimize data points to improve rendering performance (e.g., fewer than 100 points for scatter plots).
+            - Do not include the chart title in the "layout" object, as the title is already provided in the "title" field and will be rendered separately in the UI.
           - Example React Flow diagram with title (vertical orientation):
               {
                 "id": "diagram1",
@@ -151,7 +163,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                   ]
                 }
               }
-          - Example Plotly chart with title:
+          - Example Plotly chart with title (appropriate use case for a chart):
             {
               "id": "chart3",
               "format": "plotly",
@@ -174,7 +186,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                 }
               }
             }
-          - Example Plotly chart with complex functions:
+          - Example Plotly chart with complex functions (appropriate use case for a chart):
             {
               "id": "chart4",
               "format": "plotly",
@@ -208,7 +220,6 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                     }
                   ],
                   "font": { "size": 14 },
-                  "title": {"text": "Cubic Polynomial with Polygon", "x": 0.5},
                   "xaxis": {"title": "X", "range": [-6, 6], "tickfont": { "size": 12 }},
                   "yaxis": {"title": "Y", "range": [-3, 3], "tickfont": { "size": 12 }},
                   "showlegend": true
