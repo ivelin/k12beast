@@ -5,6 +5,7 @@
 // Enhanced retry logic for 504 Gateway Timeout errors with improved logging for Vercel production deployments.
 // Modified to return HTTP error code in default response for failed requests.
 // Added mobile optimization guidelines for Plotly charts.
+// Updated to remove chart title from Plotly layout to avoid duplication in UI.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
@@ -66,7 +67,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
     images,
     responseFormat,
     defaultResponse,
-    maxTokens = 10000, // support up to 10000 tokens conservatively in case the AI response exceeds the limit in the promptinstructions
+    maxTokens = 10000, // support up to 10000 tokens conservatively in case the AI response exceeds the limit in the prompt instructions
     chatHistory = [],
     sessionId,
     userId,
@@ -126,6 +127,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
           - Each chart has:
             - "id": Unique string identifier (e.g., "chart1").
             - "format": "plotly" for Plotly charts or "reactflow" for React Flow diagrams.
+            - "title": A string representing the chart title (e.g., "Figure 1: Distance vs. Time"), which will be rendered separately in the UI.
             - "config": For Plotly, an object with "data" (array of traces) and "layout" (layout options); for React Flow, an object with "nodes" (array of nodes) and "edges" (array of edges).
           - For all React Flow diagrams (including flowcharts and sequence diagrams):
             - Keep it simple and use vertically aligned nodes to represent steps or actors, and edges to represent transitions or interactions.
@@ -135,6 +137,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
               - Use simple chart types (e.g., scatter, bar, line) and avoid complex shapes unless necessary.
               - Ensure the chart fits within a 600px width for mobile screens.
               - Minimize data points to improve rendering performance (e.g., fewer than 100 points for scatter plots).
+            - Do not include the chart title in the "layout" object, as the title is already provided in the "title" field and will be rendered separately in the UI.
           - Example React Flow diagram with title (vertical orientation):
               {
                 "id": "diagram1",
@@ -154,7 +157,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                   ]
                 }
               }
-          - Example Plotly chart with title:
+          - Example Plotly chart with title (title not in layout):
             {
               "id": "chart3",
               "format": "plotly",
@@ -177,7 +180,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                 }
               }
             }
-          - Example Plotly chart with complex functions:
+          - Example Plotly chart with complex functions (title not in layout):
             {
               "id": "chart4",
               "format": "plotly",
@@ -211,7 +214,6 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                     }
                   ],
                   "font": { "size": 14 },
-                  "title": {"text": "Cubic Polynomial with Polygon", "x": 0.5},
                   "xaxis": {"title": "X", "range": [-6, 6], "tickfont": { "size": 12 }},
                   "yaxis": {"title": "Y", "range": [-3, 3], "tickfont": { "size": 12 }},
                   "showlegend": true
