@@ -6,6 +6,7 @@
 // Modified to return HTTP error code in default response for failed requests.
 // Added mobile optimization guidelines for Plotly charts.
 // Updated to remove chart title from Plotly layout to avoid duplication in UI.
+// Added stricter criteria for including charts to ensure they enhance understanding for K-12 students.
 
 import OpenAI from "openai";
 import { validateRequestInputs } from "./xaiUtils";
@@ -113,15 +114,20 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                 - For exponents, use <msup> with exactly two children: the base and the exponent. Example: <math><msup><mi>e</mi><mn>3</mn></msup></math> for \( e^3 \).
                 - If the base of an exponent is a complex expression (e.g., a product like \( e^3 \times d \)), wrap it in an <mrow> tag, e.g., <math><msup><mrow><msup><mi>e</mi><mn>3</mn></msup><mo>×</mo><mi>d</mi></mrow><mn>2</mn></msup></math> for \( (e^3 \times d)^2 \).
                 - Ensure all MathML is well-formed and will render correctly in MathJax without errors (e.g., no "Unexpected text node" or "Wrong number of children for 'msup' node" errors).
-        - When relevant use charts and diagrams with the following structure:
+        - When relevant, use charts and diagrams with the following structure:
           - Always include charts and diagrams in a "charts" array in the JSON response.
+          - Only include charts or diagrams if they provide significant educational value and directly enhance the student's understanding of the concept being taught. Follow these criteria:
+            - **When to Include Charts**:
+              - Use charts for problems involving data visualization (e.g., plotting functions, comparing quantities, showing trends like distance vs. time).
+              - Use diagrams for processes or relationships (e.g., flowcharts for problem-solving steps, geometric diagrams for geometry problems).
+            - **When NOT to Include Charts**:
+              - Avoid charts that are redundant or do not add new insight (e.g., a bar chart showing the exponents in an expression unless it helps visualize a pattern).
           - Each chart/diagram must be mobile device friendly and optimized for vertical scrolling.
           - Each chart/diagram drawing should correspond to a specific reference in the text.
-          - Each chart/diagram should plot figures, shapes and functions that represent accurately any formulas, equations, or data mentioned in the text.
-          - Each chart/diagram should be relevant to the content and enhance understanding for K-12 students.
-          - Text labels and titles should be in plain text, concise and readable on small screens without any formatting (no HTML, no Markdown in chart and diagram labels).
+          - Each chart/diagram should plot figures, shapes, and functions that represent accurately any formulas, equations, or data mentioned in the text.
+          - Text labels and titles should be in plain text, concise, and readable on small screens without any formatting (no HTML, no Markdown in chart and diagram labels).
           - Reference charts and diagrams in text via IDs (e.g., "See Figure 1", "Reference Figure 2").
-          - Do not include html tags for charts and diagrams in the text.
+          - Do not include HTML tags for charts and diagrams in the text.
           - Ensure chart and diagram IDs are unique and sequential within the chat session.
           - Do not reference images, charts, or formulas outside this immediate prompt and response.
           - Each chart has:
@@ -157,7 +163,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                   ]
                 }
               }
-          - Example Plotly chart with title (title not in layout):
+          - Example Plotly chart with title (appropriate use case for a chart):
             {
               "id": "chart3",
               "format": "plotly",
@@ -180,7 +186,7 @@ export async function sendXAIRequest(options: XAIRequestOptions): Promise<
                 }
               }
             }
-          - Example Plotly chart with complex functions (title not in layout):
+          - Example Plotly chart with complex functions (appropriate use case for a chart):
             {
               "id": "chart4",
               "format": "plotly",
