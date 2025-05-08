@@ -330,3 +330,17 @@ button[type="submit"]:hover {
     border-width: 0;
   }
 }
+
+/* src/app/globals.css */
+.prose {
+  @apply text-foreground;
+}
+.prose h1, .prose h2, .prose h3 {
+  @apply text-foreground font-bold;
+}
+.prose p {
+  @apply text-muted-foreground mb-4;
+}
+.prose ul {
+  @apply list-disc ml-6 mb-4;
+}

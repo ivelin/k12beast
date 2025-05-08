@@ -1,7 +1,11 @@
 // File path: next.config.ts
-// Updated to allow external image domains for testing and any Supabase storage URL
+// Configures Next.js for K12Beast, including MDX support for documentation pages
+// Allows external image domains for testing and Supabase storage URLs
+// Disables TypeScript build errors and source maps in development
+// Sets cache control headers for source maps
 
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
+import createMDX from '@next/mdx';
 
 const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
@@ -28,16 +32,21 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)\\.map",
+        source: '/(.*)\\.map',
         headers: [
           {
-            key: "Cache-Control",
-            value: "no-store",
+            key: 'Cache-Control',
+            value: 'no-store',
           },
         ],
       },
     ];
   },
+  pageExtensions: ['js', 'jsx', 'ts', 'tsx', 'md', 'mdx'], // Enable MDX pages
 };
 
-export default nextConfig;
+const withMDX = createMDX({
+  // Add markdown plugins here if needed (e.g., remarkPlugins, rehypePlugins)
+});
+
+export default withMDX(nextConfig);
