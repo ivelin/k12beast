@@ -1,9 +1,5 @@
 // File path: src/components/ui/DocsSidebar.tsx
-// Sidebar navigation for K12Beast documentation pages
-// Displays a collapsible menu for documentation sections (e.g., Parents, Students)
-// Uses Tailwind CSS from globals.css for consistent styling with root layout
-// Integrates with Radix UI Collapsible for interactive menu behavior
-// Hidden on mobile to match responsive design of root layout
+// Sidebar navigation for documentation pages with mobile toggle support
 
 'use client';
 
@@ -12,7 +8,6 @@ import { usePathname } from 'next/navigation';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { ChevronDown } from 'lucide-react';
 
-// Define menu structure for documentation sections
 const menu = [
   {
     title: 'Parents',
@@ -50,7 +45,7 @@ export default function DocsSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-muted p-4 hidden md:block">
+    <aside className="w-64 bg-muted p-4 hidden md:block peer-checked:block">
       <nav>
         {menu.map((section) => (
           <Collapsible

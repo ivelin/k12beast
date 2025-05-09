@@ -1,4 +1,6 @@
-/* src/app/globals.css */
+/* File path: src/app/globals.css */
+/* Global styles for K12Beast, including Tailwind CSS setup and custom styles */
+
 @config "../../tailwind.config.js";
 @import "tailwindcss";
 @tailwind base;
