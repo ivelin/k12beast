@@ -1,4 +1,6 @@
-/* src/app/globals.css */
+/* File path: src/app/globals.css */
+/* Global styles for K12Beast, including Tailwind CSS setup and custom styles */
+
 @config "../../tailwind.config.js";
 @import "tailwindcss";
 @tailwind base;
@@ -329,4 +331,18 @@ button[type="submit"]:hover {
     white-space: nowrap;
     border-width: 0;
   }
+}
+
+/* src/app/globals.css */
+.prose {
+  @apply text-foreground;
+}
+.prose h1, .prose h2, .prose h3 {
+  @apply text-foreground font-bold;
+}
+.prose p {
+  @apply text-muted-foreground mb-4;
+}
+.prose ul {
+  @apply list-disc ml-6 mb-4;
 }
