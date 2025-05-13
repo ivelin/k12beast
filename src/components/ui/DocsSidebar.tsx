@@ -9,15 +9,20 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { ChevronDown } from 'lucide-react';
 
 const menu = [
-  {
-    title: 'Parents',
-    path: '/public/docs/parents',
-    children: [{ title: 'Introduction', path: '/public/docs/parents/introduction' }],
+ {
+    title: 'Getting Started',
+    path: '/public/docs/getting-started',
+    children: [],
   },
   {
     title: 'Students',
     path: '/public/docs/students',
     children: [{ title: 'Math', path: '/public/docs/students/math' }],
+  },
+  {
+    title: 'Parents',
+    path: '/public/docs/parents',
+    children: [{ title: 'Introduction', path: '/public/docs/parents/introduction' }],
   },
   {
     title: 'Teachers',
@@ -34,12 +39,7 @@ const menu = [
     path: '/public/docs/subjects',
     children: [{ title: 'Algebra', path: '/public/docs/subjects/algebra' }],
   },
-  {
-    title: 'Getting Started',
-    path: '/public/docs/getting-started',
-    children: [],
-  },
-];
+ ];
 
 export default function DocsSidebar() {
   const pathname = usePathname();
