@@ -1,6 +1,7 @@
 // File path: src/components/ui/react-flow-diagram.tsx
 // Client-side React Flow diagram component for rendering flowcharts and sequence diagrams.
 // Updated to reduce arrowhead size for better proportionality.
+// Improved edge label visibility by using Tailwind CSS classes for theme-based text color.
 
 "use client";
 
@@ -63,7 +64,7 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
         },
       }));
 
-      // Configure edges with improved visibility
+      // Configure edges with improved visibility using Tailwind classes for theme-based text color
       const configEdges: Edge[] = chartConfig.edges.map((edge: any) => ({
         id: edge.id,
         source: edge.source,
@@ -72,8 +73,12 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
         labelStyle: { 
           fontSize: isMobile ? "14px" : "18px",
           fontWeight: "bold",
-          fill: "#333333",
         },
+        labelBgStyle: {
+          fill: "transparent", // Ensure background doesn't interfere with visibility
+        },
+        labelShowBg: false, // Disable default background for better control
+        className: "text-gray-800 dark:text-gray-200", // Dark gray in light mode, light gray in dark mode
         style: { 
           strokeWidth: 3,
           stroke: "#666666", // Medium gray for contrast in both light and dark modes
