@@ -1,6 +1,7 @@
 // File path: src/middleware.ts
 // Middleware to handle authentication and public route access for K12Beast
 // Updated to validate tokens directly with Supabase client for debugging project mismatch
+// Added logic to rewrite .js.map requests to prevent interception by catch-all route
 
 import { NextResponse, NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -35,6 +36,13 @@ export async function middleware(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.pathname;
+
+  // Rewrite requests for .js.map files to a static path to prevent interception by dynamic routes
+  if (pathname.endsWith(".js.map")) {
+    console.log(`Middleware [${requestId}]: Rewriting .js.map request for ${pathname} to /_static${pathname}`);
+    const rewrittenUrl = new URL(`/_static${pathname}`, request.url);
+    return NextResponse.rewrite(rewrittenUrl);
+  }
 
   // Allow all /public/* routes to bypass auth
   if (pathname.startsWith("/public")) {

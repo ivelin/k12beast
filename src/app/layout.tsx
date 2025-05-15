@@ -1,8 +1,9 @@
 // File path: src/app/layout.tsx
-// Root layout for K12Beast, including navigation with Feedback and Open Source links on home page.
+// Root layout for K12Beast, including navigation with Feedback, Open Source, and Docs links on home page.
 // Updated to redact sensitive information in logs and use ErrorDialogs for session expiration.
 // Reduced padding on mobile to maximize message and chart width.
 // Centered the chat area on desktop screens by adding a container with max-w-5xl mx-auto.
+// Added dropdown menu for home page links in mobile mode to save space.
 
 "use client";
 
@@ -12,13 +13,14 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { useState, useEffect } from "react";
-import { Github, Loader2 } from "lucide-react";
+import { Github, Loader2, Menu } from "lucide-react";
 import Link from "next/link";
 import { Toaster } from "@/components/ui/sonner";
 import { useRouter, usePathname } from "next/navigation";
 import supabase from "@/supabase/browserClient";
 import useAppStore from "@/store";
 import { ErrorDialogs } from "@/components/ui/ErrorDialogs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,6 +41,7 @@ export default function RootLayout({
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const reset = useAppStore((state) => state.reset);
@@ -185,23 +188,78 @@ export default function RootLayout({
             <div className="flex space-x-2 sm:space-x-4 items-center">
               {pathname === "/" && (
                 <>
-                  <Link
-                    href="https://github.com/ivelin/k12beast/issues/new"
-                    className="hover:underline text-sm sm:text-base"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Feedback
-                  </Link>
-                  <Link
-                    href="https://github.com/ivelin/k12beast"
-                    className="flex items-center hover:underline text-sm sm:text-base"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Github className="h-4 w-4 mr-1" />
-                    Open Source
-                  </Link>
+                  {/* On desktop (sm and above), show links inline */}
+                  <div className="hidden sm:flex space-x-4 items-center">
+                    <Link
+                      href="/public/docs"
+                      className="hover:underline text-sm sm:text-base"
+                    >
+                      Docs
+                    </Link>
+                    <Link
+                      href="https://github.com/ivelin/k12beast/issues/new"
+                      className="hover:underline text-sm sm:text-base"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Feedback
+                    </Link>
+                    <Link
+                      href="https://github.com/ivelin/k12beast"
+                      className="flex items-center hover:underline text-sm sm:text-base"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Github className="h-4 w-4 mr-1" />
+                      Open Source
+                    </Link>
+                  </div>
+                  {/* On mobile, show a dropdown menu */}
+                  <div className="sm:hidden">
+                    <Collapsible
+                      open={isMobileMenuOpen}
+                      onOpenChange={setIsMobileMenuOpen}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <button
+                          className="flex items-center p-2 rounded-md hover:bg-muted-foreground/20"
+                          aria-label="Toggle menu"
+                        >
+                          <Menu className="h-5 w-5" />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="absolute right-4 mt-2 w-48 bg-background border border-border rounded-md shadow-lg z-50">
+                        <div className="flex flex-col p-2 space-y-2">
+                          <Link
+                            href="/public/docs"
+                            className="hover:underline text-sm p-2 rounded-md hover:bg-muted"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            Docs
+                          </Link>
+                          <Link
+                            href="https://github.com/ivelin/k12beast/issues/new"
+                            className="hover:underline text-sm p-2 rounded-md hover:bg-muted"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            Feedback
+                          </Link>
+                          <Link
+                            href="https://github.com/ivelin/k12beast"
+                            className="flex items-center hover:underline text-sm p-2 rounded-md hover:bg-muted"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <Github className="h-4 w-4 mr-1" />
+                            Open Source
+                          </Link>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
                 </>
               )}
               {isLoggedIn && pathname !== "/" && !pathname.startsWith("/public") && (

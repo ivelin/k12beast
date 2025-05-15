@@ -1,14 +1,23 @@
 // File path: src/components/ui/react-flow-diagram.tsx
 // Client-side React Flow diagram component for rendering flowcharts and sequence diagrams.
-// Updated to constrain node positions and widths to fit within the container on mobile.
-// Adjusted Dagre layout to center nodes and fit within container width.
+// Updated to reduce arrowhead size for better proportionality.
+// Improved edge label visibility by using Tailwind CSS classes for theme-based text color.
 
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { ReactFlow, Background, Node, Edge } from "@xyflow/react";
 import dagre from "dagre";
 import "@xyflow/react/dist/style.css";
+
+// Utility to debounce resize events to prevent excessive re-renders
+const debounce = (func: (...args: any[]) => void, wait: number) => {
+  let timeout: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
 
 interface ReactFlowDiagramProps {
   chartConfig: any;
@@ -24,52 +33,25 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
   const [canvasWidth, setCanvasWidth] = useState("100%");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        console.log(`Container dimensions for chart ${id}: width=${width}, height=${height}`);
-        if (width > 0 && height > 0) {
-          setCanRender(true);
-        } else {
-          setCanRender(false);
-        }
-      }
-    });
-
-    observer.observe(container);
-
-    const { width, height } = container.getBoundingClientRect();
-    console.log(`Initial container dimensions for chart ${id}: width=${width}, height=${height}`);
-    if (width > 0 && height > 0) {
-      setCanRender(true);
+  // Compute the layout using Dagre with TB layout and center it
+  const computeLayout = useCallback(() => {
+    if (!containerRef.current || !chartConfig || !chartConfig.nodes || !chartConfig.edges) {
+      setError("Invalid React Flow configuration: Missing nodes, edges, or container");
+      return;
     }
 
-    return () => {
-      observer.disconnect();
-    };
-  }, [id]);
-
-  useEffect(() => {
-    if (!canRender || !containerRef.current) return;
-
     try {
-      if (!chartConfig || !chartConfig.nodes || !chartConfig.edges) {
-        throw new Error("Invalid React Flow configuration: Missing nodes or edges");
-      }
-
       const containerWidth = containerRef.current.getBoundingClientRect().width;
       const isMobile = containerWidth < 640;
-      const useHorizontalLayout = !isMobile;
 
-      // Adjust node width to fit within container on mobile
-      const nodeWidth = isMobile ? Math.min(180, containerWidth - 40) : Math.max(500, containerWidth * 0.98 / (chartConfig.nodes.length || 1));
-      const nodeHeight = isMobile ? 60 : 100;
+      console.log(`Computing layout for chart ${id}: containerWidth=${containerWidth}, isMobile=${isMobile}`);
+
+      // Use Dagre's default node dimensions
+      const nodeWidth = 150; // Dagre default width
+      const nodeHeight = 50; // Dagre default height
       const fontSize = isMobile ? "14px" : "18px";
 
+      // Initialize nodes without custom sizing
       const initialNodes: Node[] = chartConfig.nodes.map((node: any) => ({
         ...node,
         position: { x: 0, y: 0 },
@@ -79,27 +61,46 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
           borderRadius: 5,
           fontSize: fontSize,
           textAlign: "center",
-          width: `${nodeWidth}px`,
         },
       }));
 
+      // Configure edges with improved visibility using Tailwind classes for theme-based text color
       const configEdges: Edge[] = chartConfig.edges.map((edge: any) => ({
         id: edge.id,
         source: edge.source,
         target: edge.target,
         label: edge.label,
-        labelStyle: { fontSize: isMobile ? "12px" : "16px", fontWeight: "bold" },
-        labelBgStyle: { fillOpacity: 0.7, padding: 5 },
-        style: { strokeWidth: 2 },
+        labelStyle: { 
+          fontSize: isMobile ? "14px" : "18px",
+          fontWeight: "bold",
+        },
+        labelBgStyle: {
+          fill: "transparent", // Ensure background doesn't interfere with visibility
+        },
+        labelShowBg: false, // Disable default background for better control
+        className: "text-gray-800 dark:text-gray-200", // Dark gray in light mode, light gray in dark mode
+        style: { 
+          strokeWidth: 3,
+          stroke: "#666666", // Medium gray for contrast in both light and dark modes
+        },
         animated: true,
+        type: "smoothstep",
+        markerEnd: {
+          type: "arrowclosed",
+          width: 15, // Reduced arrowhead size
+          height: 15,
+          color: "#666666", // Match edge color
+        },
       }));
 
+      // Set up Dagre layout with TB layout
       const dagreGraph = new dagre.graphlib.Graph();
       dagreGraph.setGraph({
-        rankdir: useHorizontalLayout ? "LR" : "TB",
-        nodesep: isMobile ? 15 : 20,
-        ranksep: isMobile ? 15 : 20,
-        align: "UL", // Align nodes to the upper-left to simplify centering
+        rankdir: "TB", // Always use top-to-bottom layout
+        nodesep: 25, // Dagre default node separation
+        ranksep: 50, // Dagre default rank separation
+        marginx: 40, // Add margins to ensure nodes use full canvas space
+        marginy: 40,
       });
 
       dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -114,7 +115,7 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
 
       dagre.layout(dagreGraph);
 
-      // Calculate total layout dimensions before adjusting positions
+      // Use Dagre's positions and center the layout
       let adjustedNodes: Node[] = initialNodes.map((node: Node) => {
         const nodeWithPosition = dagreGraph.node(node.id);
         return {
@@ -126,34 +127,76 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
         };
       });
 
-      // Calculate bounding box of the layout
+      // Calculate layout bounding box
       const positions = adjustedNodes.map((node: Node) => node.position);
       const minX = Math.min(...positions.map((pos) => pos.x));
       const maxX = Math.max(...positions.map((pos) => pos.x + nodeWidth));
       const minY = Math.min(...positions.map((pos) => pos.y));
       const maxY = Math.max(...positions.map((pos) => pos.y + nodeHeight));
-      const layoutWidth = maxX - minX + (isMobile ? 40 : 60);
-      const layoutHeight = maxY - minY + (isMobile ? 120 : 60);
+      const layoutWidth = maxX - minX;
+      const layoutHeight = maxY - minY;
 
-      if (useHorizontalLayout) {
-        setCanvasWidth(`${Math.max(containerWidth, layoutWidth)}px`);
-        setCanvasHeight(Math.max(400, layoutHeight));
-      } else {
-        setCanvasWidth("100%");
-        setCanvasHeight(Math.max(650, layoutHeight));
-      }
+      console.log(`Layout dimensions: minX=${minX}, maxX=${maxX}, minY=${minY}, maxY=${maxY}, layoutWidth=${layoutWidth}, layoutHeight=${layoutHeight}`);
+
+      // Center the layout horizontally within the canvas
+      const offsetX = (containerWidth - layoutWidth) / 2 - minX;
+      adjustedNodes = adjustedNodes.map((node: Node) => ({
+        ...node,
+        position: {
+          x: node.position.x + offsetX,
+          y: node.position.y,
+        },
+      }));
+
+      // Set canvas dimensions to match the layout size with additional padding
+      setCanvasWidth("100%");
+      setCanvasHeight(layoutHeight + 80); // Consistent padding for both mobile and desktop
 
       setNodes(adjustedNodes);
       setEdges(configEdges);
       setError(null);
     } catch (err) {
-      setError("Failed to render React Flow diagram: Invalid configuration");
+      setError("Failed to render React Flow diagram: " + (err instanceof Error ? err.message : "Unknown error"));
       console.error(`React Flow render error for chart ${id}:`, err);
     }
-  }, [chartConfig, id, canRender]);
+  }, [chartConfig, id]);
+
+  // Handle container resizing with debouncing
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(
+      debounce((entries) => {
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect;
+          console.log(`Resize detected for chart ${id}: width=${width}, height=${height}`);
+          if (width > 0 && height > 0) {
+            setCanRender(true);
+            computeLayout();
+          } else {
+            setCanRender(false);
+          }
+        }
+      }, 200)
+    );
+
+    observer.observe(container);
+
+    const { width, height } = container.getBoundingClientRect();
+    console.log(`Initial container dimensions for chart ${id}: width=${width}, height=${height}`);
+    if (width > 0 && height > 0) {
+      setCanRender(true);
+      computeLayout();
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [id, computeLayout]);
 
   return (
-    <div className="w-full overflow-x-hidden"> {/* Ensure no horizontal overflow */}
+    <div className="w-full overflow-x-hidden">
       <div ref={containerRef} className="w-full" style={{ width: canvasWidth, height: `${canvasHeight}px`, maxWidth: "100%" }}>
         {error ? (
           <p className="text-red-500">{error}</p>
@@ -161,8 +204,6 @@ const ReactFlowDiagram: React.FC<ReactFlowDiagramProps> = ({ chartConfig, id }) 
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            fitView
-            fitViewOptions={{ padding: 0.02, minZoom: 0.1, maxZoom: 1.2 }}
             colorMode="system"
             style={{ width: "100%", height: "100%" }}
             panOnDrag={false}

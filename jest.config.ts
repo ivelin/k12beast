@@ -1,8 +1,12 @@
+// File path: jest.config.ts
+// Configures Jest for server-side tests in K12Beast
+// Original configuration, used with regex-based test
+
 import type { Config } from 'jest';
 
 const config: Config = {
   preset: 'ts-jest',
-  testEnvironment: 'node', // Revert to 'node'
+  testEnvironment: 'node',
   testMatch: ['**/tests/server/**/*.spec.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
