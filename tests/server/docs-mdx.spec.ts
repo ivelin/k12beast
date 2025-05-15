@@ -1,6 +1,6 @@
 // File path: tests/server/docs-mdx.spec.ts
 // Unit tests for MDX documentation files in src/content/docs
-// Validates absence of invalid comments, correct MDX formatting, SEO, and Schema.org metadata
+// Validates absence of invalid comments, correct MDX formatting, SEO, and Schema.org metadata from frontmatter
 // Uses structural checks with minimal regex, allows # or {/* */} comments before frontmatter
 
 import { readdirSync, readFileSync, existsSync } from 'fs';
@@ -86,7 +86,6 @@ describe('MDX Documentation Files', () => {
         const content = readFileSync(filePath, 'utf8').trim();
         const relativePath = filePath.replace(process.cwd(), '');
 
-        // Find frontmatter delimiters
         const lines = content.split('\n');
         let frontmatterStart = -1;
         let frontmatterEnd = -1;
@@ -109,7 +108,6 @@ describe('MDX Documentation Files', () => {
           throw new Error(`${relativePath} lacks closing --- delimiter`);
         }
 
-        // Extract frontmatter content
         let frontmatter: { [key: string]: any };
         try {
           const { data, content: rawContent } = matter(content);
@@ -123,7 +121,6 @@ describe('MDX Documentation Files', () => {
           throw new Error(`${relativePath} has invalid frontmatter: ${error.message}`);
         }
 
-        // Check content after frontmatter
         const contentAfterFrontmatter = lines.slice(frontmatterEnd + 1).join('\n');
         if (!contentAfterFrontmatter.trim()) {
           throw new Error(`${relativePath} has no content after frontmatter`);
@@ -182,39 +179,33 @@ describe('MDX Documentation Files', () => {
         const content = readFileSync(filePath, 'utf8').trim();
         const relativePath = filePath.replace(process.cwd(), '');
 
-        const scriptStart = '<script type="application/ld+json">';
-        const scriptEnd = '</script>';
-        let startIndex = content.indexOf(scriptStart);
-        let foundJsonLd = false;
-
-        while (startIndex !== -1) {
-          const endIndex = content.indexOf(scriptEnd, startIndex + scriptStart.length);
-          if (endIndex === -1) {
-            throw new Error(`${relativePath} has unclosed JSON-LD script tag at index ${startIndex}`);
-          }
-
-          const jsonLdContent = content.slice(startIndex + scriptStart.length, endIndex).trim();
-          try {
-            const jsonLd = JSON.parse(jsonLdContent);
-            if (jsonLd['@context'] !== 'https://schema.org') {
-              throw new Error(`${relativePath} JSON-LD lacks valid @context (expected https://schema.org)`);
-            }
-            if (!jsonLd['@type']) {
-              throw new Error(`${relativePath} JSON-LD lacks @type`);
-            }
-            if (typeof jsonLd['@type'] !== 'string') {
-              throw new Error(`${relativePath} JSON-LD @type is not a string`);
-            }
-            foundJsonLd = true;
-          } catch (error) {
-            throw new Error(`${relativePath} has invalid JSON-LD at index ${startIndex}: ${error.message}`);
-          }
-
-          startIndex = content.indexOf(scriptStart, endIndex + scriptEnd.length);
+        let frontmatter;
+        try {
+          const { data } = matter(content);
+          frontmatter = data;
+        } catch (error) {
+          throw new Error(`${relativePath} has invalid frontmatter: ${error.message}`);
         }
 
-        if (!foundJsonLd) {
-          throw new Error(`${relativePath} has no valid JSON-LD script tags`);
+        if (!frontmatter.jsonLd) {
+          throw new Error(`${relativePath} missing jsonLd in frontmatter`);
+        }
+
+        let jsonLd;
+        try {
+          jsonLd = JSON.parse(frontmatter.jsonLd);
+        } catch (error) {
+          throw new Error(`${relativePath} has invalid JSON-LD in frontmatter: ${error.message}`);
+        }
+
+        if (jsonLd['@context'] !== 'https://schema.org') {
+          throw new Error(`${relativePath} JSON-LD lacks valid @context (expected https://schema.org)`);
+        }
+        if (!jsonLd['@type']) {
+          throw new Error(`${relativePath} JSON-LD lacks @type`);
+        }
+        if (typeof jsonLd['@type'] !== 'string') {
+          throw new Error(`${relativePath} JSON-LD @type is not a string`);
         }
       });
     });

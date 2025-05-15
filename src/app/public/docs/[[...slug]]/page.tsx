@@ -1,4 +1,4 @@
-// File path: src/app/public/docs/[...slug]/page.tsx
+// File path: src/app/public/docs/[[...slug]]/page.tsx
 // Catch-all route for /public/docs to dynamically handle all MDX files, process frontmatter for metadata, and render content.
 // Loads MDX files from src/content/docs and uses remark plugins to strip comments and exclude frontmatter from rendering.
 
@@ -13,14 +13,12 @@ import { remove } from "unist-util-remove";
 // Custom remark plugin to remove frontmatter node from the MDX content
 function remarkRemoveFrontmatter() {
   return (tree: any) => {
-    // Remove the frontmatter node (type: "yaml")
     const hasFrontmatter = tree.children.some((node: any) => node.type === "yaml");
     if (hasFrontmatter) {
       console.log("[remarkRemoveFrontmatter] Found and removing frontmatter (yaml) node");
       remove(tree, { type: "yaml" });
     }
 
-    // Fallback: If frontmatter is parsed as a heading node, remove it (temporary until parsing is fixed)
     const hasFrontmatterHeading = tree.children.some(
       (node: any) =>
         node.type === "heading" &&
@@ -41,14 +39,13 @@ function remarkRemoveFrontmatter() {
             child.value.includes("description:") &&
             child.value.includes("ogTitle:")
           ) {
-            return true; // Remove this node
+            return true;
           }
         }
         return false;
       });
     }
 
-    // Remove thematicBreak (---) if it exists after frontmatter removal
     const hasThematicBreak = tree.children.some((node: any) => node.type === "thematicBreak");
     if (hasThematicBreak) {
       console.log("[remarkRemoveFrontmatter] Found and removing thematicBreak node");
@@ -62,33 +59,27 @@ function remarkRemoveFrontmatter() {
 // Custom remark plugin to remove JSX comments (e.g., {/* */})
 function remarkRemoveMDXComments() {
   return (tree: any) => {
-    // Check for JSX comments (parsed as mdxFlowExpression nodes with value starting with "/*")
     const hasMDXFlowComments = tree.children.some(
       (node: any) => node.type === "mdxFlowExpression" && typeof node.value === "string" && node.value.trim().startsWith("/*")
     );
     if (hasMDXFlowComments) {
       console.log("[remarkRemoveMDXComments] Found and removing JSX comment (mdxFlowExpression) nodes");
       remove(tree, (node: any) => {
-        if (node.type === "mdxFlowExpression") {
-          if (typeof node.value === "string" && node.value.trim().startsWith("/*")) {
-            return true; // Remove this node
-          }
+        if (node.type === "mdxFlowExpression" && typeof node.value === "string" && node.value.trim().startsWith("/*")) {
+          return true;
         }
         return false;
       });
     }
 
-    // Fallback for jsx nodes (in case comments are embedded within JSX elements)
     const hasJSXComments = tree.children.some(
       (node: any) => node.type === "jsx" && typeof node.value === "string" && node.value.trim().startsWith("/*")
     );
     if (hasJSXComments) {
       console.log("[remarkRemoveMDXComments] Found and removing JSX comment (jsx) nodes");
       remove(tree, (node: any) => {
-        if (node.type === "jsx") {
-          if (typeof node.value === "string" && node.value.trim().startsWith("/*")) {
-            return true; // Remove this node
-          }
+        if (node.type === "jsx" && typeof node.value === "string" && node.value.trim().startsWith("/*")) {
+          return true;
         }
         return false;
       });
@@ -108,6 +99,7 @@ interface Frontmatter {
   ogUrl?: string;
   ogImage?: string;
   canonical?: string;
+  jsonLd?: string; // Added to support Schema.org JSON-LD in frontmatter
 }
 
 // Get the MDX file path based on the slug and load its content
@@ -115,25 +107,22 @@ async function getMDXData(slug: string[]) {
   const slugPath = slug.join("/") || "/";
   console.log(`[getMDXData] Processing slug: ${slugPath}`);
 
-  // Construct the file path from the slug
   const filePath = path.join(process.cwd(), "src/content/docs", slugPath, "page.mdx");
-
   console.log(`[getMDXData] Attempting to load file: ${filePath}`);
 
   try {
     const source = await readFile(filePath, "utf8");
     console.log(`[getMDXData] Successfully read file: ${filePath}`);
 
-    // Compile MDX with remark plugins to strip comments and frontmatter
     const { content, frontmatter } = await compileMDX<Frontmatter>({
       source,
       options: {
         parseFrontmatter: true,
         mdxOptions: {
           remarkPlugins: [
-            [remarkFrontmatter, ["yaml"]], // Explicitly specify YAML frontmatter parsing
-            remarkRemoveFrontmatter, // Remove frontmatter from the rendered content
-            remarkRemoveMDXComments, // Remove JSX comments (e.g., {/* */})
+            [remarkFrontmatter, ["yaml"]],
+            remarkRemoveFrontmatter,
+            remarkRemoveMDXComments,
           ],
           rehypePlugins: [],
         },
@@ -150,7 +139,7 @@ async function getMDXData(slug: string[]) {
 
 // Generate metadata dynamically based on the MDX frontmatter
 export async function generateMetadata({ params }: { params: Promise<{ slug: string[] }> }): Promise<Metadata> {
-  const resolvedParams = await params; // Await params to resolve the Promise
+  const resolvedParams = await params;
   const slug = resolvedParams.slug || [];
   const slugPath = slug.join("/") || "[]";
   console.log(`[generateMetadata] Generating metadata for slug: ${slugPath}`);
@@ -187,9 +176,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export async function generateStaticParams() {
   console.log("[generateStaticParams] Generating static params");
 
-  // List of known slugs for MDX files under src/content/docs
   const slugs = [
-    { slug: [] }, // For /public/docs
+    { slug: [] },
     { slug: ["teachers"] },
     { slug: ["parents"] },
     { slug: ["parents", "introduction"] },
@@ -203,10 +191,10 @@ export async function generateStaticParams() {
   return slugs;
 }
 
-// Page component to render the MDX content for the given slug
+// Page component to render the MDX content for the given slug with JSON-LD
 export default async function DocsPage({ params }: { params: Promise<{ slug: string[] }> }) {
   console.log("[DocsPage] Route handler invoked with params:", params);
-  const resolvedParams = await params; // Await params to resolve the Promise
+  const resolvedParams = await params;
   const slug = resolvedParams.slug || [];
   const slugPath = slug.join("/") || "/";
   console.log(`[DocsPage] Rendering page for slug: ${slugPath}`);
@@ -217,8 +205,18 @@ export default async function DocsPage({ params }: { params: Promise<{ slug: str
     notFound();
   }
 
-  const { content } = mdxData;
+  const { content, frontmatter } = mdxData;
   console.log(`[DocsPage] Successfully rendered content for slug: ${slugPath}`);
 
-  return <div className="docs-page">{content}</div>;
+  return (
+    <div className="docs-page">
+      {frontmatter.jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: frontmatter.jsonLd }}
+        />
+      )}
+      {content}
+    </div>
+  );
 }

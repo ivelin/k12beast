@@ -1,43 +1,18 @@
-{/*
-File path: src/app/public/docs/teachers/page.mdx
-Documentation page for teachers, providing an overview of how to use K12Beast in the classroom.
-Updated to include Open Graph tags, canonical URL, and structured data for SEO optimization.
-Fixed JSON-LD parsing issue by escaping the content to prevent MDX from parsing it as JavaScript.
-*/}
-
 ---
 title: Teachers Guide
-description: Learn how teachers can use K12Beast to support K-12 education in the classroom.
-ogTitle: Teachers Guide to K12Beast - Support K-12 Education
-ogDescription: Learn how teachers can use K12Beast to support K-12 education with personalized lessons and quizzes in the classroom.
+description: Learn how teachers can integrate K12Beast into their classroom activities.
+ogTitle: Teachers Guide - K12Beast
+ogDescription: Discover how K12Beast supports teachers in enhancing K12 education with personalized lessons and quizzes.
 ogType: website
-ogUrl: https://k12beast.com/public/docs/teachers
-ogImage: https://k12beast.com/images/teachers-guide.png
-canonical: https://k12beast.com/public/docs/teachers
----
-
-# Teachers Guide
-
-Welcome to K12Beast, a personalized tutoring app designed to enhance K-12 education. This guide helps teachers understand how to integrate K12Beast into their classroom to support student learning.
-
-## Getting Started
-
-1. **Sign Up**: Create an account at [/signup](/signup).
-2. **Start a Session**: Begin a session for your students at [/chat/new](/chat/new) by submitting a problem.
-3. **Track Progress**: Use shared sessions to monitor student improvement and understanding.
-
-## Key Features
-
-- **Personalized Lessons**: Provide students with tailored lessons based on their needs.
-- **Interactive Quizzes**: Assign AI-generated quizzes to reinforce concepts.
-- **Session Sharing**: Review student sessions to assess progress and provide feedback.
-
-<script type="application/ld+json" dangerouslySetInnerHTML={{
-  __html: JSON.stringify({
+ogUrl: https://k12beast.com/docs/teachers
+ogImage: https://k12beast.com/images/docs.png
+canonical: https://k12beast.com/docs/teachers
+jsonLd: |
+  {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    "name": "Getting Started with K12Beast for Teachers",
-    "description": "A guide for teachers to start using K12Beast in the classroom.",
+    "name": "Teachers Guide to K12Beast",
+    "description": "A guide for teachers to integrate K12Beast into classroom activities.",
     "step": [
       {
         "@type": "HowToStep",
@@ -52,8 +27,23 @@ Welcome to K12Beast, a personalized tutoring app designed to enhance K-12 educat
       {
         "@type": "HowToStep",
         "name": "Track Progress",
-        "text": "Use shared sessions to monitor student improvement and understanding."
+        "text": "Use shared sessions to monitor student improvement."
       }
     ]
-  })
-}} />
+  }
+---
+
+{/*
+File path: src/content/docs/teachers/page.mdx
+Guide for teachers on integrating K12Beast into the classroom.
+*/}
+
+# Teachers Guide
+
+Integrate K12Beast into your teaching with personalized lessons and quizzes.
+
+## Getting Started
+
+1. **Sign Up**: Create an account at [/signup](/signup).
+2. **Start a Session**: Begin a session at [/chat/new](/chat/new) by submitting a problem.
+3. **Track Progress**: Monitor student progress through shared sessions.

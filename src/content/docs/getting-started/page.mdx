@@ -1,11 +1,44 @@
-// File path: src/app/public/docs/getting-started/page.mdx
-// Sample documentation page for testing the layout and sidebar
-// Server-rendered for SEO optimization
+---
+title: Getting Started with K12Beast
+description: Learn how to get started with K12Beast, a personalized tutoring app for K12 students.
+ogTitle: Getting Started with K12Beast
+ogDescription: Learn how to get started with K12Beast, a personalized tutoring app for K12 students.
+ogType: website
+ogUrl: https://k12beast.com/docs/getting-started
+ogImage: https://k12beast.com/images/docs.png
+canonical: https://k12beast.com/docs/getting-started
+jsonLd: |
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Getting Started with K12Beast",
+    "description": "A guide to help you get started with K12Beast for K-12 education.",
+    "url": "https://k12beast.com/docs/getting-started",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "Sign Up",
+        "text": "Create an account at /signup."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Explore",
+        "text": "Check out the documentation for your role."
+      },
+      {
+        "@type": "HowToStep",
+        "name": "Start Learning",
+        "text": "Submit a problem to begin a tutoring session."
+      }
+    ]
+  }
+---
 
----
-title: Getting Started
-description: Learn how to get started with K12Beast.
----
+{/*
+File path: src/app/public/docs/getting-started/page.mdx
+Sample documentation page for testing the layout and sidebar.
+Server-rendered for SEO optimization.
+*/}
 
 # Getting Started
 
@@ -16,3 +49,4 @@ Welcome to K12Beast! This guide helps you begin using the app for K-12 education
 1. **Sign Up**: Create an account at [/signup](/signup).
 2. **Explore**: Check out the documentation for your role (Parent, Student, Teacher, Tutor).
 3. **Start Learning**: Submit a problem to begin a tutoring session.
+
