@@ -174,7 +174,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 // Generate static params for known MDX files (optional, for static generation)
 export async function generateStaticParams() {
-  console.log("[generateStaticParams] Generating static params");
+  // console.log("[generateStaticParams] Generating static params");
 
   const slugs = [
     { slug: [] },
@@ -187,7 +187,7 @@ export async function generateStaticParams() {
     { slug: ["getting-started"] },
   ];
 
-  console.log("[generateStaticParams] Generated slugs:", slugs);
+  // console.log("[generateStaticParams] Generated slugs:", slugs);
   return slugs;
 }
 

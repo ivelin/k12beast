@@ -1,62 +1,63 @@
 // File path: src/app/public/about/page.tsx
-// About page for K12Beast, detailing its purpose, open-source status, and brand ownership
+// Server component for K12Beast about page, handling SEO and structured data
+// Renders AboutClient for static content
 
-import Link from "next/link";
+import { Metadata } from 'next';
+import AboutClient from './AboutClient';
+
+// Define SEO metadata for the page
+export const metadata: Metadata = {
+  title: 'About K12Beast',
+  description: 'Learn about K12Beast, a personalized tutoring app for K-12 students, parents, and educators.',
+  openGraph: {
+    title: 'About K12Beast',
+    description: 'Learn about K12Beast, a personalized tutoring app for K-12 students, parents, and educators.',
+    type: 'website',
+    url: 'https://k12beast.com/public/about',
+    images: ['https://k12beast.com/images/about.png'],
+  },
+};
+
+// Define FAQPage JSON-LD for rich results
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is K12Beast?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'K12Beast is a personalized tutoring platform for K-12 students, using AI to deliver tailored lessons, examples, and quizzes.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is K12Beast open-source?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes, K12Beast is open-source under the Apache License 2.0. Explore or contribute on our GitHub repository.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How can I contact K12Beast?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Reach out to us at support@k12beast.com for any questions or support.',
+      },
+    },
+  ],
+};
 
 export default function About() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-[90vw] sm:max-w-4xl">
-      <h1 className="text-2xl font-bold mb-4">About K12Beast</h1>
-      <p className="mb-4 text-muted-foreground">
-        K12Beast is a personalized tutoring platform designed to help K-12 students
-        master academic concepts through AI-powered lessons, examples, and quizzes.
-        Our mission is to make learning engaging and accessible for students,
-        parents, and educators.
-      </p>
-      <section className="mb-4">
-        <h2 className="text-xl font-semibold mb-2">Open-Source Software</h2>
-        <p className="text-muted-foreground">
-          K12Beast is proudly open-source, licensed under the{" "}
-          <a
-            href="https://www.apache.org/licenses/LICENSE-2.0"
-            className="text-primary hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Apache License 2.0
-          </a>
-          . Developers can explore, contribute to, or modify the source code on our{" "}
-          <a
-            href="https://github.com/ivelin/k12beast"
-            className="text-primary hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub repository
-          </a>
-          .
-        </p>
-      </section>
-      <section className="mb-4">
-        <h2 className="text-xl font-semibold mb-2">Ownership</h2>
-        <p className="text-muted-foreground">
-          The K12Beast brand and the k12beast.com domain are owned by zk0 DBA,
-          a company based in Austin, Texas.
-        </p>
-      </section>
-      <section>
-        <h2 className="text-xl font-semibold mb-2">Contact Us</h2>
-        <p className="text-muted-foreground">
-          Have questions? Reach out to us at{" "}
-          <a
-            href="mailto:support@k12beast.com"
-            className="text-primary hover:underline"
-          >
-            support@k12beast.com
-          </a>
-          .
-        </p>
-      </section>
-    </div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <AboutClient />
+    </>
   );
 }

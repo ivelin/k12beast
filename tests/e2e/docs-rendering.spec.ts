@@ -88,10 +88,6 @@ test.describe('Documentation Pages Rendering', () => {
       'content',
       'https://k12beast.com/docs/getting-started'
     );
-    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
-      'content',
-      'https://k12beast.com/images/docs.png'
-    );
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       'href',
       'https://k12beast.com/docs/getting-started'

@@ -4,24 +4,58 @@ description: Explore the various subjects covered by K12Beast's tutoring service
 ogTitle: Subjects - K12Beast
 ogDescription: Discover the range of K12 subjects supported by K12Beast’s personalized tutoring.
 ogType: website
-ogUrl: https://k12beast.com/docs/subjects
+ogUrl: https://k12beast.com/public/docs/subjects
 ogImage: https://k12beast.com/images/docs.png
-canonical: https://k12beast.com/docs/subjects
+canonical: https://k12beast.com/public/docs/subjects
 jsonLd: |
   {
     "@context": "https://schema.org",
-    "@type": "WebPage",
-    "name": "Subjects",
-    "description": "Explore the various subjects covered by K12Beast's tutoring services.",
-    "url": "https://k12beast.com/docs/subjects"
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What subjects does K12Beast cover for tutoring?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "K12Beast offers tutoring in core K12 subjects, including mathematics, science, English, and social studies."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can K12Beast support advanced subjects like calculus or physics?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, K12Beast provides personalized tutoring for advanced subjects like calculus, physics, and more, tailored to student needs."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How can students access subject-specific tutoring on K12Beast?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Students can log in at /public/login, go to /chat, and submit a problem in their chosen subject to start a tutoring session."
+        }
+      }
+    ]
   }
 ---
 
 {/*
-File path: src/content/docs/subjects/page.mdx
-Overview of subjects available in K12Beast’s tutoring services.
+  File path: src/content/docs/subjects/page.mdx
+  Overview of subjects available in K12Beast’s tutoring services
+  Includes FAQPage schema for rich results eligibility, addressing common subject-related questions
 */}
 
 # Subjects
 
 Browse the subjects available in K12Beast, from math to science and more.
+
+## Available Subjects
+
+K12Beast offers tutoring in core K12 subjects, including:
+- **Mathematics**: Algebra, geometry, calculus, and more.
+- **Science**: Biology, chemistry, physics, and earth science.
+- **English**: Reading, writing, and literature.
+- **Social Studies**: History, geography, and civics.
+
+To start a subject-specific tutoring session, visit [/chat](/chat) after logging in.

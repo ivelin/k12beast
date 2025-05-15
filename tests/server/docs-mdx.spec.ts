@@ -1,7 +1,7 @@
 // File path: tests/server/docs-mdx.spec.ts
 // Unit tests for MDX documentation files in src/content/docs
 // Validates absence of invalid comments, correct MDX formatting, SEO, and Schema.org metadata from frontmatter
-// Enhanced to check Schema.org types and required properties for Google rich results
+// Enhanced to check Schema.org types and required properties for Google rich results, aligned with rich-results.spec.ts
 
 import { readdirSync, readFileSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
@@ -206,6 +206,7 @@ describe('MDX Documentation Files', () => {
           throw new Error(`${relativePath} has invalid JSON-LD in frontmatter: ${error.message}`);
         }
 
+        // Validate Schema.org basics
         if (jsonLd['@context'] !== 'https://schema.org') {
           throw new Error(`${relativePath} JSON-LD lacks valid @context (expected https://schema.org)`);
         }
@@ -224,7 +225,7 @@ describe('MDX Documentation Files', () => {
           }
         });
 
-        // Additional validation for specific types
+        // Specific validation for FAQPage
         if (jsonLd['@type'] === 'FAQPage') {
           if (!Array.isArray(jsonLd.mainEntity) || jsonLd.mainEntity.length === 0) {
             throw new Error(`${relativePath} FAQPage JSON-LD mainEntity must be a non-empty array`);
@@ -236,7 +237,57 @@ describe('MDX Documentation Files', () => {
             if (!entity.name || !entity.acceptedAnswer || !entity.acceptedAnswer.text) {
               throw new Error(`${relativePath} FAQPage mainEntity[${index}] missing name or acceptedAnswer.text`);
             }
+            if (typeof entity.name !== 'string') {
+              throw new Error(`${relativePath} FAQPage mainEntity[${index}] name must be a string`);
+            }
+            if (typeof entity.acceptedAnswer.text !== 'string') {
+              throw new Error(`${relativePath} FAQPage mainEntity[${index}] acceptedAnswer.text must be a string`);
+            }
           });
+        }
+
+        // Specific validation for HowTo
+        if (jsonLd['@type'] === 'HowTo') {
+          if (!Array.isArray(jsonLd.step) || jsonLd.step.length === 0) {
+            throw new Error(`${relativePath} HowTo JSON-LD step must be a non-empty array`);
+          }
+          jsonLd.step.forEach((step: any, index: number) => {
+            if (step['@type'] !== 'HowToStep') {
+              throw new Error(`${relativePath} HowTo step[${index}] must have @type 'HowToStep'`);
+            }
+            if (!step.name || !step.text) {
+              throw new Error(`${relativePath} HowTo step[${index}] missing name or text`);
+            }
+            if (typeof step.name !== 'string') {
+              throw new Error(`${relativePath} HowTo step[${index}] name must be a string`);
+            }
+            if (typeof step.text !== 'string') {
+              throw new Error(`${relativePath} HowTo step[${index}] text must be a string`);
+            }
+          });
+        }
+
+        // Specific validation for Article
+        if (jsonLd['@type'] === 'Article') {
+          if (typeof jsonLd.headline !== 'string') {
+            throw new Error(`${relativePath} Article JSON-LD headline must be a string`);
+          }
+          if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(jsonLd.datePublished)) {
+            throw new Error(`${relativePath} Article JSON-LD datePublished must be in ISO 8601 format (e.g., 2023-01-01T00:00:00Z)`);
+          }
+          if (!jsonLd.author || !jsonLd.author['@type'] || !jsonLd.author.name) {
+            throw new Error(`${relativePath} Article JSON-LD author must have @type and name`);
+          }
+        }
+
+        // Specific validation for EducationalOrganization
+        if (jsonLd['@type'] === 'EducationalOrganization') {
+          if (typeof jsonLd.name !== 'string') {
+            throw new Error(`${relativePath} EducationalOrganization JSON-LD name must be a string`);
+          }
+          if (typeof jsonLd.description !== 'string') {
+            throw new Error(`${relativePath} EducationalOrganization JSON-LD description must be a string`);
+          }
         }
       });
     });
