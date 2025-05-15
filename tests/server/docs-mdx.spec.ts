@@ -1,7 +1,7 @@
 // File path: tests/server/docs-mdx.spec.ts
 // Unit tests for MDX documentation files in src/content/docs
 // Validates absence of invalid comments, correct MDX formatting, SEO, and Schema.org metadata from frontmatter
-// Uses structural checks with minimal regex, allows # or {/* */} comments before frontmatter
+// Enhanced to check Schema.org types and required properties for Google rich results
 
 import { readdirSync, readFileSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
@@ -9,6 +9,14 @@ import matter from 'gray-matter';
 
 // Define the directory containing MDX files
 const DOCS_DIR = resolve(process.cwd(), 'src/content/docs');
+
+// Schema.org type-specific required fields for rich results
+const SCHEMA_REQUIREMENTS: { [key: string]: string[] } = {
+  Article: ['headline', 'datePublished', 'author'],
+  FAQPage: ['mainEntity'],
+  HowTo: ['step'],
+  EducationalOrganization: ['name', 'description'],
+};
 
 // Helper function to recursively get all .mdx files
 function getMDXFiles(dir: string): string[] {
@@ -206,6 +214,29 @@ describe('MDX Documentation Files', () => {
         }
         if (typeof jsonLd['@type'] !== 'string') {
           throw new Error(`${relativePath} JSON-LD @type is not a string`);
+        }
+
+        // Validate required fields for specific Schema.org types
+        const requiredFields = SCHEMA_REQUIREMENTS[jsonLd['@type']] || [];
+        requiredFields.forEach(field => {
+          if (!jsonLd[field]) {
+            throw new Error(`${relativePath} JSON-LD missing required field for ${jsonLd['@type']}: ${field}`);
+          }
+        });
+
+        // Additional validation for specific types
+        if (jsonLd['@type'] === 'FAQPage') {
+          if (!Array.isArray(jsonLd.mainEntity) || jsonLd.mainEntity.length === 0) {
+            throw new Error(`${relativePath} FAQPage JSON-LD mainEntity must be a non-empty array`);
+          }
+          jsonLd.mainEntity.forEach((entity: any, index: number) => {
+            if (entity['@type'] !== 'Question') {
+              throw new Error(`${relativePath} FAQPage mainEntity[${index}] must have @type 'Question'`);
+            }
+            if (!entity.name || !entity.acceptedAnswer || !entity.acceptedAnswer.text) {
+              throw new Error(`${relativePath} FAQPage mainEntity[${index}] missing name or acceptedAnswer.text`);
+            }
+          });
         }
       });
     });

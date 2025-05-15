@@ -193,7 +193,7 @@ export async function generateStaticParams() {
 
 // Page component to render the MDX content for the given slug with JSON-LD
 export default async function DocsPage({ params }: { params: Promise<{ slug: string[] }> }) {
-  console.log("[DocsPage] Route handler invoked with params:", params);
+  // console.log("[DocsPage] Route handler invoked with params:", params);
   const resolvedParams = await params;
   const slug = resolvedParams.slug || [];
   const slugPath = slug.join("/") || "/";
