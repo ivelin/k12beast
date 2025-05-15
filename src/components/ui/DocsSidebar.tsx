@@ -17,7 +17,7 @@ const menu = [
   {
     title: 'Students',
     path: '/public/docs/students',
-    children: [{ title: 'Math', path: '/public/docs/students/math' }],
+    children: [],
   },
   {
     title: 'Parents',
@@ -37,7 +37,7 @@ const menu = [
   {
     title: 'Subjects',
     path: '/public/docs/subjects',
-    children: [{ title: 'Algebra', path: '/public/docs/subjects/algebra' }],
+    children: [],
   },
  ];
 
