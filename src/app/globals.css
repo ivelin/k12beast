@@ -1,5 +1,7 @@
 /* File path: src/app/globals.css */
 /* Global styles for K12Beast, including Tailwind CSS setup and custom styles */
+/* Updated to improve readability of bold text and links in dark mode with minimal changes */
+/* Updated to add table styling for Markdown tables in the prose class */
 
 @config "../../tailwind.config.js";
 @import "tailwindcss";
@@ -337,12 +339,52 @@ button[type="submit"]:hover {
 .prose {
   @apply text-foreground;
 }
+
 .prose h1, .prose h2, .prose h3 {
   @apply text-foreground font-bold;
 }
+
 .prose p {
   @apply text-muted-foreground mb-4;
 }
+
 .prose ul {
   @apply list-disc ml-6 mb-4;
+}
+
+/* Dark mode adjustments for bold text and links */
+.dark .prose strong {
+  @apply text-gray-300; /* Softer gray for bold text to reduce harshness */
+}
+
+.dark .prose a {
+  @apply text-blue-400; /* Lighter blue for links to improve visibility */
+  text-decoration-color: hsl(var(--muted-foreground)); /* Use muted-foreground for underline */
+}
+
+/* Table styling for Markdown tables */
+.prose table {
+  @apply w-full my-4 border-collapse;
+}
+
+.prose th,
+.prose td {
+  @apply border border-border px-4 py-2 text-left;
+}
+
+.prose th {
+  @apply bg-muted text-foreground font-semibold;
+}
+
+.prose td {
+  @apply text-foreground;
+}
+
+/* Dark mode adjustments for tables */
+.dark .prose th {
+  @apply bg-gray-800; /* Darker background for table headers in dark mode */
+}
+
+.dark .prose td {
+  @apply border-gray-700; /* Adjust border color for better visibility in dark mode */
 }

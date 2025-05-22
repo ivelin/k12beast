@@ -3,11 +3,12 @@
 // Allows external image domains for testing and Supabase storage URLs
 // Disables TypeScript build errors and source maps in development
 // Sets cache control headers for source maps
-// Configures MDX to strip comments and frontmatter from rendering
+// Configures MDX to strip comments and frontmatter from rendering, with GFM support for tables
 
 import type { NextConfig } from 'next';
 import createMDX from '@next/mdx';
 import remarkFrontmatter from 'remark-frontmatter';
+import remarkGfm from 'remark-gfm'; // Added for GFM table support
 import remarkRemoveComments from 'remark-remove-comments';
 import { remove } from 'unist-util-remove';
 
@@ -63,6 +64,7 @@ const withMDX = createMDX({
       remarkFrontmatter, // Parse frontmatter
       remarkRemoveFrontmatter, // Remove frontmatter from rendering
       remarkRemoveComments, // Remove comments (e.g., lines starting with //)
+      remarkGfm, // Enable GitHub Flavored Markdown for table support,
     ],
     // Add rehype plugins here if needed in the future
     rehypePlugins: [],

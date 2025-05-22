@@ -1,6 +1,8 @@
 // File path: src/app/public/docs/[[...slug]]/page.tsx
 // Catch-all route for /public/docs to dynamically handle all MDX files, process frontmatter for metadata, and render content.
 // Loads MDX files from src/content/docs and uses remark plugins to strip comments and exclude frontmatter from rendering.
+// Updated to apply the prose class for proper styling of MDX content, ensuring headings are styled distinctly.
+// Updated to include remark-gfm for rendering Markdown tables.
 
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -8,6 +10,7 @@ import { compileMDX } from "next-mdx-remote/rsc";
 import { readFile } from "fs/promises";
 import path from "path";
 import remarkFrontmatter from "remark-frontmatter";
+import remarkGfm from "remark-gfm"; // Added for table support
 import { remove } from "unist-util-remove";
 
 // Custom remark plugin to remove frontmatter node from the MDX content
@@ -123,6 +126,7 @@ async function getMDXData(slug: string[]) {
             [remarkFrontmatter, ["yaml"]],
             remarkRemoveFrontmatter,
             remarkRemoveMDXComments,
+            remarkGfm, // Added for table support
           ],
           rehypePlugins: [],
         },
@@ -216,7 +220,9 @@ export default async function DocsPage({ params }: { params: Promise<{ slug: str
           dangerouslySetInnerHTML={{ __html: frontmatter.jsonLd }}
         />
       )}
-      {content}
+      <article className="prose">
+        {content}
+      </article>
     </div>
   );
 }

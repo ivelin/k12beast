@@ -168,6 +168,9 @@ describe('MDX Documentation Files', () => {
         if (frontmatter.description.length < 50) {
           throw new Error(`${relativePath} description is too short (must be at least 50 characters)`);
         }
+        if (frontmatter.description.length > 160) {
+          throw new Error(`${relativePath} description is too long (must be at most 160 characters)`);
+        }
         if (!frontmatter.ogUrl.match(/^https?:\/\/[^\s/$.?#[].*[^\s]$/)) {
           throw new Error(`${relativePath} ogUrl is not a valid URL`);
         }
