@@ -1,7 +1,7 @@
 // tests/server/sitemap.spec.ts
 // File path: tests/server/sitemap.spec.ts
 // Verifies sitemap.xml generation includes all expected URLs
-// Logs each URL comparison for precise debugging
+// Handles missing sitemap file and generation errors
 
 import { execSync } from 'child_process';
 import { readFileSync, unlinkSync, existsSync } from 'fs';

@@ -1,6 +1,6 @@
 # .github/workflows/e2e-tests.yaml
 # File path: .github/workflows/e2e-tests.yaml
-# Runs CI for K12Beast, including E2E and server tests with build step
+# Runs CI for K12Beast, including E2E and server tests with build debugging
 
 name: Tests
 on:
@@ -18,6 +18,8 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
       TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+      XAI_MODEL_NAME: ${{ secrets.XAI_MODEL_NAME }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,9 +51,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
       TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+      XAI_MODEL_NAME: ${{ secrets.XAI_MODEL_NAME }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,10 +67,22 @@ jobs:
       - name: Debug environment variables
         run: |
           echo "NEXT_PUBLIC_SUPABASE_URL: $NEXT_PUBLIC_SUPABASE_URL"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY: [REDACTED]"
           echo "SUPABASE_SERVICE_ROLE_KEY: [REDACTED]"
-          env | grep -E 'NEXT_PUBLIC_SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY'
+          echo "XAI_API_KEY: [REDACTED]"
+          echo "XAI_MODEL_NAME: [REDACTED]"
+          env | grep -E 'NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY|XAI_API_KEY|XAI_MODEL_NAME'
       - name: Run build
-        run: npm run build
+        run: npm run build --verbose
+      - name: Verify build manifest
+        run: |
+          if [ -f .next/build-manifest.json ]; then
+            echo "build-manifest.json found"
+          else
+            echo "build-manifest.json missing"
+            ls -la .next
+            exit 1
+          fi
       - name: Run Jest server tests
         run: npm run test:server
       - name: Upload server test report
