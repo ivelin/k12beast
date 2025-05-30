@@ -50,6 +50,13 @@ describe('Sitemap Generation', () => {
       'https://k12beast.com/public/terms',
     ];
 
+    // Check for non-public URLs
+    const nonPublicUrls = urls.filter(url => !url.match(/^https:\/\/k12beast\.com(\/?|\/public\/.*)$/));
+    if (nonPublicUrls.length > 0) {
+      console.log(`[Sitemap Test] Non-public URLs found: ${nonPublicUrls.join(', ')}`);
+      throw new Error(`Non-public URLs found in sitemap: ${nonPublicUrls.join(', ')}`);
+    }
+
     // Verify total number of URLs
     if (urls.length !== expectedUrls.length) {
       console.log(`[Sitemap Test] URL count mismatch. Expected: ${expectedUrls.length}, Received: ${urls.length}`);
@@ -59,9 +66,6 @@ describe('Sitemap Generation', () => {
 
     // Verify all URLs are either root or start with /public/
     for (const url of urls) {
-      if (!url.match(/^https:\/\/k12beast\.com(\/?|\/public\/.*)$/)) {
-        console.log(`[Sitemap Test] Invalid URL format: ${url}`);
-      }
       expect(url).toMatch(/^https:\/\/k12beast\.com(\/?|\/public\/.*)$/);
       expect(expectedUrls).toContain(url);
     }
