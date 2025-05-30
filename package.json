@@ -10,7 +10,7 @@
     "postinstall": "echo 'Please set up your environment variables in .env.local. See README.md for instructions.'",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:server": "jest --config jest.config.ts",
+    "test:server": "npm run sitemap && jest --config jest.config.ts",
     "test": "npm run test:e2e && npm run test:server",
     "sitemap": "next-sitemap"
   },

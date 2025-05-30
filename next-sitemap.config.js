@@ -1,7 +1,7 @@
 // next-sitemap.config.js
 // File path: next-sitemap.config.js
-// Configures sitemap for K12Beast, including home, public, and documentation pages
-// Scans directories for page.tsx and page.mdx files, excluding dynamic routes
+// Configures sitemap for K12Beast, including only root and public pages
+// Scans directories for page.tsx and page.mdx files, excluding dynamic routes and non-public paths
 
 const fs = require('fs');
 const path = require('path');
@@ -17,10 +17,13 @@ function addPaths(dir, prefix, fileName) {
       paths.push(...addPaths(filePath, `${prefix}/${file}`, fileName));
     } else if (file === fileName) {
       const relativePath = prefix.endsWith('/public') ? '/public' : prefix;
-      if (!relativePath.includes('[')) {
+      // Exclude dynamic routes and non-public paths
+      if (!relativePath.includes('[') && (relativePath === '/public' || relativePath.startsWith('/public/'))) {
         paths.push({
           loc: relativePath,
           lastmod: new Date().toISOString(),
+          changefreq: 'daily',
+          priority: relativePath === '/public' ? 0.8 : 0.7,
         });
       }
     }
@@ -37,6 +40,8 @@ module.exports = {
       {
         loc: '/',
         lastmod: new Date().toISOString(),
+        changefreq: 'daily',
+        priority: 1.0,
       },
     ];
     paths.push(...addPaths(PUBLIC_DIR, '/public', 'page.tsx'));
