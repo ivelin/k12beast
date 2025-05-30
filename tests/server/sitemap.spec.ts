@@ -12,7 +12,11 @@ describe('Sitemap Generation', () => {
 
   beforeAll(() => {
     // Run next-sitemap CLI to generate sitemap.xml
-    execSync('npm run sitemap', { stdio: 'inherit' });
+    try {
+      execSync('npm run sitemap', { stdio: 'inherit' });
+    } catch (error) {
+      throw new Error(`Failed to generate sitemap: ${error.message}`);
+    }
   });
 
   afterAll(() => {
@@ -23,6 +27,11 @@ describe('Sitemap Generation', () => {
   });
 
   it('includes all expected pages in sitemap.xml', async () => {
+    // Check if sitemap.xml exists
+    if (!existsSync(sitemapPath)) {
+      throw new Error('Sitemap file not found: ./public/sitemap.xml. Ensure `npm run build` is run before `npm run sitemap`.');
+    }
+
     // Read sitemap.xml
     const sitemapContent = readFileSync(sitemapPath, 'utf8');
 
