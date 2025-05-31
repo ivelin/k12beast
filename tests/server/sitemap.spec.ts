@@ -36,7 +36,6 @@ describe('Sitemap Generation', () => {
       'https://k12beast.com/public/docs',
       'https://k12beast.com/public/docs/getting-started',
       'https://k12beast.com/public/docs/parents',
-      'https://k12beast.com/public/docs/parents/introduction',
       'https://k12beast.com/public/docs/students',
       'https://k12beast.com/public/docs/subjects',
       'https://k12beast.com/public/docs/teachers',

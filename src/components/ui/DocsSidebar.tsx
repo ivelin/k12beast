@@ -22,7 +22,7 @@ const menu = [
   {
     title: 'Parents',
     path: '/public/docs/parents',
-    children: [{ title: 'Introduction', path: '/public/docs/parents/introduction' }],
+    children: [],
   },
   {
     title: 'Teachers',
