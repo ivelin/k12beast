@@ -8,7 +8,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 1,
   reporter: 'html',
   outputDir: 'test-results',
   use: {
@@ -20,7 +20,7 @@ export default defineConfig({
     storageState: 'playwright/.auth/user.json',
     actionTimeout: 10000, // Increase action timeout to 10 seconds
   },
-  timeout: 20000, // Increase test timeout to 20 seconds
+  timeout: process.env.CI ? 60000 : 20000, // 60s for CI, 20s for local
   expect: { timeout: 5000 }, // Increase expect timeout to 5 seconds
   projects: [
     {

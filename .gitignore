@@ -53,3 +53,6 @@ tmp/
 playwright-report/
 test-results/
 playwright/
+
+# ignore dynamically generated files
+public/sitemap.xml

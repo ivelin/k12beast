@@ -1,10 +1,10 @@
-// File path: tests/e2e/utils.ts
+// tests/e2e/utils.ts
 // Reusable utility functions for E2E tests
 
-import { Page, BrowserContext } from "@playwright/test";
+import { Page } from "@playwright/test";
 
 // Login utility function that can be used in both fixtures and global setup
-export async function loginUser(page: Page, context: BrowserContext) {
+export async function loginUser(page: Page) {
   const testUserEmail = process.env.TEST_USER_EMAIL;
   const testUserPassword = process.env.TEST_USER_PASSWORD;
 
@@ -61,13 +61,13 @@ export async function loginUser(page: Page, context: BrowserContext) {
 
     // Log additional context for debugging without sensitive information
     console.log('Current URL after login attempt:', page.url());
-    console.log('Cookies after login attempt (count):', (await context.cookies()).length);
+    console.log('Cookies after login attempt (count):', (await page.context().cookies()).length);
     console.log('Page content after login attempt:', await page.content().catch(e => `Failed to get page content: ${e.message}`));
-    throw new Error(`Failed to redirect to /chat/new/: ${error.message}`);
+    throw new Error(`Failed to redirect to /chat/new/: ${(error as Error).message}`);
   }
 
   // Verify authentication by checking for the presence of the auth token cookie
-  const cookies = await context.cookies();
+  const cookies = await page.context().cookies();
   const authTokenCookie = cookies.find(cookie => cookie.name === 'supabase-auth-token');
   if (!authTokenCookie) {
     throw new Error("Supabase auth token cookie not set after login");

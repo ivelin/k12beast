@@ -1,17 +1,18 @@
 {
   "name": "k12beast",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/generate-search-index.js && node scripts/migrate.js && next dev",
-    "build": "node scripts/generate-search-index.js && node scripts/migrate.js && next build",
+    "build": "node scripts/generate-search-index.js && node scripts/migrate.js && next build && next-sitemap",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "echo 'Please set up your environment variables in .env.local. See README.md for instructions.'",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:server": "jest --config jest.config.ts",
-    "test": "npm run test:e2e && npm run test:server"
+    "test:server": "npm run sitemap && jest --config jest.config.ts",
+    "test": "npm run test:e2e && npm run test:server",
+    "sitemap": "next-sitemap"
   },
   "dependencies": {
     "@applitools/eyes-playwright": "^1.37.1",
@@ -39,6 +40,7 @@
     "lucide-react": "^0.441.0",
     "mathjax-full": "^3.2.2",
     "next": "15.2.4",
+    "next-intl": "^4.1.0",
     "next-mdx-remote": "^5.0.0",
     "next-themes": "^0.4.6",
     "openai": "^4.90.0",
@@ -57,7 +59,8 @@
     "tailwind-merge": "^2.5.2",
     "unist-util-remove": "^4.0.0",
     "uuid": "^11.1.0",
-    "zustand": "^4.5.5"
+    "zustand": "^4.5.5",
+    "next-sitemap": "^4.2.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.1",
@@ -78,6 +81,7 @@
     "tailwindcss": "^4",
     "ts-jest": "^29.3.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "xml2js": "^0.6.2"
   }
 }

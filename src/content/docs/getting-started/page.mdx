@@ -1,54 +1,99 @@
 ---
+# File path: src/content/docs/getting-started/page.mdx
+# Purpose: Guides users through setting up and using K12Beast for the first time, targeting students, parents, teachers, and tutors.
 title: Getting Started with K12Beast
-description: Learn how to get started with K12Beast, a personalized tutoring app for K12 students.
+description: Learn how to set up and start using K12Beast, the AI-powered tutoring platform for K-12 learning.
 ogTitle: Getting Started with K12Beast
-ogDescription: Learn how to get started with K12Beast, a personalized tutoring app for K12 students.
+ogDescription: Learn how to set up and start using K12Beast, the AI-powered tutoring platform for K-12 learning.
 ogType: website
-ogUrl: https://k12beast.com/docs/getting-started
-ogImage: https://k12beast.com/images/getting-started.png
-canonical: https://k12beast.com/docs/getting-started
+ogUrl: https://k12beast.com/public/docs/getting-started
+ogImage: https://k12beast.com/k12beast.jpg
+canonical: https://k12beast.com/public/docs/getting-started
 jsonLd: |
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
     "name": "Getting Started with K12Beast",
-    "description": "A guide to help you get started with K12Beast for K-12 education.",
+    "description": "Step-by-step guide to set up and use K12Beast for K-12 learning.",
+    "url": "https://k12beast.com/public/docs/getting-started",
     "step": [
       {
         "@type": "HowToStep",
-        "name": "Sign Up",
-        "text": "Visit /public/signup, enter your email and password, and verify your account via the confirmation email."
+        "name": "Sign Up or Log In",
+        "text": "Create an account or log in at /public/signup or /public/login to access K12Beast."
       },
       {
         "@type": "HowToStep",
-        "name": "Explore",
-        "text": "Log in at /public/login and navigate to /public/docs to explore guides for students, parents, and teachers."
+        "name": "Start a Chat Session",
+        "text": "Navigate to /chat to begin a new tutoring session by submitting a problem."
       },
       {
         "@type": "HowToStep",
-        "name": "Start Learning",
-        "text": "Go to /chat, submit a problem via text or image, and begin an AI-guided tutoring session."
+        "name": "Explore Features",
+        "text": "Use lessons, quizzes, and progress tracking to enhance learning."
       }
-    ]
+    ],
+    "publisher": {
+      "@type": "Organization",
+      "name": "K12Beast",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://k12beast.com/images/logo.png"
+      }
+    }
   }
 ---
 
-{/*
-  File path: src/content/docs/getting-started/page.mdx
-  Getting Started guide for K12Beast, with HowTo schema for rich results eligibility
-  Provides steps to sign up, explore, and start tutoring sessions, aligned with test expectations
-*/}
+# Getting Started with K12Beast 🚀
 
-# Getting Started with K12Beast
+Welcome to **K12Beast**, the AI-powered tutoring platform designed to make K-12 learning fun and effective! This guide walks you through setting up and using K12Beast, whether you're a **student**, **parent**, **teacher**, or **tutor**. Our documentation is WCAG 2.1 compliant, ensuring accessibility for all users.
 
-Welcome to K12Beast! This guide helps you set up your account and begin your learning journey as a student, parent, or teacher.
+---
 
-## First Steps
+## Step-by-Step Setup
 
-1. Go to [/public/signup](/public/signup).
-2. Enter your email and password.
-3. Verify your email to activate your account.
+Follow these steps to get started with K12Beast:
 
-4. Log in at [/public/login](/public/login).
-5. Navigate to [/chat](/chat).
-6. Submit a problem to start a personalized tutoring session.
+### 1. Sign Up or Log In
+
+- Visit the [Sign Up](/public/signup) page to create a free account or [Log In](/public/login) if you already have one.
+- Accounts are required to save your progress and access personalized features.
+- **Tip**: Parents and teachers can create accounts to monitor student progress.
+
+### 2. Start a Chat Session
+
+- Navigate to the [Chat](/chat) page to begin a new tutoring session.
+- Submit a problem (via text or image) to receive a tailored lesson from our AI.
+- **Example**: Students can input a math problem like "What is 2 + 2?" to get started.
+
+### 3. Explore K12Beast Features
+
+- **Personalized Lessons**: Receive AI-generated lessons tailored to your problem.
+- **Interactive Quizzes**: Test your knowledge with fun, adaptive quizzes.
+- **Progress Tracking**: Parents and teachers can view session history at [/history](/history).
+- **Session Sharing**: Share sessions with parents or teachers for review.
+
+---
+
+## Role-Specific Tips
+
+| Role       | How to Use K12Beast                                                                 |
+|------------|-------------------------------------------------------------------------------------|
+| [Students](/public/docs/students) | Submit problems and take quizzes to master subjects. 📖                            |
+| [Parents](/public/docs/parents)   | Share sessions with your child and track their progress. 👪                        |
+| [Teachers](/public/docs/teachers) | Use K12Beast in the classroom to enhance lessons. 👩‍🏫                            |
+| [Tutors](/public/docs/tutors)     | Deliver personalized tutoring with AI support. 🧑‍🏫                               |
+
+---
+
+## Troubleshooting
+
+- **Can’t log in?** Visit [Reset Password](/public/reset-password) to recover your account.
+- **App not loading?** Ensure you’re using a modern browser (e.g., Chrome, Firefox) and check your internet connection.
+- **Need help?** Read our [K12Beast Medium Article](https://medium.com/@ivelin.atanasoff.ivanov/k12beast-kids-grok-it-da024ab7a864) or contact support.
+
+---
+
+## Ready to Learn?
+
+Dive into K12Beast now! Visit the [Chat](/chat) page to start your first session, or explore our [Subjects](/public/docs/subjects) guide to see what you can learn. Let’s make learning a beastly success! 🐾

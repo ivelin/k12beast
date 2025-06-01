@@ -1,135 +1,90 @@
 // File path: tests/e2e/docs-navigation.spec.ts
-// E2E tests for navigating the documentation tree and ensuring no broken links
+// E2E tests for navigating the documentation tree from /public/docs
+// Dynamically crawls all sidebar links and ensures no broken links
 
 import { test, expect } from '@playwright/test';
 
 test.describe('Documentation Navigation', () => {
-  test('No broken links in documentation tree', async ({ page }) => {
-    // Set a desktop viewport to ensure the sidebar is visible (md:block)
+  test('No broken links in documentation sidebar', async ({ page }) => {
+    // Set a desktop viewport to ensure the sidebar is visible
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    // Start at the root documentation page
-    await page.goto('/public/docs/parents/introduction', { waitUntil: 'domcontentloaded' });
+    // Navigate to the root documentation page
+    await page.goto('/public/docs', { waitUntil: 'domcontentloaded' });
+    console.log('Navigated to /public/docs');
 
-    // Verify the sidebar is visible
+    // Verify the sidebar is present
     const sidebar = page.locator('aside');
     await expect(sidebar).toBeVisible({ timeout: 5000 });
     console.log('Sidebar visibility confirmed');
 
-    // Track visited URLs and collect broken links
-    const visitedUrls = new Set<string>();
-    const brokenLinks: string[] = [];
+    // Expand all accordion sections to reveal hidden links
+    const accordionTriggers = page.locator('button.flex.items-center.justify-between.w-full');
+    const triggerCount = await accordionTriggers.count();
+    console.log(`Found ${triggerCount} accordion triggers`);
 
-    // Expand all accordions in the sidebar to ensure all links are visible
-    const accordionTriggers = page.locator('[data-testid="accordion-trigger"]');
-    let triggerCount = await accordionTriggers.count();
-    console.log(`Found ${triggerCount} accordion triggers to expand`);
-
-    // If data-testid fails, fall back to a more reliable locator (e.g., by class or text)
-    if (triggerCount === 0) {
-      console.log('Falling back to alternative locator for accordion triggers');
-      const triggerElements = page.locator('.hover\\:no-underline'); // Class from AccordionTrigger
-      triggerCount = await triggerElements.count();
-      console.log(`Found ${triggerCount} accordion triggers with fallback locator`);
-
-      for (let i = 0; i < triggerCount; i++) {
-        const trigger = triggerElements.nth(i);
-        const isVisible = await trigger.isVisible();
-        if (isVisible) {
-          await trigger.click();
-          console.log(`Expanded accordion trigger ${i + 1}/${triggerCount}`);
-          await page.waitForTimeout(500); // Wait for accordion animation
-        } else {
-          console.log(`Accordion trigger ${i + 1}/${triggerCount} is not visible`);
-        }
-      }
-    } else {
-      for (let i = 0; i < triggerCount; i++) {
-        const trigger = accordionTriggers.nth(i);
-        const isVisible = await trigger.isVisible();
-        if (isVisible) {
-          await trigger.click();
-          console.log(`Expanded accordion trigger ${i + 1}/${triggerCount}`);
-          await page.waitForTimeout(500); // Wait for accordion animation
-        } else {
-          console.log(`Accordion trigger ${i + 1}/${triggerCount} is not visible`);
-        }
+    for (let i = 0; i < triggerCount; i++) {
+      const trigger = accordionTriggers.nth(i);
+      if (await trigger.isVisible()) {
+        await trigger.click();
+        console.log(`Expanded accordion trigger ${i + 1}/${triggerCount}`);
+        await page.waitForTimeout(1000); // Wait for animation to complete
       }
     }
 
-    // Collect all links dynamically by traversing the sidebar
-    const allLinks = new Set<string>();
-    const sidebarLinks = page.getByRole('link');
-    let linkCount = await sidebarLinks.count();
-    console.log(`Found ${linkCount} links in the sidebar after expansion`);
+    // Collect all unique sidebar links with their text
+    const allLinks = [];
+    const sidebarLinks = page.locator('aside a[href^="/public/docs"]');
+    const linkCount = await sidebarLinks.count();
+    console.log(`Found ${linkCount} sidebar links`);
 
     for (let i = 0; i < linkCount; i++) {
       const href = await sidebarLinks.nth(i).getAttribute('href');
-      if (href && href.startsWith('/public/docs')) {
-        allLinks.add(href);
+      const text = await sidebarLinks.nth(i).innerText();
+      if (href && text) {
+        allLinks.push({ href, text });
       }
     }
-    console.log('Found links:', Array.from(allLinks));
+    console.log('Links to validate:', allLinks.map(link => link.href));
 
-    // Navigate to each link
-    for (const href of allLinks) {
-      if (visitedUrls.has(href)) {
-        continue;
-      }
+    // Test each link for successful navigation and content
+    const brokenLinks = [];
+    for (const link of allLinks) {
+      const { href, text } = link;
+      console.log(`Checking link: ${href} with text: ${text}`);
 
-      visitedUrls.add(href);
+      // Navigate to the link
+      await page.goto(href, { waitUntil: 'domcontentloaded' });
 
-      // Navigate to the link and capture the initial response status
-      const responsePromise = page.waitForResponse(
-        res => res.url().endsWith(href),
-        { timeout: 5000 }
-      );
-      await page.goto(href);
-      await page.waitForURL(href, { waitUntil: 'domcontentloaded' });
-      let status: number;
+      // Check for the expected <h1> heading
+      const headingLocator = page.locator(`h1:has-text("${text}")`);
       try {
-        const response = await responsePromise;
-        status = response.status();
+        await headingLocator.waitFor({ state: 'visible', timeout: 5000 });
       } catch (error) {
-        console.log(`Timeout waiting for response for ${href}: ${error}`);
-        status = 404; // Assume 404 if response times out
+        console.log(`Heading "${text}" not found on ${href}`);
+        brokenLinks.push(`Link ${href} - Expected heading "${text}" not found`);
       }
 
-      console.log(`Checking link ${href} - Status: ${status}`);
-
-      // Check for non-200 status
-      if (status !== 200) {
-        brokenLinks.push(`Link ${href} returned status ${status}`);
+      // Check for 404 indicators
+      const is404 = await page.evaluate(() => {
+        return document.body.innerText.includes('Page not found') || document.title.includes('404');
+      });
+      if (is404) {
+        brokenLinks.push(`Link ${href} - 404 page detected`);
       }
 
-      // Go back to the starting page to continue crawling
-      await page.goto('/public/docs/parents/introduction');
-      await page.waitForURL('/public/docs/parents/introduction', { waitUntil: 'domcontentloaded' });
-
-      // Re-expand accordions to ensure links remain accessible
-      const reExpandTriggers = triggerCount === 0 ? page.locator('.hover\\:no-underline') : accordionTriggers;
-      for (let j = 0; j < triggerCount; j++) {
-        const trigger = reExpandTriggers.nth(j);
-        const isVisible = await trigger.isVisible();
-        if (isVisible) {
+      // Return to /public/docs and re-expand accordions
+      await page.goto('/public/docs', { waitUntil: 'domcontentloaded' });
+      for (let i = 0; i < triggerCount; i++) {
+        const trigger = accordionTriggers.nth(i);
+        if (await trigger.isVisible()) {
           await trigger.click();
-          console.log(`Re-expanded accordion trigger ${j + 1}/${triggerCount}`);
-          await page.waitForTimeout(500);
-        }
-      }
-
-      // Re-collect links in case the DOM has changed
-      const updatedLinks = page.getByRole('link');
-      linkCount = await updatedLinks.count();
-      for (let i = 0; i < linkCount; i++) {
-        const newHref = await updatedLinks.nth(i).getAttribute('href');
-        if (newHref && newHref.startsWith('/public/docs') && !visitedUrls.has(newHref)) {
-          allLinks.add(newHref);
+          await page.waitForTimeout(1000);
         }
       }
     }
 
-    // Fail the test if any broken links were found
+    // Fail the test if any broken links are found
     if (brokenLinks.length > 0) {
       throw new Error(`Found broken links:\n${brokenLinks.join('\n')}`);
     }
