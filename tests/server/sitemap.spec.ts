@@ -36,6 +36,7 @@ describe('Sitemap Generation', () => {
       'https://k12beast.com/public/docs',
       'https://k12beast.com/public/docs/getting-started',
       'https://k12beast.com/public/docs/parents',
+      'https://k12beast.com/public/docs/skilled-trades',
       'https://k12beast.com/public/docs/students',
       'https://k12beast.com/public/docs/subjects',
       'https://k12beast.com/public/docs/teachers',
@@ -47,7 +48,10 @@ describe('Sitemap Generation', () => {
       'https://k12beast.com/public/reset-password',
       'https://k12beast.com/public/signup',
       'https://k12beast.com/public/terms',
-    ];
+    ].sort(); // Sort for consistent comparison
+
+    // Sort parsed URLs for matching
+    urls.sort();
 
     // Check for non-public URLs
     const nonPublicUrls = urls.filter(url => !url.match(/^https:\/\/k12beast\.com(\/?|\/public\/.*)$/));

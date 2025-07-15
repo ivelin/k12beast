@@ -1,5 +1,7 @@
+
 // File path: src/components/ui/DocsSidebar.tsx
 // Sidebar navigation for documentation pages with mobile toggle support
+// Added Skilled Trades section to menu for main documentation navigation
 
 'use client';
 
@@ -9,7 +11,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { ChevronDown } from 'lucide-react';
 
 const menu = [
- {
+  {
     title: 'Getting Started',
     path: '/public/docs/getting-started',
     children: [],
@@ -39,7 +41,12 @@ const menu = [
     path: '/public/docs/subjects',
     children: [],
   },
- ];
+  {
+    title: 'Skilled Trades',
+    path: '/public/docs/skilled-trades',
+    children: [],
+  },
+];
 
 export default function DocsSidebar() {
   const pathname = usePathname();
