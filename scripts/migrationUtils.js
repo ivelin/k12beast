@@ -1,6 +1,38 @@
 // scripts/migrationUtils.js
 const semver = require("semver");
 
+// Network failures from a missing or unreachable Supabase host. These are not
+// schema errors: the app can still compile, and database-backed requests fail
+// later when they actually need the database.
+const CONNECTIVITY_FAILURE = /ENOTFOUND|EAI_AGAIN|ENETUNREACH|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|EAI_NODATA|getaddrinfo|Failed to send a request to the Edge Function|fetch failed/i;
+
+function collectErrorText(error) {
+  const parts = [];
+  const pending = [error];
+  const seen = new Set();
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current == null || seen.has(current)) continue;
+    if (typeof current === "string" || typeof current === "number") {
+      parts.push(String(current));
+      continue;
+    }
+    if (typeof current !== "object") continue;
+    seen.add(current);
+    parts.push(current.code, current.errno, current.syscall, current.hostname, current.message, current.details);
+    if (current.cause) pending.push(current.cause);
+    if (current.context) pending.push(current.context);
+    if (current.error) pending.push(current.error);
+  }
+
+  return parts.filter(Boolean).join(" ");
+}
+
+function isConnectivityFailure(error) {
+  return CONNECTIVITY_FAILURE.test(collectErrorText(error));
+}
+
 // Execute SQL via the execute-sql Edge Function with retry logic
 async function executeSql(sqlText, supabase, retries = 3, delay = 1000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -267,4 +299,5 @@ module.exports = {
   isAppVersionCompatible,
   acquireLock,
   releaseLock,
+  isConnectivityFailure,
 };

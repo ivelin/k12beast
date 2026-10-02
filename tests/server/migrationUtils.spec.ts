@@ -1,5 +1,5 @@
 // tests/server/migrationUtils.spec.ts
-import { ensureTablesExist } from '../../scripts/migrationUtils';
+import { ensureTablesExist, isConnectivityFailure } from '../../scripts/migrationUtils';
 
 // Mock Supabase
 jest.mock('../../src/supabase/serverClient', () => ({
@@ -60,5 +60,32 @@ describe('migrationUtils - ensureTablesExist', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to verify sessions table existence:', 'Database error');
     expect(consoleLogSpy).not.toHaveBeenCalledWith('All required tables ensured and verified.');
     expect(supabase.from).toHaveBeenCalledWith('sessions');
+  });
+});
+
+describe('migrationUtils - isConnectivityFailure', () => {
+  it('recognizes the unresolved Supabase host error from the build', () => {
+    const error = new Error(
+      'Failed to invoke Edge Function: Failed to send a request to the Edge Function'
+    );
+    expect(isConnectivityFailure(error)).toBe(true);
+    const cause = Object.assign(new Error('getaddrinfo ENOTFOUND cdmjvfyfvycjyxxcqxoe.supabase.co'), {
+      code: 'ENOTFOUND',
+    });
+    const wrapped = new Error('Failed to invoke Edge Function: network down');
+    wrapped.cause = cause;
+    expect(isConnectivityFailure(wrapped)).toBe(true);
+    expect(isConnectivityFailure(
+      Object.assign(new Error('getaddrinfo ENOTFOUND cdmjvfyfvycjyxxcqxoe.supabase.co'), {
+        code: 'ENOTFOUND',
+        syscall: 'getaddrinfo',
+        hostname: 'cdmjvfyfvycjyxxcqxoe.supabase.co',
+      })
+    )).toBe(true);
+  });
+
+  it('does not treat schema or SQL failures as connectivity problems', () => {
+    expect(isConnectivityFailure(new Error('SQL execution failed: relation "sessions" does not exist'))).toBe(false);
+    expect(isConnectivityFailure(new Error('Failed to acquire migration lock after attempts.'))).toBe(false);
   });
 });
