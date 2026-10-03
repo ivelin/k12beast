@@ -1,5 +1,7 @@
 # K12Beast
 
+> **Retired (Oct 2026): this project is no longer maintained and the hosted site is offline.** The source code stays here for anyone who wants to clone and self-host it. The Vercel deployment only serves a static retirement page (see `redirects()` in `next.config.ts`); local and self-hosted builds still run the full app. The last pre-retirement commit is tagged `v-final`.
+
 K12Beast is a personalized tutoring app for K12 students, designed to help them master concepts through tailored lessons, examples, and quizzes based on their test results. Built with Super Grok 3 and Next.js, it leverages Supabase (or any PostgreSQL database) for data storage and the Grok/X xAI API for generating educational content. 
 
 This guide will walk you through setting up a local instance of the app from scratch.
