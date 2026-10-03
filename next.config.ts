@@ -43,6 +43,21 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  // The hosted site is retired. On Vercel, send every path, including /api and
+  // old deep links, to the static retirement page. Local and self-hosted
+  // builds still run the full app.
+  async redirects() {
+    if (process.env.VERCEL !== '1' && process.env.K12BEAST_RETIRED !== '1') {
+      return [];
+    }
+    return [
+      {
+        source: '/:path((?!retired\\.html$).*)',
+        destination: '/retired.html',
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {
